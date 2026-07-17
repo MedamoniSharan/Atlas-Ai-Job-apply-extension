@@ -4,7 +4,7 @@ import {
   LoginInput,
   RegisterInput,
   User,
-} from '@codexcareer/shared';
+} from '@atlas/shared';
 import { UserModel } from '../users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 import {

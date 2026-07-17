@@ -3,7 +3,7 @@ import type {
   Application,
   AuthTokens,
   User,
-} from '@codexcareer/shared';
+} from '@atlas/shared';
 import { useAuthStore } from '../store/authStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';

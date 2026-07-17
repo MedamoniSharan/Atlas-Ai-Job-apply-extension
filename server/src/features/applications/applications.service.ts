@@ -1,4 +1,4 @@
-import { Application } from '@codexcareer/shared';
+import { Application } from '@atlas/shared';
 import { ApplicationModel, IApplication } from './application.model';
 
 function toApplication(doc: IApplication): Application {

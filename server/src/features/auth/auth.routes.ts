@@ -4,7 +4,7 @@ import {
   ok,
   refreshTokenSchema,
   registerSchema,
-} from '@codexcareer/shared';
+} from '@atlas/shared';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';

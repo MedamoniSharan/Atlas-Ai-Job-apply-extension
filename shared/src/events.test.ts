@@ -31,7 +31,7 @@ describe('jobPayloadSchema', () => {
     const result = jobPayloadSchema.safeParse({
       platform: 'naukri',
       title: 'Frontend Engineer',
-      company: 'CodeX',
+      company: 'Atlas',
       location: 'Bengaluru',
       status: 'applied',
     });

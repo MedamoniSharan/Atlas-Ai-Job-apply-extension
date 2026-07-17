@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { EventEnvelope, EventType, JobPayload } from '@codexcareer/shared';
+import type { EventEnvelope, EventType, JobPayload } from '@atlas/shared';
 import { enqueue } from '../core/queueManager';
 import { flushQueue } from '../core/syncManager';
 import { reportHealth } from '../core/healthMonitor';

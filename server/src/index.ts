@@ -1,16 +1,12 @@
 import http from 'http';
 import { createApp } from './app';
 import { connectMongo } from './config/database';
-import { connectRedis } from './config/redis';
 import { env } from './config/env';
 import { logger } from './config/logger';
-import { initQueue, closeQueue } from './queue/workers';
 import { initSocket } from './realtime/socket';
 
 async function main() {
   await connectMongo();
-  await connectRedis();
-  initQueue();
 
   const app = createApp();
   const server = http.createServer(app);
@@ -20,9 +16,8 @@ async function main() {
     logger.info('Server listening', { port: env.port, env: env.nodeEnv });
   });
 
-  const shutdown = async () => {
+  const shutdown = () => {
     logger.info('Shutting down...');
-    await closeQueue();
     server.close(() => process.exit(0));
   };
 

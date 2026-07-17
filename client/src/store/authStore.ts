@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User } from '@codexcareer/shared';
+import type { User } from '@atlas/shared';
 
 type AuthState = {
   accessToken: string | null;
@@ -25,6 +25,6 @@ export const useAuthStore = create<AuthState>()(
       clearSession: () =>
         set({ accessToken: null, refreshToken: null, user: null }),
     }),
-    { name: 'codexcareer-auth' }
+    { name: 'atlas-auth' }
   )
 );

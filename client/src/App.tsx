@@ -13,7 +13,7 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <p className="brand">CodeXCareer</p>
+        <p className="brand">Atlas</p>
         <nav>
           <NavLink
             to="/applications"

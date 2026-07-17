@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CodeXCareer Job Assistant",
+  "name": "Atlas Job Assistant",
   "version": "1.0.0",
-  "description": "Sync job applications from supported platforms to CodeXCareer",
+  "description": "Sync job applications from supported platforms to Atlas",
   "permissions": ["storage", "alarms", "activeTab"],
   "host_permissions": [
     "http://localhost:4000/*",
@@ -15,7 +15,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CodeXCareer"
+    "default_title": "Atlas"
   },
   "content_scripts": [
     {

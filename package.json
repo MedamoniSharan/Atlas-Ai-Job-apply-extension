@@ -1,8 +1,8 @@
 {
-  "name": "codexcareer",
+  "name": "atlas",
   "version": "1.0.0",
   "private": true,
-  "description": "CodeXCareer Job Assistant — MERN + Chrome Extension",
+  "description": "Atlas Job Assistant — MERN + Chrome Extension",
   "workspaces": [
     "shared",
     "server",
@@ -15,7 +15,7 @@
     "dev:client": "npm run dev --workspace=client",
     "dev:extension": "npm run build --workspace=extension -- --watch",
     "build": "npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=client && npm run build --workspace=extension",
-    "test": "npm run test --workspace=@codexcareer/shared && npm run test --workspace=@codexcareer/server && npm run test --workspace=@codexcareer/extension",
+    "test": "npm run test --workspace=@atlas/shared && npm run test --workspace=@atlas/server && npm run test --workspace=@atlas/extension",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
     "lint": "npm run lint --workspaces --if-present"

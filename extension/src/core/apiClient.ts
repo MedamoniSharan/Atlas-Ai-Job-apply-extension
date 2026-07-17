@@ -3,7 +3,7 @@ import type {
   AuthTokens,
   EventEnvelope,
   SyncEventsRequest,
-} from '@codexcareer/shared';
+} from '@atlas/shared';
 import { getAuthState, setAuthState, clearAuth } from './storageManager';
 import { logger } from './logger';
 

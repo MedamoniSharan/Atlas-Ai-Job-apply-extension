@@ -38,7 +38,7 @@ const ctx = await esbuild.context({
   target: 'chrome120',
   sourcemap: true,
   alias: {
-    '@codexcareer/shared': sharedEntry,
+    '@atlas/shared': sharedEntry,
   },
   logLevel: 'info',
 });

@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { ok } from '@codexcareer/shared';
-import { isRedisAvailable } from '../../config/redis';
+import { ok } from '@atlas/shared';
 import mongoose from 'mongoose';
 
 export const healthRouter = Router();
@@ -10,7 +9,6 @@ healthRouter.get('/', (_req, res) => {
     ok({
       status: 'ok',
       mongo: mongoose.connection.readyState === 1 ? 'up' : 'down',
-      redis: isRedisAvailable() ? 'up' : 'down',
       timestamp: new Date().toISOString(),
     })
   );

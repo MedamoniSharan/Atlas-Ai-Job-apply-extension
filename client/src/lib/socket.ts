@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { Application } from '@codexcareer/shared';
+import type { Application } from '@atlas/shared';
 import { useAuthStore } from '../store/authStore';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? '';

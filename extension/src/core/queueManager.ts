@@ -1,4 +1,4 @@
-import type { EventEnvelope } from '@codexcareer/shared';
+import type { EventEnvelope } from '@atlas/shared';
 import { KEYS } from './storageManager';
 import { logger } from './logger';
 

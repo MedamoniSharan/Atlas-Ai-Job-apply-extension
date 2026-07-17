@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ok } from '@codexcareer/shared';
+import { ok } from '@atlas/shared';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import * as applicationsService from './applications.service';

@@ -1,5 +1,5 @@
 {
-  "name": "@codexcareer/extension",
+  "name": "@atlas/extension",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@codexcareer/shared": "*",
+    "@atlas/shared": "*",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

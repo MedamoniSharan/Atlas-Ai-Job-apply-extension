@@ -1,4 +1,4 @@
-import type { JobPayload } from '@codexcareer/shared';
+import type { JobPayload } from '@atlas/shared';
 import { resolveAdapter } from '../adapters';
 import { logger } from '../core/logger';
 

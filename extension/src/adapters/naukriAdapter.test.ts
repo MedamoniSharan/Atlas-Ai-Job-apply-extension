@@ -22,12 +22,12 @@ describe('NaukriAdapter', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `
       <h1 class="jd-header-title">Frontend Engineer</h1>
-      <div class="jd-header-comp-name"><a>CodeX Labs</a></div>
+      <div class="jd-header-comp-name"><a>Atlas Labs</a></div>
       <div class="loc"><span>Bengaluru</span></div>
     `;
     const job = adapter.readJob(document);
     expect(job?.title).toBe('Frontend Engineer');
-    expect(job?.company).toBe('CodeX Labs');
+    expect(job?.company).toBe('Atlas Labs');
     expect(job?.location).toBe('Bengaluru');
   });
 });

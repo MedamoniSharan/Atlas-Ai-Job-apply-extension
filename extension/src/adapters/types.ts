@@ -1,4 +1,4 @@
-import type { JobPayload, Platform } from '@codexcareer/shared';
+import type { JobPayload, Platform } from '@atlas/shared';
 
 export interface PlatformAdapter {
   readonly platform: Platform;

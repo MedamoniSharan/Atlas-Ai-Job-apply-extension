@@ -1,11 +1,11 @@
-# CodeXCareer Job Assistant
+# Atlas Job Assistant
 
 MERN + Chrome Extension (Manifest V3) MVP for syncing job applications from supported platforms into a dashboard.
 
 ## Stack
 
 - **client** — React + Vite + React Query + Zustand + Socket.IO
-- **server** — Express + MongoDB + Redis + BullMQ + Socket.IO
+- **server** — Express + MongoDB + Socket.IO
 - **extension** — Chrome MV3 with offline queue and Naukri adapter
 - **shared** — Zod contracts and API types
 
@@ -17,7 +17,7 @@ npm run docker:up
 
 # 2. Install + build shared contracts
 npm install
-npm run build --workspace=@codexcareer/shared
+npm run build --workspace=@atlas/shared
 
 # 3. API (http://localhost:4000)
 cp .env.example .env   # already present for local defaults
@@ -27,7 +27,7 @@ npm run dev:server
 npm run dev:client
 
 # 5. Extension
-npm run build --workspace=@codexcareer/extension
+npm run build --workspace=@atlas/extension
 # Chrome → Extensions → Load unpacked → select extension/dist
 ```
 
@@ -69,7 +69,7 @@ Or run `bash scripts/bootstrap.sh`.
 
 ```bash
 npm test
-npm run test --workspace=@codexcareer/extension
+npm run test --workspace=@atlas/extension
 ```
 
 ## Design
@@ -80,4 +80,3 @@ See [docs/design.md](docs/design.md).
 
 - Naukri adapter is implemented; other platforms are stubs.
 - Google OAuth, billing, and cloud resume storage are deferred.
-- Redis is optional at runtime: the API still runs if Redis is down (BullMQ enrichment is skipped).

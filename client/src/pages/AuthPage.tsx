@@ -39,7 +39,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
   return (
     <div className="auth-page">
       <div className="auth-panel">
-        <p className="brand">CodeXCareer</p>
+        <p className="brand">Atlas</p>
         <h1>{mode === 'login' ? 'Welcome back' : 'Create account'}</h1>
         <p className="sub">
           Track applications synced from your browser extension.

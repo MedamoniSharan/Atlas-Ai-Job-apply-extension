@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ok, syncEventsRequestSchema } from '@codexcareer/shared';
+import { ok, syncEventsRequestSchema } from '@atlas/shared';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';

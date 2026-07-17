@@ -1,4 +1,4 @@
-# CodeXCareer Job Assistant
+# Atlas Job Assistant
 
 # System Design Document (design.md)
 
@@ -12,7 +12,7 @@
 
 # 1. System Overview
 
-CodeXCareer Job Assistant is a SaaS platform consisting of:
+Atlas Job Assistant is a SaaS platform consisting of:
 
 * React Dashboard
 * Chrome Extension
@@ -272,7 +272,7 @@ Dashboard
 
 Extension
 
-* Authenticates with the backend using the user's CodeXCareer token.
+* Authenticates with the backend using the user's Atlas token.
 * Does not store or manage third-party job platform credentials.
 
 ---

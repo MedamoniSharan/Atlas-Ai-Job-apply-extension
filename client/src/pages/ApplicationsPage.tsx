@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Application } from '@codexcareer/shared';
+import type { Application } from '@atlas/shared';
 import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 

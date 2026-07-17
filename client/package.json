@@ -1,5 +1,5 @@
 {
-  "name": "@codexcareer/client",
+  "name": "@atlas/client",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "lint": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
-    "@codexcareer/shared": "*",
+    "@atlas/shared": "*",
     "@tanstack/react-query": "^5.64.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

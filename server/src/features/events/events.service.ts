@@ -3,10 +3,9 @@ import {
   EventEnvelope,
   jobPayloadSchema,
   SyncEventsRequest,
-} from '@codexcareer/shared';
+} from '@atlas/shared';
 import { ActivityModel } from './activity.model';
 import { ApplicationModel, IApplication } from '../applications/application.model';
-import { enqueueEventEnrichment } from '../../queue/workers';
 import { getIo } from '../../realtime/socket';
 import { logger } from '../../config/logger';
 
@@ -110,12 +109,6 @@ export async function syncEvents(
       const io = getIo();
       io?.to(`user:${userId}`).emit('application.updated', app);
     }
-
-    await enqueueEventEnrichment({
-      userId,
-      eventId: event.eventId,
-      type: event.type,
-    });
   }
 
   return { processed: body.events.length, applications };
