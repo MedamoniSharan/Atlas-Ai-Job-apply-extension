@@ -1,0 +1,38 @@
+import http from 'http';
+import { createApp } from './app';
+import { connectMongo } from './config/database';
+import { connectRedis } from './config/redis';
+import { env } from './config/env';
+import { logger } from './config/logger';
+import { initQueue, closeQueue } from './queue/workers';
+import { initSocket } from './realtime/socket';
+
+async function main() {
+  await connectMongo();
+  await connectRedis();
+  initQueue();
+
+  const app = createApp();
+  const server = http.createServer(app);
+  initSocket(server);
+
+  server.listen(env.port, () => {
+    logger.info('Server listening', { port: env.port, env: env.nodeEnv });
+  });
+
+  const shutdown = async () => {
+    logger.info('Shutting down...');
+    await closeQueue();
+    server.close(() => process.exit(0));
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+main().catch((err) => {
+  logger.error('Failed to start server', {
+    error: err instanceof Error ? err.message : String(err),
+  });
+  process.exit(1);
+});

@@ -1,0 +1,23 @@
+{
+  "name": "@codexcareer/extension",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codexcareer/shared": "*",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/uuid": "^10.0.0",
+    "esbuild": "^0.24.2",
+    "happy-dom": "^16.6.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

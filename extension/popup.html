@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CodeXCareer</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header>
+        <h1>CodeXCareer</h1>
+        <p class="tagline">Job Assistant</p>
+      </header>
+
+      <section id="status" class="status">
+        <p id="auth-state">Checking…</p>
+        <p id="health-state"></p>
+      </section>
+
+      <form id="login-form" class="form hidden">
+        <label>
+          Email
+          <input id="email" type="email" required autocomplete="username" />
+        </label>
+        <label>
+          Password
+          <input
+            id="password"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
+        </label>
+        <label>
+          API Base URL
+          <input id="api-base" type="url" placeholder="http://localhost:4000" />
+        </label>
+        <button type="submit">Sign in</button>
+        <p id="form-error" class="error"></p>
+      </form>
+
+      <section id="authed" class="authed hidden">
+        <button id="sync-now" type="button">Sync now</button>
+        <button id="logout" type="button" class="secondary">Sign out</button>
+      </section>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

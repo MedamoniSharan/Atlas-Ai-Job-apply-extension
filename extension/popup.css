@@ -1,0 +1,96 @@
+:root {
+  --bg: #0f1c2e;
+  --panel: #162536;
+  --text: #e8eef5;
+  --muted: #8fa3b8;
+  --accent: #2bb0a6;
+  --danger: #e35d6a;
+  --radius: 10px;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 320px;
+  background: radial-gradient(circle at top left, #1d3a52, var(--bg) 55%);
+  color: var(--text);
+}
+
+.popup {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.status p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.form,
+.authed {
+  display: grid;
+  gap: 10px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  padding: 12px;
+  border-radius: var(--radius);
+}
+
+.hidden {
+  display: none !important;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+input {
+  border: 1px solid #2b4258;
+  background: #0c1622;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--accent);
+  color: #052826;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid #2b4258;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+  font-size: 0.8rem;
+  min-height: 1em;
+}
