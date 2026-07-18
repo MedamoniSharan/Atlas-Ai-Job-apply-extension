@@ -12,6 +12,7 @@ import {
   getCopilotState,
   setCopilotState,
 } from './copilotState';
+import { mergeJobFields } from './jobFields';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -249,8 +250,8 @@ export async function runBot(handlers: BotHandlers): Promise<{
     const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tab.id, {
       type: 'RUN_SCAN_SCRAPE',
     });
-    const matched = (scrape.jobs ?? []).filter((job) =>
-      matchesPreferences(job, prefs)
+    const matched = (scrape.jobs ?? []).filter(
+      (job) => !job.companySiteApply && matchesPreferences(job, prefs)
     );
     await setCopilotState({ matched: matched.length });
     await appendCopilotLog(
@@ -261,22 +262,10 @@ export async function runBot(handlers: BotHandlers): Promise<{
     for (const job of matched) {
       if (!(await waitWhilePaused())) break;
 
-      const detectPayload: JobPayload = {
-        platform: 'naukri',
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        url: job.url,
-        externalJobId: job.externalJobId,
-        companyLogo: job.companyLogo,
-        description: job.description,
-        experience: job.experienceText,
-        salary: job.salaryText,
-        skills: job.skills,
-        rating: job.rating,
+      const detectPayload = mergeJobFields(undefined, job, {
         status: 'detected',
         metadata: { source: 'auto_scan' },
-      };
+      });
       await handlers.persistJobDetected(detectPayload);
 
       await setCopilotState({ currentTitle: job.title });
@@ -321,23 +310,11 @@ export async function runBot(handlers: BotHandlers): Promise<{
         job?: Partial<JobPayload>;
       }>(tab.id, { type: 'RUN_EASY_APPLY' });
 
-      const base: JobPayload = {
-        platform: 'naukri',
-        title: result.job?.title || job.title,
-        company: result.job?.company || job.company,
-        location: result.job?.location || job.location,
+      const base = mergeJobFields(result.job, job, {
         url: job.url,
-        externalJobId: result.job?.externalJobId || job.externalJobId,
-        companyLogo: result.job?.companyLogo || job.companyLogo,
-        description: result.job?.description || job.description,
-        experience:
-          result.job?.experience || job.experienceText,
-        salary: result.job?.salary || job.salaryText,
-        skills: result.job?.skills || job.skills,
-        rating: result.job?.rating || job.rating,
         status: 'detected',
         metadata: { source: 'auto_apply' },
-      };
+      });
 
       if (result.needsUserInput) {
         await setCopilotState({ paused: true, currentTitle: base.title });

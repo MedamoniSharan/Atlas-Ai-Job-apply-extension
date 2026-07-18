@@ -111,7 +111,7 @@ export function TrackerPage() {
             {total ? ` · ${total} total` : ''}
           </p>
         </div>
-        <Link className="dash-btn dash-btn--ghost" to="/">
+        <Link className="dash-btn dash-btn--ghost" to="/dashboard">
           Open Dashboard
         </Link>
       </div>
@@ -132,7 +132,7 @@ export function TrackerPage() {
               columns.
             </p>
           </div>
-          <Link className="dash-btn dash-btn--primary" to="/">
+          <Link className="dash-btn dash-btn--primary" to="/dashboard">
             Back to Dashboard
           </Link>
         </div>

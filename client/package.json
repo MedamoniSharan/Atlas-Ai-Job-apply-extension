@@ -12,6 +12,7 @@
   "dependencies": {
     "@atlas/shared": "*",
     "@tanstack/react-query": "^5.64.2",
+    "lucide-react": "^1.25.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.3",

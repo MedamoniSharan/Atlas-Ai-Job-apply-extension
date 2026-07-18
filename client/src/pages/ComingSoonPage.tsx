@@ -14,7 +14,7 @@ export function ComingSoonPage({
           <h2>{title}</h2>
           <p>{blurb}</p>
         </div>
-        <Link className="dash-btn dash-btn--primary" to="/">
+        <Link className="dash-btn dash-btn--primary" to="/dashboard">
           Back to Dashboard
         </Link>
       </div>

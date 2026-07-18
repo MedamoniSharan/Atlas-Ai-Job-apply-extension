@@ -8,6 +8,7 @@ import { fetchPreferences } from './apiClient';
 import { getCachedPreferences } from './storageManager';
 import { logger } from './logger';
 import { enqueueApplyJobs } from './applyQueue';
+import { mergeJobFields } from './jobFields';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,27 +115,15 @@ export async function runScan(options: {
     type: 'RUN_SCAN_SCRAPE',
   });
 
-  const matched = (scrape.jobs ?? []).filter((job) =>
-    matchesPreferences(job, prefs)
+  const matched = (scrape.jobs ?? []).filter(
+    (job) => !job.companySiteApply && matchesPreferences(job, prefs)
   );
 
   for (const job of matched) {
-    const payload: JobPayload = {
-      platform: 'naukri',
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      url: job.url,
-      externalJobId: job.externalJobId,
-      companyLogo: job.companyLogo,
-      description: job.description,
-      experience: job.experienceText,
-      salary: job.salaryText,
-      skills: job.skills,
-      rating: job.rating,
+    const payload = mergeJobFields(undefined, job, {
       status: 'detected',
       metadata: { source: 'auto_scan' },
-    };
+    });
     await options.persistAndSync(
       'JobDetected',
       payload as unknown as Record<string, unknown>
@@ -156,6 +145,8 @@ export async function runScan(options: {
         salary: j.salaryText,
         skills: j.skills,
         rating: j.rating,
+        reviews: j.reviews,
+        postedAt: j.postedAt,
       }))
     );
   }

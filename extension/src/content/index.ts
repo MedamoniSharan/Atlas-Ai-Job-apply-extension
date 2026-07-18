@@ -78,15 +78,14 @@ function bindApplyClickCapture() {
         const job = current.readJob(document);
         if (!job?.title || !job.company) return;
         const payload: JobPayload = {
+          ...job,
           platform: current.platform,
           title: job.title,
           company: job.company,
-          location: job.location,
           url: window.location.href,
-          externalJobId: job.externalJobId,
           status: 'applied',
           appliedAt: new Date().toISOString(),
-          metadata: { source: 'manual' },
+          metadata: { ...(job.metadata ?? {}), source: 'manual' },
         };
         lastFingerprint = fingerprint(payload);
         chrome.runtime.sendMessage({
@@ -129,6 +128,15 @@ async function runEasyApply(): Promise<{
   // Success page / already applied must win over leftover questionnaire DOM.
   if (naukri.detectApplicationStatus(document) === 'applied') {
     return { ok: true, job };
+  }
+
+  if (naukri.isCompanySiteApply(document)) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'Apply on company site — skipped',
+      job,
+    };
   }
 
   const loginBlock = (() => {

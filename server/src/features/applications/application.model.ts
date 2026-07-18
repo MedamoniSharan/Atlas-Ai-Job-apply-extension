@@ -16,6 +16,18 @@ export interface IApplication extends Document {
   salary?: string;
   skills?: string[];
   rating?: string;
+  reviews?: string;
+  postedAt?: string;
+  openings?: string;
+  applicants?: string;
+  highlights?: string[];
+  role?: string;
+  industry?: string;
+  department?: string;
+  employmentType?: string;
+  roleCategory?: string;
+  education?: string;
+  aboutCompany?: string;
   status: ApplicationStatus;
   appliedAt?: Date;
   metadata?: Record<string, unknown>;
@@ -43,6 +55,18 @@ const applicationSchema = new Schema<IApplication>(
     salary: { type: String },
     skills: { type: [String], default: undefined },
     rating: { type: String },
+    reviews: { type: String },
+    postedAt: { type: String },
+    openings: { type: String },
+    applicants: { type: String },
+    highlights: { type: [String], default: undefined },
+    role: { type: String },
+    industry: { type: String },
+    department: { type: String },
+    employmentType: { type: String },
+    roleCategory: { type: String },
+    education: { type: String },
+    aboutCompany: { type: String },
     status: {
       type: String,
       enum: ['detected', 'applied', 'viewed', 'saved', 'interview', 'offer', 'rejected'],

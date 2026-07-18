@@ -45,7 +45,7 @@ export function GetStartedPage() {
             >
               Open Naukri
             </a>
-            <Link className="secondary-btn" to="/">
+            <Link className="secondary-btn" to="/dashboard">
               View dashboard
             </Link>
           </div>

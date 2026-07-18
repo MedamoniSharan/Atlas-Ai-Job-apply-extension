@@ -31,6 +31,7 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/tracker')) return 'Tracker';
   if (pathname.startsWith('/profile')) return 'Profile';
   if (pathname.startsWith('/applications')) return 'Applications';
+  if (pathname.startsWith('/dashboard')) return 'Dashboard';
   return 'Dashboard';
 }
 
@@ -92,12 +93,16 @@ export function AppLayout() {
   const needsSetup = needsPrefs || needsExtension;
   const title = pageTitle(location.pathname);
   const showHeaderSearch =
-    location.pathname === '/' || location.pathname.startsWith('/applications');
+    location.pathname.startsWith('/dashboard') ||
+    location.pathname.startsWith('/applications');
 
   function onSearchSubmit(e: FormEvent) {
     e.preventDefault();
-    if (location.pathname !== '/' && !location.pathname.startsWith('/applications')) {
-      navigate('/');
+    if (
+      !location.pathname.startsWith('/dashboard') &&
+      !location.pathname.startsWith('/applications')
+    ) {
+      navigate('/dashboard');
     }
   }
 
@@ -118,7 +123,7 @@ export function AppLayout() {
         </div>
 
         <nav className="sidebar__nav">
-          <NavLink to="/" end className="sidebar__link">
+          <NavLink to="/dashboard" end className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
               <DashIcon />
             </span>

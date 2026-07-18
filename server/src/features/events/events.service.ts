@@ -27,6 +27,18 @@ function toApplication(doc: IApplication): Application {
     salary: doc.salary,
     skills: doc.skills,
     rating: doc.rating,
+    reviews: doc.reviews,
+    postedAt: doc.postedAt,
+    openings: doc.openings,
+    applicants: doc.applicants,
+    highlights: doc.highlights,
+    role: doc.role,
+    industry: doc.industry,
+    department: doc.department,
+    employmentType: doc.employmentType,
+    roleCategory: doc.roleCategory,
+    education: doc.education,
+    aboutCompany: doc.aboutCompany,
     status: doc.status,
     appliedAt: doc.appliedAt?.toISOString(),
     metadata: doc.metadata as Application['metadata'],
@@ -75,8 +87,26 @@ async function upsertApplicationFromEvent(
   if (job.salary) richFields.salary = job.salary;
   if (job.skills?.length) richFields.skills = job.skills;
   if (job.rating) richFields.rating = job.rating;
+  if (job.reviews) richFields.reviews = job.reviews;
+  if (job.postedAt) richFields.postedAt = job.postedAt;
+  if (job.openings) richFields.openings = job.openings;
+  if (job.applicants) richFields.applicants = job.applicants;
+  if (job.highlights?.length) richFields.highlights = job.highlights;
+  if (job.role) richFields.role = job.role;
+  if (job.industry) richFields.industry = job.industry;
+  if (job.department) richFields.department = job.department;
+  if (job.employmentType) richFields.employmentType = job.employmentType;
+  if (job.roleCategory) richFields.roleCategory = job.roleCategory;
+  if (job.education) richFields.education = job.education;
+  if (job.aboutCompany) richFields.aboutCompany = job.aboutCompany;
   if (job.location) richFields.location = job.location;
   if (job.url) richFields.url = job.url;
+
+  const existing = await ApplicationModel.findOne(filter).lean();
+  const mergedMetadata = {
+    ...((existing?.metadata as Record<string, unknown> | undefined) ?? {}),
+    ...(job.metadata ?? {}),
+  };
 
   const doc = await ApplicationModel.findOneAndUpdate(
     filter,
@@ -88,7 +118,7 @@ async function upsertApplicationFromEvent(
         company: job.company,
         status,
         appliedAt: job.appliedAt ? new Date(job.appliedAt) : undefined,
-        metadata: job.metadata,
+        metadata: Object.keys(mergedMetadata).length ? mergedMetadata : undefined,
         ...richFields,
       },
       $setOnInsert: {

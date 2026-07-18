@@ -136,6 +136,109 @@ describe('NaukriAdapter', () => {
     `;
     expect(adapter.isLoggedIn(document)).toBe(true);
   });
+  it('scrapes rich Naukri JD detail fields', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <h1 class="jd-header-title">Java Software Developer</h1>
+      <div class="jd-header-comp-name">
+        <a>moglix</a>
+        <div class="rating"><span class="main-2">3.3</span></div>
+        <a href="/reviews">718 Reviews</a>
+      </div>
+      <img class="logoImage" alt="companyLogo" src="https://img.naukimg.com/logo.png" />
+      <span class="expwdth">0 - 1 years</span>
+      <span class="sal">3-6 Lacs P.A.</span>
+      <div class="loc"><span>Hyderabad</span></div>
+      <div class="styles_jhc__stat__abc">
+        Posted: 1 day ago | Openings: 1 | Applicants: 100+
+      </div>
+      <section class="styles_highlight__x">
+        <h2>Job highlights</h2>
+        <ul>
+          <li>Experience with Java, Spring Boot, Elasticsearch, Redis, and Google Cloud Platform services</li>
+          <li>Develop and maintain backend applications, design RESTful APIs, manage databases</li>
+        </ul>
+      </section>
+      <h2>Job description</h2>
+      <div class="styles_job-desc__y">
+        <h3>Role &amp; responsibilities</h3>
+        <p>Develop and maintain backend applications using Java and Spring Boot.</p>
+        <h3>Preferred candidate profile</h3>
+        <p>Good knowledge of Java and Object-Oriented Programming (OOP).</p>
+      </div>
+      <div class="styles_other-details__z">
+        <label>Role</label><span>Technology / IT - Other</span>
+        <label>Industry Type</label><span>IT Services &amp; Consulting</span>
+        <label>Department</label><span>Project &amp; Program Management</span>
+        <label>Employment Type</label><span>Full Time, Permanent</span>
+        <label>Role Category</label><span>Technology / IT</span>
+        <label>Education</label><span>UG: B.Tech / B.E. in Any Specialization</span>
+      </div>
+      <div class="styles_key-skill__k">
+        <span class="chip">Java</span>
+        <span class="chip">Spring Boot Framework</span>
+        <span class="chip">Microservices</span>
+        <span class="chip">J2EE</span>
+        <span class="chip">AWS</span>
+        <span class="chip">SQL</span>
+      </div>
+      <h2>About company</h2>
+      <div>Moglix is a B2B commerce company focused on industrial supplies.</div>
+    `;
+    const job = adapter.readJob(document);
+    expect(job?.title).toBe('Java Software Developer');
+    expect(job?.company).toBe('moglix');
+    expect(job?.location).toBe('Hyderabad');
+    expect(job?.experience).toMatch(/0\s*-\s*1/i);
+    expect(job?.salary).toMatch(/3-6/i);
+    expect(job?.rating).toBe('3.3');
+    expect(job?.reviews).toMatch(/718/i);
+    expect(job?.postedAt).toMatch(/1 day ago/i);
+    expect(job?.openings).toBe('1');
+    expect(job?.applicants).toMatch(/100\+/);
+    expect(job?.highlights?.length).toBeGreaterThan(0);
+    expect(job?.skills).toEqual(
+      expect.arrayContaining(['Java', 'Spring Boot Framework', 'SQL'])
+    );
+    expect(job?.role).toMatch(/Technology \/ IT - Other/i);
+    expect(job?.industry).toMatch(/IT Services/i);
+    expect(job?.department).toMatch(/Project/i);
+    expect(job?.employmentType).toMatch(/Full Time/i);
+    expect(job?.roleCategory).toMatch(/Technology \/ IT/i);
+    expect(job?.education).toMatch(/B\.Tech/i);
+    expect(job?.description).toMatch(/Spring Boot/i);
+    expect(job?.aboutCompany).toMatch(/Moglix/i);
+    expect(job?.companyLogo).toContain('naukimg.com');
+  });
+  it('skips company-site apply jobs from search results', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <div class="srp-jobtuple-wrapper" data-job-id="111">
+        <a class="title" href="https://www.naukri.com/job-listings-easy-111">Easy Apply Role</a>
+        <a class="comp-name" href="#">Acme</a>
+        <button type="button">Apply</button>
+      </div>
+      <div class="srp-jobtuple-wrapper" data-job-id="222">
+        <a class="title" href="https://www.naukri.com/job-listings-external-222">External Role</a>
+        <a class="comp-name" href="#">OtherCo</a>
+        <button type="button">Apply on company site</button>
+      </div>
+    `;
+    const jobs = adapter.readSearchResults(document);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.title).toBe('Easy Apply Role');
+  });
+
+  it('detects company-site apply on job detail pages', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <h1 class="jd-header-title">Backend Engineer</h1>
+      <div class="jd-header-comp-name"><a>Acme</a></div>
+      <button type="button">Apply on company site</button>
+    `;
+    expect(adapter.isCompanySiteApply(document)).toBe(true);
+    expect(adapter.findEasyApplyButton(document)).toBeNull();
+  });
 });
 
 describe('preference matching helpers', () => {

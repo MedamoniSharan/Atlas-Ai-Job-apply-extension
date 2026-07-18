@@ -30,7 +30,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
       }
 
       setSession(result.data);
-      navigate(mode === 'register' ? '/get-started' : '/');
+      navigate(mode === 'register' ? '/get-started' : '/dashboard');
     } finally {
       setLoading(false);
     }

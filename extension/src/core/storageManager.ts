@@ -21,6 +21,18 @@ export type ApplyQueueItem = {
   salary?: string;
   skills?: string[];
   rating?: string;
+  reviews?: string;
+  postedAt?: string;
+  openings?: string;
+  applicants?: string;
+  highlights?: string[];
+  role?: string;
+  industry?: string;
+  department?: string;
+  employmentType?: string;
+  roleCategory?: string;
+  education?: string;
+  aboutCompany?: string;
 };
 
 export type ApplyDayStats = {

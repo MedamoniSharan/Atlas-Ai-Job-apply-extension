@@ -13,6 +13,7 @@ import {
   getCopilotState,
   setCopilotState,
 } from './copilotState';
+import { mergeJobFields } from './jobFields';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -171,22 +172,11 @@ export async function processApplyQueue(
           job?: Partial<JobPayload>;
         }>(activeTabId, { type: 'RUN_EASY_APPLY' });
 
-        const base: JobPayload = {
-          platform: 'naukri',
-          title: result.job?.title || item.title,
-          company: result.job?.company || item.company,
-          location: result.job?.location || item.location,
+        const base = mergeJobFields(result.job, item, {
           url: item.url,
-          externalJobId: result.job?.externalJobId || item.externalJobId,
-          companyLogo: result.job?.companyLogo || item.companyLogo,
-          description: result.job?.description || item.description,
-          experience: result.job?.experience || item.experience,
-          salary: result.job?.salary || item.salary,
-          skills: result.job?.skills || item.skills,
-          rating: result.job?.rating || item.rating,
           status: 'detected',
           metadata: { source: 'auto_apply' },
-        };
+        });
 
         if (result.ok) {
           await handlers.persistApplicationRecorded({
@@ -216,26 +206,16 @@ export async function processApplyQueue(
           url: item.url,
           error: error instanceof Error ? error.message : String(error),
         });
-        await handlers.persistJobDetected({
-          platform: 'naukri',
-          title: item.title,
-          company: item.company,
-          location: item.location,
-          url: item.url,
-          externalJobId: item.externalJobId,
-          companyLogo: item.companyLogo,
-          description: item.description,
-          experience: item.experience,
-          salary: item.salary,
-          skills: item.skills,
-          rating: item.rating,
-          status: 'detected',
-          metadata: {
-            source: 'auto_scan',
-            skipped: true,
-            skipReason: 'Apply failed',
-          },
-        });
+        await handlers.persistJobDetected(
+          mergeJobFields(undefined, item, {
+            status: 'detected',
+            metadata: {
+              source: 'auto_scan',
+              skipped: true,
+              skipReason: 'Apply failed',
+            },
+          })
+        );
       }
 
       await wait(randomDelay());
