@@ -6,6 +6,7 @@ import { LandingNavbar } from '../components/LandingNavbar';
 import { SproutJobsMarquee } from '../components/SproutJobsMarquee';
 import { TrustedCompanyMarquee } from '../components/TrustedCompanyMarquee';
 import { useAuthStore } from '../store/authStore';
+import '../styles/landing-fonts.css';
 
 export function LandingPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
