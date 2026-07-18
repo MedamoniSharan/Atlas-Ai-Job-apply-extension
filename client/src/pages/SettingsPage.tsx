@@ -9,7 +9,7 @@ export function SettingsPage() {
   const queryClient = useQueryClient();
 
   return (
-    <div className="page">
+    <div className="dash">
       <div className="panel settings-grid">
         <div>
           <h2>Settings</h2>

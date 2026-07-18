@@ -15,8 +15,8 @@ export function GetStartedPage() {
 
   if (isLoading) {
     return (
-      <div className="page">
-        <p className="empty">Loading setup…</p>
+      <div className="dash">
+        <p className="dash-empty">Loading setup…</p>
       </div>
     );
   }
@@ -28,11 +28,11 @@ export function GetStartedPage() {
 
   if (prefsDone && extensionDone) {
     return (
-      <div className="page">
+      <div className="dash">
         <div className="panel onboarding-success">
           <h2>You&apos;re set up</h2>
           <p className="muted">
-            Preferences saved and extension connected. Open Naukri — the Atlas
+            Preferences saved and extension connected. Open Naukri — the
             Co-Pilot panel appears at the bottom left. Press Start to scan and
             apply.
           </p>
@@ -45,8 +45,8 @@ export function GetStartedPage() {
             >
               Open Naukri
             </a>
-            <Link className="secondary-btn" to="/applications">
-              View applications
+            <Link className="secondary-btn" to="/">
+              View dashboard
             </Link>
           </div>
         </div>
@@ -55,7 +55,7 @@ export function GetStartedPage() {
   }
 
   return (
-    <div className="page">
+    <div className="dash">
       <div className="panel">
         <h2>Get started</h2>
         <p className="muted">Hi {user?.name} — finish these two steps.</p>

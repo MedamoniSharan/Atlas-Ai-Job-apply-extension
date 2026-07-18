@@ -30,7 +30,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
       }
 
       setSession(result.data);
-      navigate(mode === 'register' ? '/get-started' : '/applications');
+      navigate(mode === 'register' ? '/get-started' : '/');
     } finally {
       setLoading(false);
     }
@@ -39,7 +39,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
   return (
     <div className="auth-page">
       <div className="auth-panel">
-        <p className="brand">Atlas</p>
+        <p className="brand">tsenta</p>
         <h1>{mode === 'login' ? 'Welcome back' : 'Create account'}</h1>
         <p className="sub">
           Track applications synced from your browser extension.

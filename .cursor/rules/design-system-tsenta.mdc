@@ -1,0 +1,69 @@
+---
+description: Tsenta design-system tokens, component states, and accessibility rules for Atlas marketing/web UI.
+globs: client/**/*.{tsx,css,html}
+alwaysApply: false
+---
+
+# Tsenta design system
+
+Deliver token-driven, accessible UI for the Atlas web client using Tsenta foundations.
+
+## Intent
+
+Structured, content-first marketing/product UI with semantic tokens, visible focus, and WCAG 2.2 AA contrast.
+
+## Foundations (must)
+
+- Use semantic CSS variables from `client/src/styles.css` (`--color-*`, `--font-*`, `--space-*`, `--radius-*`, `--shadow-*`, `--motion-*`).
+- Do not hardcode one-off hex, spacing, or type sizes in components when a token exists.
+- Font stack must remain Inter via `--font-family-stack`.
+- Base type: `--font-size-base` / `--font-line-height-base`.
+- Surfaces: dark shell (`--color-surface-base`) with light panels (`--color-surface-muted`).
+- Primary CTA uses `--color-surface-strong`; raised/success accents use `--color-surface-raised`.
+
+## Component states (must)
+
+Every interactive control must define:
+
+- default
+- hover
+- focus-visible (never remove outlines; use `--color-focus-ring`)
+- active
+- disabled
+- loading (when async)
+- error (when validation applies)
+
+## Interaction (must)
+
+- Keyboard-first: Tab order logical; Enter/Space activate buttons/links.
+- Pointer and touch targets should be at least ~40px tall where practical.
+- Links and buttons must have descriptive labels (no “Click here”).
+
+## Content / overflow (should)
+
+- Long titles clamp or wrap without breaking layout.
+- Empty states use `.empty` and secondary text tokens.
+- Prefer system density consistency over local visual exceptions.
+
+## Accessibility acceptance criteria (must be testable)
+
+- [ ] Focus-visible ring appears on keyboard focus for links, buttons, inputs, selects.
+- [ ] Text on panels meets AA against `--color-surface-muted`.
+- [ ] Text on dark shell meets AA against `--color-surface-base`.
+- [ ] Disabled controls are not focusable for submit actions when invalid, or are clearly announced.
+- [ ] Error text uses `--color-danger` and is associated with the field.
+
+## Anti-patterns (must not)
+
+- Low-contrast gray-on-gray text
+- Hidden or outline:none focus without a replacement ring
+- One-off spacing/type outside the token scale
+- Ambiguous actions (“Submit”, “OK”) without context
+
+## QA checklist
+
+- [ ] No raw brand hex in new component CSS
+- [ ] Primary buttons use `--color-surface-strong`
+- [ ] Panels use `--color-surface-muted` + `--radius-xs` + `--shadow-2`
+- [ ] Hover/focus/active/disabled verified
+- [ ] Mobile toolbar/filters wrap without overflow
