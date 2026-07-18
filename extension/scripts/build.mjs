@@ -26,6 +26,10 @@ for (const size of ['icon16.png', 'icon48.png', 'icon128.png']) {
 
 const sharedEntry = path.resolve(root, '../shared/src/index.ts');
 
+/**
+ * IIFE avoids Zod/ESM circular-init failures in Chrome MV3 service workers.
+ * Extension code must only `import type` from @atlas/shared (no Zod value imports).
+ */
 const ctx = await esbuild.context({
   entryPoints: {
     background: path.join(root, 'src/background/index.ts'),
@@ -34,7 +38,8 @@ const ctx = await esbuild.context({
   },
   bundle: true,
   outdir: dist,
-  format: 'esm',
+  format: 'iife',
+  platform: 'browser',
   target: 'chrome120',
   sourcemap: true,
   alias: {

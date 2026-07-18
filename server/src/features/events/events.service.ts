@@ -6,6 +6,7 @@ import {
 } from '@atlas/shared';
 import { ActivityModel } from './activity.model';
 import { ApplicationModel, IApplication } from '../applications/application.model';
+import { UserModel } from '../users/user.model';
 import { getIo } from '../../realtime/socket';
 import { logger } from '../../config/logger';
 
@@ -22,6 +23,7 @@ function toApplication(doc: IApplication): Application {
     url: doc.url,
     status: doc.status,
     appliedAt: doc.appliedAt?.toISOString(),
+    metadata: doc.metadata as Application['metadata'],
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
@@ -55,8 +57,13 @@ async function upsertApplicationFromEvent(
         : job.status
       : job.status;
 
+  const filter =
+    job.externalJobId && job.externalJobId.length > 0
+      ? { userId, platform: job.platform, externalJobId: job.externalJobId }
+      : { userId, eventId: event.eventId };
+
   const doc = await ApplicationModel.findOneAndUpdate(
-    { userId, eventId: event.eventId },
+    filter,
     {
       $set: {
         platform: job.platform,
@@ -78,6 +85,21 @@ async function upsertApplicationFromEvent(
   );
 
   return toApplication(doc);
+}
+
+async function handleExtensionConnected(
+  userId: string,
+  event: EventEnvelope
+): Promise<void> {
+  const connectedAt = new Date(event.timestamp);
+  await UserModel.findByIdAndUpdate(userId, {
+    $set: { extensionConnectedAt: connectedAt },
+  });
+
+  const io = getIo();
+  io?.to(`user:${userId}`).emit('extension.connected', {
+    extensionConnectedAt: connectedAt.toISOString(),
+  });
 }
 
 export async function syncEvents(
@@ -102,6 +124,10 @@ export async function syncEvents(
       },
       { upsert: true, new: true }
     );
+
+    if (event.type === 'ExtensionConnected') {
+      await handleExtensionConnected(userId, event);
+    }
 
     const app = await upsertApplicationFromEvent(userId, event);
     if (app) {

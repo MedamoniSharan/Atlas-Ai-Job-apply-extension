@@ -1,12 +1,26 @@
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Application } from '@atlas/shared';
 import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
+import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
+import { ExtensionOnboarding } from '../components/ExtensionOnboarding';
+import { useAuthStore } from '../store/authStore';
+
+function sourceLabel(app: Application): string {
+  if (app.metadata?.skipped) return 'Skipped';
+  if (app.status === 'applied') return 'Applied';
+  if (app.metadata?.source === 'auto_scan') return 'Matched';
+  if (app.metadata?.source === 'auto_apply') return 'Applied';
+  return app.status;
+}
 
 export function ApplicationsPage() {
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const [liveHint, setLiveHint] = useState('');
+  const { data: onboarding } = useOnboardingStatus();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['applications'],
@@ -41,12 +55,39 @@ export function ApplicationsPage() {
 
   useApplicationSocket(onUpdate);
 
+  const needsPrefs = onboarding && !onboarding.preferencesCompleted;
+  const showOnboarding =
+    onboarding &&
+    !onboarding.extensionConnected &&
+    !onboarding.hasApplications;
+
   return (
     <div className="page">
+      {needsPrefs && (
+        <div className="panel onboarding-panel">
+          <h3>Set job preferences</h3>
+          <p className="muted">
+            Add titles or keywords so Atlas can scan and apply on Naukri.
+          </p>
+          <Link className="primary-btn" to="/get-started">
+            Complete preferences
+          </Link>
+        </div>
+      )}
+
+      {showOnboarding && !needsPrefs && (
+        <div className="panel onboarding-panel">
+          <ExtensionOnboarding compact userEmail={user?.email} />
+          <Link className="onboarding__link" to="/get-started">
+            View full setup guide →
+          </Link>
+        </div>
+      )}
+
       <div className="panel">
         <h2>Applications</h2>
         <p className="muted">
-          Synced from your extension in near real time.
+          Matched from scan and applied via the extension in near real time.
           {liveHint ? ` · ${liveHint}` : ''}
         </p>
 
@@ -57,10 +98,10 @@ export function ApplicationsPage() {
           </p>
         )}
 
-        {data && data.items.length === 0 && (
+        {data && data.items.length === 0 && !showOnboarding && !needsPrefs && (
           <p className="empty">
-            No applications yet. Install the extension and browse Naukri while
-            signed in.
+            No matches yet. Open Naukri while logged in, or use Scan now in the
+            extension.
           </p>
         )}
 
@@ -86,11 +127,14 @@ export function ApplicationsPage() {
                     ) : (
                       app.title
                     )}
+                    {app.metadata?.skipReason ? (
+                      <div className="muted tiny">{app.metadata.skipReason}</div>
+                    ) : null}
                   </td>
                   <td>{app.company}</td>
                   <td>{app.platform}</td>
                   <td>
-                    <span className="badge">{app.status}</span>
+                    <span className="badge">{sourceLabel(app)}</span>
                   </td>
                   <td>
                     {new Date(app.appliedAt ?? app.createdAt).toLocaleString()}

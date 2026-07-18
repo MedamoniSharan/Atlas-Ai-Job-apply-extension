@@ -9,6 +9,8 @@ import { authRouter } from './features/auth/auth.routes';
 import { eventsRouter } from './features/events/events.routes';
 import { applicationsRouter } from './features/applications/applications.routes';
 import { healthRouter } from './features/health/health.routes';
+import { onboardingRouter } from './features/onboarding/onboarding.routes';
+import { preferencesRouter } from './features/preferences/preferences.routes';
 
 export function createApp() {
   const app = express();
@@ -47,6 +49,8 @@ export function createApp() {
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/events', eventsRouter);
   app.use('/api/v1/applications', applicationsRouter);
+  app.use('/api/v1/onboarding', onboardingRouter);
+  app.use('/api/v1/preferences', preferencesRouter);
 
   app.use(errorHandler);
   return app;

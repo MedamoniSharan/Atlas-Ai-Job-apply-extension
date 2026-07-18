@@ -1,65 +1,60 @@
 import type { JobPayload } from '@atlas/shared';
+import {
+  NaukriAdapter,
+  SearchResultJob,
+} from '../adapters/naukriAdapter';
 import { resolveAdapter } from '../adapters';
 import { logger } from '../core/logger';
+import { mountCopilotPanel } from './copilotPanel';
 
-const adapter = resolveAdapter(window.location.href);
+const naukri = new NaukriAdapter();
+let lastFingerprint = '';
+let applyClickBound = false;
 
-if (!adapter) {
-  logger.debug('No adapter for page', { href: window.location.href });
-} else {
-  logger.info('Adapter matched', { platform: adapter.platform });
+function fingerprint(job: Partial<JobPayload>): string {
+  return `${job.title}|${job.company}|${job.url ?? ''}|${job.status ?? ''}`;
+}
 
-  let lastFingerprint = '';
+function emitJob(adapter = resolveAdapter(window.location.href)) {
+  if (!adapter) return;
 
-  function fingerprint(job: Partial<JobPayload>): string {
-    return `${job.title}|${job.company}|${job.url ?? ''}`;
-  }
+  const job = adapter.readJob(document);
+  if (!job?.title || !job.company) return;
 
-  function emitJob() {
-    const job = adapter!.readJob(document);
-    if (!job?.title || !job.company) return;
+  const status =
+    adapter.detectApplicationStatus(document) ?? job.status ?? 'detected';
+  const payload: JobPayload = {
+    platform: adapter.platform,
+    title: job.title,
+    company: job.company,
+    location: job.location,
+    url: job.url ?? window.location.href,
+    externalJobId: job.externalJobId,
+    status,
+    appliedAt: status === 'applied' ? new Date().toISOString() : undefined,
+    metadata: { source: 'manual' },
+  };
 
-    const fp = fingerprint(job);
-    if (fp === lastFingerprint) return;
-    lastFingerprint = fp;
+  const fp = fingerprint(payload);
+  if (fp === lastFingerprint) return;
+  lastFingerprint = fp;
 
-    const status =
-      adapter!.detectApplicationStatus(document) ?? job.status ?? 'detected';
-    const payload: JobPayload = {
-      platform: adapter!.platform,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      url: job.url ?? window.location.href,
-      externalJobId: job.externalJobId,
-      status,
-      appliedAt:
-        status === 'applied' ? new Date().toISOString() : undefined,
-    };
+  const messageType =
+    status === 'applied' ? 'APPLICATION_RECORDED' : 'JOB_DETECTED';
 
-    const messageType =
-      status === 'applied' ? 'APPLICATION_RECORDED' : 'JOB_DETECTED';
-
-    chrome.runtime.sendMessage({ type: messageType, payload }, () => {
-      if (chrome.runtime.lastError) {
-        logger.warn('Failed to send message', {
-          error: chrome.runtime.lastError.message,
-        });
-      }
-    });
-  }
-
-  emitJob();
-
-  const observer = new MutationObserver(() => {
-    emitJob();
+  chrome.runtime.sendMessage({ type: messageType, payload }, () => {
+    if (chrome.runtime.lastError) {
+      logger.warn('Failed to send message', {
+        error: chrome.runtime.lastError.message,
+      });
+    }
   });
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
+}
 
-  // Capture apply button clicks as application signals when success UI is missing.
+function bindApplyClickCapture() {
+  if (applyClickBound) return;
+  applyClickBound = true;
+
   document.addEventListener(
     'click',
     (e) => {
@@ -69,27 +64,186 @@ if (!adapter) {
         'button, a, [role="button"]'
       ) as HTMLElement | null;
       const label = applyBtn?.textContent?.toLowerCase() ?? '';
-      if (label.includes('apply')) {
-        setTimeout(() => {
-          const job = adapter!.readJob(document);
-          if (!job?.title || !job.company) return;
-          const payload: JobPayload = {
-            platform: adapter!.platform,
-            title: job.title,
-            company: job.company,
-            location: job.location,
-            url: window.location.href,
-            externalJobId: job.externalJobId,
-            status: 'applied',
-            appliedAt: new Date().toISOString(),
-          };
-          chrome.runtime.sendMessage({
-            type: 'APPLICATION_RECORDED',
-            payload,
-          });
-        }, 1500);
-      }
+      if (!label.includes('apply')) return;
+
+      setTimeout(() => {
+        const current = resolveAdapter(window.location.href);
+        if (!current) return;
+        const job = current.readJob(document);
+        if (!job?.title || !job.company) return;
+        const payload: JobPayload = {
+          platform: current.platform,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          url: window.location.href,
+          externalJobId: job.externalJobId,
+          status: 'applied',
+          appliedAt: new Date().toISOString(),
+          metadata: { source: 'manual' },
+        };
+        lastFingerprint = fingerprint(payload);
+        chrome.runtime.sendMessage({
+          type: 'APPLICATION_RECORDED',
+          payload,
+        });
+      }, 1500);
     },
     true
   );
 }
+
+function onPossibleNavigation() {
+  emitJob();
+}
+
+function patchHistory() {
+  const wrap = (method: 'pushState' | 'replaceState') => {
+    const original = history[method].bind(history);
+    history[method] = function (...args: Parameters<History['pushState']>) {
+      const result = original(...args);
+      onPossibleNavigation();
+      return result;
+    };
+  };
+  wrap('pushState');
+  wrap('replaceState');
+  window.addEventListener('popstate', onPossibleNavigation);
+}
+
+async function runEasyApply(): Promise<{
+  ok: boolean;
+  skipped?: boolean;
+  needsUserInput?: boolean;
+  reason?: string;
+  job?: Partial<JobPayload>;
+}> {
+  const job = naukri.readJob(document) ?? undefined;
+
+  const loginBlock = (() => {
+    const text = (document.body?.innerText || '').toLowerCase();
+    if (text.includes('login to apply') || text.includes('register to apply')) {
+      return 'Naukri login required';
+    }
+    return null;
+  })();
+  if (loginBlock) {
+    return { ok: false, skipped: true, reason: loginBlock, job };
+  }
+
+  const questionsBefore = naukri.detectNeedsUserQuestions(document);
+  if (questionsBefore) {
+    return {
+      ok: false,
+      needsUserInput: true,
+      reason: questionsBefore,
+      job,
+    };
+  }
+
+  if (naukri.detectApplicationStatus(document) === 'applied') {
+    return { ok: true, job };
+  }
+
+  const btn = naukri.findEasyApplyButton(document);
+  if (!btn) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'Easy Apply button not found',
+      job,
+    };
+  }
+
+  const label = (btn.textContent || '').toLowerCase();
+  if (/company site|external/.test(label)) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'External / company-site apply',
+      job,
+    };
+  }
+
+  btn.click();
+  await new Promise((r) => setTimeout(r, 2200));
+
+  const questionsAfter = naukri.detectNeedsUserQuestions(document);
+  if (questionsAfter) {
+    return {
+      ok: false,
+      needsUserInput: true,
+      reason: questionsAfter,
+      job: naukri.readJob(document) ?? job,
+    };
+  }
+
+  const loginAfter = (() => {
+    const text = (document.body?.innerText || '').toLowerCase();
+    if (text.includes('login to apply') || text.includes('register to apply')) {
+      return 'Naukri login required';
+    }
+    return null;
+  })();
+  if (loginAfter) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: loginAfter,
+      job: naukri.readJob(document) ?? job,
+    };
+  }
+
+  if (naukri.detectApplicationStatus(document) === 'applied') {
+    return { ok: true, job: naukri.readJob(document) ?? job };
+  }
+
+  const afterLabel = (btn.textContent || '').toLowerCase();
+  if (
+    /applied|applied successfully/.test(afterLabel) ||
+    btn.hasAttribute('disabled')
+  ) {
+    return { ok: true, job: naukri.readJob(document) ?? job };
+  }
+
+  // No questionnaire detected — treat as applied for Easy Apply.
+  return { ok: true, job: naukri.readJob(document) ?? job };
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  (async () => {
+    switch (message?.type) {
+      case 'CHECK_LOGIN': {
+        sendResponse({ loggedIn: naukri.isLoggedIn(document) });
+        break;
+      }
+      case 'RUN_SCAN_SCRAPE': {
+        const jobs: SearchResultJob[] = naukri.readSearchResults(document);
+        logger.info('Scan scrape complete', { count: jobs.length });
+        sendResponse({ jobs });
+        break;
+      }
+      case 'RUN_EASY_APPLY': {
+        const result = await runEasyApply();
+        sendResponse(result);
+        break;
+      }
+      default:
+        sendResponse({ ok: false });
+    }
+  })();
+  return true;
+});
+
+patchHistory();
+bindApplyClickCapture();
+mountCopilotPanel();
+emitJob();
+
+const observer = new MutationObserver(() => {
+  emitJob();
+});
+observer.observe(document.documentElement, {
+  childList: true,
+  subtree: true,
+});

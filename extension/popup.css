@@ -15,7 +15,9 @@
 
 body {
   margin: 0;
-  width: 320px;
+  width: 360px;
+  max-height: 560px;
+  overflow: auto;
   background: radial-gradient(circle at top left, #1d3a52, var(--bg) 55%);
   color: var(--text);
 }
@@ -64,12 +66,15 @@ label {
   color: var(--muted);
 }
 
-input {
+input,
+select,
+textarea {
   border: 1px solid #2b4258;
   background: #0c1622;
   color: var(--text);
   border-radius: 8px;
   padding: 8px 10px;
+  width: 100%;
 }
 
 button {
@@ -92,5 +97,33 @@ button.secondary {
   color: var(--danger);
   margin: 0;
   font-size: 0.8rem;
+  min-height: 1em;
+}
+
+.prefs {
+  display: grid;
+  gap: 8px;
+}
+
+.prefs .row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.prefs .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prefs .check input {
+  width: auto;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
   min-height: 1em;
 }

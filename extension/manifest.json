@@ -2,16 +2,15 @@
   "manifest_version": 3,
   "name": "Atlas Job Assistant",
   "version": "1.0.0",
-  "description": "Sync job applications from supported platforms to Atlas",
-  "permissions": ["storage", "alarms", "activeTab"],
+  "description": "Scan and apply to Naukri jobs from your preferences, synced to Atlas",
+  "permissions": ["storage", "alarms", "activeTab", "tabs"],
   "host_permissions": [
     "http://localhost:4000/*",
     "https://www.naukri.com/*",
     "https://naukri.com/*"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from './App';
 import { AuthPage } from './pages/AuthPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
+import { GetStartedPage } from './pages/GetStartedPage';
 import { SettingsPage } from './pages/SettingsPage';
 import './styles.css';
 
@@ -18,6 +19,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route element={<AppLayout />}>
+            <Route path="/get-started" element={<GetStartedPage />} />
             <Route path="/applications" element={<ApplicationsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

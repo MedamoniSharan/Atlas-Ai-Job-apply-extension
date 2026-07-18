@@ -14,6 +14,7 @@ function toApplication(doc: IApplication): Application {
     url: doc.url,
     status: doc.status,
     appliedAt: doc.appliedAt?.toISOString(),
+    metadata: doc.metadata as Application['metadata'],
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };

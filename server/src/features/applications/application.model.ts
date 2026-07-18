@@ -43,6 +43,10 @@ const applicationSchema = new Schema<IApplication>(
 );
 
 applicationSchema.index({ userId: 1, eventId: 1 }, { unique: true });
+applicationSchema.index(
+  { userId: 1, platform: 1, externalJobId: 1 },
+  { unique: true, partialFilterExpression: { externalJobId: { $type: 'string' } } }
+);
 applicationSchema.index({ userId: 1, createdAt: -1 });
 
 export const ApplicationModel = mongoose.model<IApplication>(

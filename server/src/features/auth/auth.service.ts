@@ -18,12 +18,14 @@ function toUser(doc: {
   email: string;
   name: string;
   createdAt?: Date;
+  extensionConnectedAt?: Date;
 }): User {
   return {
     id: doc._id.toString(),
     email: doc.email,
     name: doc.name,
     createdAt: doc.createdAt?.toISOString(),
+    extensionConnectedAt: doc.extensionConnectedAt?.toISOString(),
   };
 }
 

@@ -144,6 +144,30 @@ input {
   color: var(--accent-ink);
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.secondary-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prefs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .error {
@@ -226,7 +250,228 @@ input {
   color: var(--muted);
 }
 
+.setup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #0f3d38;
+  color: #ecfdf8;
+}
+
+.setup-banner p {
+  margin: 0;
+}
+
+.setup-banner__cta {
+  flex-shrink: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: #2bb0a6;
+  color: #052826;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.setup-nav {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+.onboarding-panel {
+  margin-bottom: 1rem;
+}
+
+.onboarding {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.onboarding__eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.onboarding__header h3 {
+  margin: 0 0 0.35rem;
+  font-family: Fraunces, Georgia, serif;
+}
+
+.onboarding__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.onboarding__step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.onboarding__step--done {
+  border-color: #b7dfd6;
+  background: #edf8f4;
+}
+
+.onboarding__step--active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.onboarding__step-num {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.onboarding__step strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.onboarding__step p,
+.onboarding__step .muted {
+  margin: 0;
+}
+
+.onboarding__substeps {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.onboarding__actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.onboarding__hint {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.onboarding__link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+
+.onboarding-success {
+  display: grid;
+  gap: 1rem;
+}
+
+.onboarding--compact .onboarding__header h3 {
+  font-size: 1.15rem;
+}
+
+.prefs-form {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.prefs-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.prefs-form input,
+.prefs-form textarea,
+.prefs-form select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.prefs-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.prefs-toggles {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.prefs-form .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.prefs-form .checkbox input {
+  width: auto;
+}
+
+.setup-steps {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 1.25rem;
+}
+
+.setup-steps li {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.setup-steps li.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.setup-steps li.done {
+  background: #edf8f4;
+  border-color: #b7dfd6;
+  color: var(--ink);
+}
+
+.success {
+  color: #0f766e;
+  margin: 0;
+}
+
+.tiny {
+  font-size: 0.8rem;
+}
+
 @media (max-width: 720px) {
+  .prefs-row {
+    grid-template-columns: 1fr;
+  }
+
   .apps-table thead {
     display: none;
   }
