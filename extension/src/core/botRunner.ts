@@ -63,36 +63,45 @@ async function waitWhilePaused() {
  * Before each apply: require Naukri login. If logged out, pause and wait for Resume.
  */
 async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 8; attempt++) {
     if (!(await waitWhilePaused())) return false;
+
+    // Give the header a moment to render Login vs profile.
+    await wait(attempt === 0 ? 800 : 400);
 
     const login = await sendToTab<{ loggedIn: boolean }>(tabId, {
       type: 'CHECK_LOGIN',
     });
     if (login.loggedIn) {
+      await setCopilotState({ needsLogin: false });
       if (attempt > 0) {
         await appendCopilotLog('Naukri login detected — continuing', 'success');
       }
       return true;
     }
 
-    await setCopilotState({ paused: true });
+    await setCopilotState({ paused: true, needsLogin: true });
     await appendCopilotLog(
-      'Paused — you are not logged into Naukri. Log in on this page, then press Resume.',
+      'Paused — please log into Naukri to continue. Use the popup, then press Resume.',
       'warn'
     );
+    await sendToTab(tabId, { type: 'SHOW_LOGIN_PROMPT' }).catch(() => undefined);
 
     if (!(await waitWhilePaused())) return false;
 
     await appendCopilotLog('Resumed — checking Naukri login again…');
-    await wait(1200);
+    await wait(1500);
   }
 
   await appendCopilotLog(
     'Still not logged into Naukri. Stopping bot.',
     'error'
   );
-  await setCopilotState({ running: false, paused: false });
+  await setCopilotState({
+    running: false,
+    paused: false,
+    needsLogin: false,
+  });
   return false;
 }
 
@@ -105,7 +114,12 @@ export type BotHandlers = {
 let botRunning = false;
 
 export async function stopBot(): Promise<void> {
-  await setCopilotState({ running: false, paused: false, currentTitle: '' });
+  await setCopilotState({
+    running: false,
+    paused: false,
+    needsLogin: false,
+    currentTitle: '',
+  });
   await appendCopilotLog('Bot stopped', 'warn');
 }
 
@@ -115,7 +129,7 @@ export async function pauseBot(): Promise<void> {
 }
 
 export async function resumeBot(): Promise<void> {
-  await setCopilotState({ paused: false });
+  await setCopilotState({ paused: false, needsLogin: false });
   await appendCopilotLog('Bot resumed', 'success');
 }
 
@@ -149,6 +163,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
     await setCopilotState({
       running: true,
       paused: false,
+      needsLogin: false,
       keyword,
       matched: 0,
       applied: 0,
@@ -178,21 +193,14 @@ export async function runBot(handlers: BotHandlers): Promise<{
     }
 
     await waitForTabComplete(tab.id);
-    await wait(2200);
+    await wait(2500);
 
     if (!(await waitWhilePaused())) {
       return { ok: true, message: 'Stopped.' };
     }
 
-    const login = await sendToTab<{ loggedIn: boolean }>(tab.id, {
-      type: 'CHECK_LOGIN',
-    });
-    if (!login.loggedIn) {
-      await appendCopilotLog(
-        'Log into Naukri in this browser, then Start again',
-        'error'
-      );
-      await setCopilotState({ running: false });
+    // Must be logged into Naukri before scanning/applying.
+    if (!(await ensureNaukriLoggedIn(tab.id))) {
       return { ok: false, message: 'Not logged into Naukri.' };
     }
 
@@ -219,6 +227,12 @@ export async function runBot(handlers: BotHandlers): Promise<{
         location: job.location,
         url: job.url,
         externalJobId: job.externalJobId,
+        companyLogo: job.companyLogo,
+        description: job.description,
+        experience: job.experienceText,
+        salary: job.salaryText,
+        skills: job.skills,
+        rating: job.rating,
         status: 'detected',
         metadata: { source: 'auto_scan' },
       };
@@ -270,6 +284,13 @@ export async function runBot(handlers: BotHandlers): Promise<{
         location: result.job?.location || job.location,
         url: job.url,
         externalJobId: result.job?.externalJobId || job.externalJobId,
+        companyLogo: result.job?.companyLogo || job.companyLogo,
+        description: result.job?.description || job.description,
+        experience:
+          result.job?.experience || job.experienceText,
+        salary: result.job?.salary || job.salaryText,
+        skills: result.job?.skills || job.skills,
+        rating: result.job?.rating || job.rating,
         status: 'detected',
         metadata: { source: 'auto_apply' },
       };

@@ -15,6 +15,12 @@ export type ApplyQueueItem = {
   company: string;
   externalJobId?: string;
   location?: string;
+  companyLogo?: string;
+  description?: string;
+  experience?: string;
+  salary?: string;
+  skills?: string[];
+  rating?: string;
 };
 
 export type ApplyDayStats = {

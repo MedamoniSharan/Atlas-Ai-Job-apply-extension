@@ -153,13 +153,37 @@ export async function fetchOnboardingStatus() {
   return request<OnboardingStatus>('/api/v1/onboarding/status');
 }
 
-export async function fetchApplications(page = 1, limit = 50) {
+export type ApplicationsQuery = {
+  page?: number;
+  limit?: number;
+  q?: string;
+  bucket?: 'all' | 'matched' | 'applied' | 'skipped';
+  platform?: string;
+  source?: 'all' | 'manual' | 'auto_scan' | 'auto_apply';
+};
+
+export async function fetchApplications(params: ApplicationsQuery = {}) {
+  const search = new URLSearchParams();
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? 12));
+  if (params.q?.trim()) search.set('q', params.q.trim());
+  if (params.bucket && params.bucket !== 'all') {
+    search.set('bucket', params.bucket);
+  }
+  if (params.platform && params.platform !== 'all') {
+    search.set('platform', params.platform);
+  }
+  if (params.source && params.source !== 'all') {
+    search.set('source', params.source);
+  }
+
   return request<{
     items: Application[];
     total: number;
     page: number;
     limit: number;
-  }>(`/api/v1/applications?page=${page}&limit=${limit}`);
+    totalPages: number;
+  }>(`/api/v1/applications?${search.toString()}`);
 }
 
 export async function fetchPreferences() {

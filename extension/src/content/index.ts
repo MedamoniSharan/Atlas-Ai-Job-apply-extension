@@ -30,6 +30,12 @@ function emitJob(adapter = resolveAdapter(window.location.href)) {
     location: job.location,
     url: job.url ?? window.location.href,
     externalJobId: job.externalJobId,
+    companyLogo: job.companyLogo,
+    description: job.description,
+    experience: job.experience,
+    salary: job.salary,
+    skills: job.skills,
+    rating: job.rating,
     status,
     appliedAt: status === 'applied' ? new Date().toISOString() : undefined,
     metadata: { source: 'manual' },
@@ -214,7 +220,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     switch (message?.type) {
       case 'CHECK_LOGIN': {
+        // Header auth controls can render slightly after document_idle.
+        await new Promise((r) => setTimeout(r, 300));
         sendResponse({ loggedIn: naukri.isLoggedIn(document) });
+        break;
+      }
+      case 'SHOW_LOGIN_PROMPT': {
+        sendResponse({ ok: true });
         break;
       }
       case 'RUN_SCAN_SCRAPE': {

@@ -126,6 +126,12 @@ export async function runScan(options: {
       location: job.location,
       url: job.url,
       externalJobId: job.externalJobId,
+      companyLogo: job.companyLogo,
+      description: job.description,
+      experience: job.experienceText,
+      salary: job.salaryText,
+      skills: job.skills,
+      rating: job.rating,
       status: 'detected',
       metadata: { source: 'auto_scan' },
     };
@@ -144,6 +150,12 @@ export async function runScan(options: {
         company: j.company,
         externalJobId: j.externalJobId,
         location: j.location,
+        companyLogo: j.companyLogo,
+        description: j.description,
+        experience: j.experienceText,
+        salary: j.salaryText,
+        skills: j.skills,
+        rating: j.rating,
       }))
     );
   }

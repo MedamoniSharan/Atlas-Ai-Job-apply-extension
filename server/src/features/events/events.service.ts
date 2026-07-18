@@ -21,6 +21,12 @@ function toApplication(doc: IApplication): Application {
     company: doc.company,
     location: doc.location,
     url: doc.url,
+    companyLogo: doc.companyLogo,
+    description: doc.description,
+    experience: doc.experience,
+    salary: doc.salary,
+    skills: doc.skills,
+    rating: doc.rating,
     status: doc.status,
     appliedAt: doc.appliedAt?.toISOString(),
     metadata: doc.metadata as Application['metadata'],
@@ -62,6 +68,16 @@ async function upsertApplicationFromEvent(
       ? { userId, platform: job.platform, externalJobId: job.externalJobId }
       : { userId, eventId: event.eventId };
 
+  const richFields: Record<string, unknown> = {};
+  if (job.companyLogo) richFields.companyLogo = job.companyLogo;
+  if (job.description) richFields.description = job.description;
+  if (job.experience) richFields.experience = job.experience;
+  if (job.salary) richFields.salary = job.salary;
+  if (job.skills?.length) richFields.skills = job.skills;
+  if (job.rating) richFields.rating = job.rating;
+  if (job.location) richFields.location = job.location;
+  if (job.url) richFields.url = job.url;
+
   const doc = await ApplicationModel.findOneAndUpdate(
     filter,
     {
@@ -70,11 +86,10 @@ async function upsertApplicationFromEvent(
         externalJobId: job.externalJobId,
         title: job.title,
         company: job.company,
-        location: job.location,
-        url: job.url,
         status,
         appliedAt: job.appliedAt ? new Date(job.appliedAt) : undefined,
         metadata: job.metadata,
+        ...richFields,
       },
       $setOnInsert: {
         eventId: event.eventId,

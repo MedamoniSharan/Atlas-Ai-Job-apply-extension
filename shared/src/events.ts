@@ -36,6 +36,12 @@ export const jobPayloadSchema = z.object({
   company: z.string().min(1),
   location: z.string().optional(),
   url: z.string().url().optional(),
+  companyLogo: z.string().min(1).optional(),
+  description: z.string().max(4000).optional(),
+  experience: z.string().optional(),
+  salary: z.string().optional(),
+  skills: z.array(z.string()).max(40).optional(),
+  rating: z.string().optional(),
   appliedAt: z.string().datetime().optional(),
   status: z
     .enum(['detected', 'applied', 'viewed', 'saved'])

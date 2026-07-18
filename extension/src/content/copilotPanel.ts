@@ -133,6 +133,55 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} .atlas-notice.show { display: block; }
       #${ROOT_ID} .atlas-empty { color: #6f8499; font-size: 12px; padding: 8px; }
+      #${ROOT_ID} .atlas-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        background: rgba(8, 14, 22, 0.72);
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      #${ROOT_ID} .atlas-modal.show { display: flex; }
+      #${ROOT_ID} .atlas-modal-card {
+        width: min(360px, 100%);
+        background: #121a24;
+        color: #e8eef5;
+        border: 1px solid #2a3b4f;
+        border-radius: 14px;
+        padding: 18px 16px;
+        box-shadow: 0 20px 50px rgba(0,0,0,.45);
+        display: grid;
+        gap: 12px;
+      }
+      #${ROOT_ID} .atlas-modal-card h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      #${ROOT_ID} .atlas-modal-card p {
+        margin: 0;
+        font-size: 13px;
+        color: #8fa3b8;
+        line-height: 1.4;
+      }
+      #${ROOT_ID} .atlas-modal-actions {
+        display: grid;
+        gap: 8px;
+      }
+      #${ROOT_ID} .btn-login {
+        background: #2bb0a6;
+        color: #042421;
+        width: 100%;
+        padding: 10px 12px;
+      }
+      #${ROOT_ID} .btn-resume-login {
+        background: #3a4a5c;
+        color: #e8eef5;
+        width: 100%;
+        padding: 10px 12px;
+      }
       #${ROOT_ID}.collapsed .atlas-log,
       #${ROOT_ID}.collapsed .atlas-meta,
       #${ROOT_ID}.collapsed .atlas-notice { display: none; }
@@ -158,16 +207,40 @@ export function mountCopilotPanel() {
         <div class="atlas-empty">Press Start to scan Naukri and open matching jobs.</div>
       </div>
     </div>
+    <div class="atlas-modal" id="atlas-login-modal" role="dialog" aria-modal="true">
+      <div class="atlas-modal-card">
+        <h3>Log in to Naukri to continue</h3>
+        <p>
+          Atlas needs your Naukri session to scan and apply. Log in on this site,
+          then continue.
+        </p>
+        <div class="atlas-modal-actions">
+          <button type="button" class="btn-login" id="atlas-open-login">
+            Open Naukri Login
+          </button>
+          <button type="button" class="btn-resume-login" id="atlas-logged-in">
+            I&apos;ve logged in — Continue
+          </button>
+        </div>
+      </div>
+    </div>
   `;
   document.documentElement.appendChild(root);
 
   const logEl = root.querySelector('#atlas-log') as HTMLElement;
   const statsEl = root.querySelector('#atlas-stats') as HTMLElement;
   const noticeEl = root.querySelector('#atlas-notice') as HTMLElement;
+  const loginModal = root.querySelector('#atlas-login-modal') as HTMLElement;
   const startBtn = root.querySelector('#atlas-start') as HTMLButtonElement;
   const pauseBtn = root.querySelector('#atlas-pause') as HTMLButtonElement;
   const stopBtn = root.querySelector('#atlas-stop') as HTMLButtonElement;
   const bgToggle = root.querySelector('#atlas-bg') as HTMLInputElement;
+  const openLoginBtn = root.querySelector('#atlas-open-login') as HTMLButtonElement;
+  const loggedInBtn = root.querySelector('#atlas-logged-in') as HTMLButtonElement;
+
+  function showLoginModal(show: boolean) {
+    loginModal.classList.toggle('show', show);
+  }
 
   function render(logs: CopilotLogEntry[], state: CopilotState) {
     statsEl.textContent = `Matched ${state.matched} · Applied ${state.applied}${
@@ -179,18 +252,23 @@ export function mountCopilotPanel() {
     pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
     pauseBtn.disabled = !state.running;
 
+    const waitingOnLogin =
+      state.needsLogin ||
+      (state.paused &&
+        /log into naukri|not logged into naukri|naukri login|login to continue/i.test(
+          state.lastMessage || logs[0]?.message || ''
+        ));
     const waitingOnQuestions =
       state.paused &&
+      !waitingOnLogin &&
       /question/i.test(state.lastMessage || logs[0]?.message || '');
-    const waitingOnLogin =
-      state.paused &&
-      /not logged into naukri|log into naukri|naukri login/i.test(
-        state.lastMessage || logs[0]?.message || ''
-      );
+
+    showLoginModal(Boolean(waitingOnLogin));
+
     if (waitingOnLogin) {
       noticeEl.classList.add('show');
       noticeEl.textContent =
-        'You are not logged into Naukri. Log in on this page, then press Resume.';
+        'Log into Naukri to continue, then press Continue / Resume.';
     } else if (waitingOnQuestions) {
       noticeEl.classList.add('show');
       noticeEl.textContent =
@@ -250,6 +328,22 @@ export function mountCopilotPanel() {
     );
   });
 
+  openLoginBtn.addEventListener('click', () => {
+    const loginEl =
+      (document.querySelector('#login_Layer') as HTMLElement | null) ||
+      (document.querySelector('a.nI-gNb-lg-rg__login') as HTMLElement | null);
+    if (loginEl) {
+      loginEl.click();
+      return;
+    }
+    window.location.href = 'https://www.naukri.com/nLogin/Login.php';
+  });
+
+  loggedInBtn.addEventListener('click', () => {
+    showLoginModal(false);
+    chrome.runtime.sendMessage({ type: 'COPILOT_RESUME' }, () => void refresh());
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes[LOG_KEY] || changes[STATE_KEY]) {
@@ -258,8 +352,11 @@ export function mountCopilotPanel() {
   });
 
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'COPILOT_REFRESH') {
+    if (message?.type === 'COPILOT_REFRESH' || message?.type === 'SHOW_LOGIN_PROMPT') {
       void refresh();
+      if (message?.type === 'SHOW_LOGIN_PROMPT') {
+        showLoginModal(true);
+      }
     }
   });
 

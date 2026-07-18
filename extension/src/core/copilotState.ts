@@ -11,6 +11,7 @@ export type CopilotState = {
   running: boolean;
   paused: boolean;
   runInBackground: boolean;
+  needsLogin: boolean;
   keyword: string;
   matched: number;
   applied: number;
@@ -27,6 +28,7 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   running: false,
   paused: false,
   runInBackground: false,
+  needsLogin: false,
   keyword: '',
   matched: 0,
   applied: 0,

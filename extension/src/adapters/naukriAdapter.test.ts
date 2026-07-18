@@ -82,6 +82,22 @@ describe('NaukriAdapter', () => {
     `;
     expect(adapter.detectNeedsUserQuestions(document)).toMatch(/mandatory/i);
   });
+
+  it('treats Login/Register header as logged out', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <a id="login_Layer" class="nI-gNb-lg-rg__login" href="/login">Login</a>
+      <a id="register_Layer" class="nI-gNb-lg-rg__register" href="/register">Register</a>
+    `;
+    document.cookie = 'naukri=1';
+    expect(adapter.isLoggedIn(document)).toBe(false);
+  });
+
+  it('treats profile drawer as logged in', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `<div class="nI-gNb-drawer__icon"></div>`;
+    expect(adapter.isLoggedIn(document)).toBe(true);
+  });
 });
 
 describe('preference matching helpers', () => {

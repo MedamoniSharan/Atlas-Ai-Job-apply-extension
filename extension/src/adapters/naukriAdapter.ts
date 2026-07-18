@@ -36,9 +36,17 @@ export const naukriSelectors: SelectorRegistry = {
     '[class*="already-applied"]',
   ],
   loggedIn: [
-    '#login_Layer',
     '.nI-gNb-drawer__icon',
+    '.nI-gNb-drawer',
     '[data-ga-track*="profile"]',
+    '.user-name',
+    '.nI-gNb-icon-and-drawer',
+  ],
+  loggedOut: [
+    '#login_Layer',
+    '#register_Layer',
+    'a.nI-gNb-lg-rg__login',
+    'a.nI-gNb-lg-rg__register',
   ],
   easyApply: [
     'button.styles_apply-button__uJI3A',
@@ -63,11 +71,35 @@ export type SearchResultJob = {
   externalJobId?: string;
   experienceText?: string;
   salaryText?: string;
+  companyLogo?: string;
+  description?: string;
+  skills?: string[];
+  rating?: string;
 };
 
 export function jobIdFromUrl(url: string): string | undefined {
   const match = url.match(/(\d{8,})(?:\?|#|$)/);
   return match?.[1];
+}
+
+function cleanText(value?: string | null): string | undefined {
+  const t = value?.replace(/\s+/g, ' ').trim();
+  return t || undefined;
+}
+
+function cleanCompany(value?: string | null): string {
+  return (
+    cleanText(value)?.replace(/\s*Reviews?.*$/i, '').trim() || 'Unknown'
+  );
+}
+
+function absoluteUrl(src?: string | null): string | undefined {
+  if (!src || src.startsWith('data:')) return undefined;
+  try {
+    return new URL(src, 'https://www.naukri.com').href;
+  } catch {
+    return undefined;
+  }
 }
 
 export function buildNaukriSearchUrl(prefs: JobPreferences): string {
@@ -122,14 +154,14 @@ export class NaukriAdapter implements PlatformAdapter {
   }
 
   isLoggedIn(doc: Document = document): boolean {
-    const loginCta = doc.querySelector('#login_Layer');
-    if (loginCta) return false;
-    return Boolean(
-      queryFirst(
-        naukriSelectors.loggedIn.filter((s) => s !== '#login_Layer'),
-        doc
-      ) || doc.cookie.includes('naukri')
-    );
+    // Explicit logged-out header controls.
+    if (queryFirst(naukriSelectors.loggedOut, doc)) {
+      return false;
+    }
+
+    // Require a positive logged-in signal. Never use cookies — Naukri sets
+    // cookies even when logged out, which previously caused false positives.
+    return Boolean(queryFirst(naukriSelectors.loggedIn, doc));
   }
 
   readJob(doc: Document = document): Partial<JobPayload> | null {
@@ -143,13 +175,56 @@ export class NaukriAdapter implements PlatformAdapter {
       doc.querySelector('[data-job-id]')?.getAttribute('data-job-id') ??
       jobIdFromUrl(href);
 
+    const logoEl =
+      (doc.querySelector(
+        'img.logoImage, img[alt="companyLogo"], [class*="jd-header"] img, [class*="company-logo"] img'
+      ) as HTMLImageElement | null) ?? null;
+    const companyLogo = absoluteUrl(logoEl?.src);
+
+    const description =
+      cleanText(
+        doc.querySelector(
+          '.job-desc, [class*="job-desc"], [class*="styles_job-desc"], #job-description, [class*="description"]'
+        )?.textContent
+      )?.slice(0, 1200) || undefined;
+
+    const experience =
+      cleanText(
+        doc.querySelector(
+          '.expwdth, [class*="experience"], .styles_jhc__exp__'
+        )?.textContent
+      ) || undefined;
+    const salary =
+      cleanText(
+        doc.querySelector('.sal, [class*="salary"], .styles_jhc__salary__')
+          ?.textContent
+      ) || undefined;
+    const rating =
+      cleanText(doc.querySelector('.rating .main-2, [class*="rating"] .main-2')?.textContent) ||
+      undefined;
+
+    const skills = Array.from(
+      doc.querySelectorAll(
+        '.chip, [class*="chip"], [class*="key-skill"] span, [class*="skills"] span'
+      )
+    )
+      .map((el) => cleanText(el.textContent))
+      .filter((s): s is string => Boolean(s))
+      .slice(0, 20);
+
     return {
       platform: this.platform,
-      title,
-      company,
-      location,
+      title: cleanText(title) || title,
+      company: cleanCompany(company),
+      location: cleanText(location),
       externalJobId,
       url: href,
+      companyLogo,
+      description,
+      experience,
+      salary,
+      skills: skills.length ? skills : undefined,
+      rating,
       status: 'detected',
     };
   }
@@ -173,27 +248,49 @@ export class NaukriAdapter implements PlatformAdapter {
       const titleEl =
         (root.querySelector('a.title') as HTMLAnchorElement | null) ??
         (card.tagName === 'A' ? (card as HTMLAnchorElement) : null);
-      const title = titleEl?.textContent?.trim();
+      const title = cleanText(titleEl?.textContent);
       const href = titleEl?.href;
       if (!title || !href || !href.includes('job-listings')) continue;
       if (seen.has(href)) continue;
       seen.add(href);
 
       const company =
-        root.querySelector('a.comp-name, .comp-name, [class*="comp-name"]')
-          ?.textContent?.trim() || 'Unknown';
+        cleanCompany(
+          root.querySelector('a.comp-name, .comp-name, [class*="comp-name"]')
+            ?.textContent
+        ) || 'Unknown';
       const location =
-        root
-          .querySelector('.locWdth, .location, [class*="location"]')
-          ?.textContent?.trim() || undefined;
+        cleanText(
+          root
+            .querySelector('.locWdth, .location, [class*="location"]')
+            ?.textContent
+        ) || undefined;
       const experienceText =
-        root
-          .querySelector('.expwdth, .experience, [class*="experience"]')
-          ?.textContent?.trim() || undefined;
+        cleanText(
+          root
+            .querySelector('.expwdth, .experience, [class*="experience"]')
+            ?.textContent
+        ) || undefined;
       const salaryText =
-        root
-          .querySelector('.sal, .salary, [class*="salary"]')
-          ?.textContent?.trim() || undefined;
+        cleanText(
+          root.querySelector('.sal, .salary, [class*="salary"]')?.textContent
+        ) || undefined;
+      const description =
+        cleanText(root.querySelector('.job-desc, [class*="job-desc"]')?.textContent)?.slice(
+          0,
+          600
+        ) || undefined;
+      const logoEl = root.querySelector(
+        'img.logoImage, img[alt="companyLogo"], .imagewrap img'
+      ) as HTMLImageElement | null;
+      const companyLogo = absoluteUrl(logoEl?.src);
+      const rating =
+        cleanText(root.querySelector('.rating .main-2')?.textContent) ||
+        undefined;
+      const skills = Array.from(root.querySelectorAll('.tag-li, .tag, [class*="skill"] span'))
+        .map((el) => cleanText(el.textContent))
+        .filter((s): s is string => Boolean(s))
+        .slice(0, 12);
 
       results.push({
         title,
@@ -204,6 +301,10 @@ export class NaukriAdapter implements PlatformAdapter {
           root.getAttribute('data-job-id') ?? jobIdFromUrl(href),
         experienceText,
         salaryText,
+        companyLogo,
+        description,
+        skills: skills.length ? skills : undefined,
+        rating,
       });
     }
 

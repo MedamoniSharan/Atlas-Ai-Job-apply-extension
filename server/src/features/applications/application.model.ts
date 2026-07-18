@@ -10,6 +10,12 @@ export interface IApplication extends Document {
   company: string;
   location?: string;
   url?: string;
+  companyLogo?: string;
+  description?: string;
+  experience?: string;
+  salary?: string;
+  skills?: string[];
+  rating?: string;
   status: ApplicationStatus;
   appliedAt?: Date;
   metadata?: Record<string, unknown>;
@@ -31,6 +37,12 @@ const applicationSchema = new Schema<IApplication>(
     company: { type: String, required: true },
     location: { type: String },
     url: { type: String },
+    companyLogo: { type: String },
+    description: { type: String },
+    experience: { type: String },
+    salary: { type: String },
+    skills: { type: [String], default: undefined },
+    rating: { type: String },
     status: {
       type: String,
       enum: ['detected', 'applied', 'viewed', 'saved', 'interview', 'offer', 'rejected'],
