@@ -1,5 +1,19 @@
 export type CopilotLogLevel = 'info' | 'success' | 'warn' | 'error';
 
+export type CopilotAlertKind =
+  | 'daily_limit'
+  | 'login'
+  | 'questions'
+  | 'error'
+  | 'generic';
+
+export type CopilotAlert = {
+  message: string;
+  level: 'warn' | 'error' | 'info';
+  kind: CopilotAlertKind;
+  at: string;
+};
+
 export type CopilotLogEntry = {
   id: string;
   at: string;
@@ -18,6 +32,7 @@ export type CopilotState = {
   skipped: number;
   currentTitle?: string;
   lastMessage?: string;
+  alert?: CopilotAlert | null;
 };
 
 const LOG_KEY = 'copilotLogs';
@@ -33,6 +48,7 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   matched: 0,
   applied: 0,
   skipped: 0,
+  alert: null,
 };
 
 export async function getCopilotState(): Promise<CopilotState> {
@@ -71,7 +87,87 @@ export async function appendCopilotLog(
   const next = [entry, ...logs].slice(0, MAX_LOGS);
   await chrome.storage.local.set({ [LOG_KEY]: next });
   await setCopilotState({ lastMessage: message });
+
+  // Surface important warnings in popup + flashing banner.
+  if (level === 'warn' || level === 'error') {
+    const kind = classifyAlert(message);
+    if (kind) {
+      await raiseCopilotAlert(message, level === 'error' ? 'error' : 'warn', kind);
+    }
+  }
+
   return entry;
+}
+
+function classifyAlert(message: string): CopilotAlertKind | null {
+  const m = message.toLowerCase();
+  if (/daily apply limit/.test(m)) return 'daily_limit';
+  if (/log into naukri|not logged into naukri|naukri login/.test(m)) {
+    return 'login';
+  }
+  if (/asking questions|waiting on naukri questions|questions still open/.test(m)) {
+    return 'questions';
+  }
+  if (/bot error|still not logged|stopping bot/.test(m)) return 'error';
+  if (levelLooksImportant(m)) return 'generic';
+  return null;
+}
+
+function levelLooksImportant(message: string): boolean {
+  return /limit reached|failed|unavailable|stopped/.test(message);
+}
+
+async function syncActionBadge(alert: CopilotAlert | null | undefined) {
+  try {
+    if (!alert) {
+      await chrome.action.setBadgeText({ text: '' });
+      return;
+    }
+    const text =
+      alert.kind === 'daily_limit'
+        ? 'MAX'
+        : alert.kind === 'login'
+          ? 'IN'
+          : alert.level === 'error'
+            ? '!'
+            : '⚠';
+    await chrome.action.setBadgeText({ text });
+    await chrome.action.setBadgeBackgroundColor({
+      color: alert.level === 'error' ? '#b42318' : '#b45309',
+    });
+    await chrome.action.setTitle({
+      title: `Atlas — ${alert.message}`,
+    });
+  } catch {
+    /* action API may be unavailable in tests */
+  }
+}
+
+export async function raiseCopilotAlert(
+  message: string,
+  level: CopilotAlert['level'] = 'warn',
+  kind: CopilotAlertKind = 'generic'
+): Promise<CopilotAlert> {
+  const alert: CopilotAlert = {
+    message,
+    level,
+    kind,
+    at: new Date().toISOString(),
+  };
+  await setCopilotState({ alert });
+  await syncActionBadge(alert);
+  await broadcastCopilotToNaukriTabs({ type: 'COPILOT_ALERT', alert });
+  return alert;
+}
+
+export async function clearCopilotAlert(): Promise<void> {
+  await setCopilotState({ alert: null });
+  await syncActionBadge(null);
+  try {
+    await chrome.action.setTitle({ title: 'Atlas' });
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function clearCopilotLogs(): Promise<void> {

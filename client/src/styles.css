@@ -90,6 +90,10 @@ input {
   margin: 2rem auto;
 }
 
+.page--wide {
+  width: min(1480px, calc(100% - 2rem));
+}
+
 .auth-page {
   min-height: 100vh;
   display: grid;
@@ -523,12 +527,15 @@ input {
 }
 
 .apps-table-wrap {
+  width: 100%;
   overflow-x: auto;
-  margin: 0 -0.25rem;
+  margin: 0;
 }
 
 .apps-table--rich {
-  min-width: 960px;
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
 }
 
 .apps-table--rich th {
@@ -542,11 +549,26 @@ input {
   font-size: 0.9rem;
 }
 
+.apps-table--rich th:nth-child(1),
+.apps-table--rich td:nth-child(1) {
+  width: 28%;
+}
+
+.apps-table--rich th:nth-child(2),
+.apps-table--rich td:nth-child(2) {
+  width: 12%;
+}
+
+.apps-table--rich th:nth-child(6),
+.apps-table--rich td:nth-child(6) {
+  width: 14%;
+}
+
 .apps-table__role {
   display: flex;
   gap: 0.7rem;
   align-items: flex-start;
-  min-width: 16rem;
+  width: 100%;
 }
 
 .apps-table__role a {
@@ -569,12 +591,12 @@ input {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  max-width: 22rem;
+  max-width: none;
 }
 
 .apps-table__skills {
   margin: 0;
-  max-width: 12rem;
+  max-width: none;
 }
 
 .apps-table__platform {

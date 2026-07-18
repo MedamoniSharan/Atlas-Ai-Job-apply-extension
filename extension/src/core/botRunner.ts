@@ -60,14 +60,55 @@ async function waitWhilePaused() {
 }
 
 /**
+ * While paused for Naukri questions, also poll the tab for apply-success.
+ * If the user finishes the form, auto-resume without requiring Resume click.
+ */
+async function waitWhilePausedForQuestions(
+  tabId: number
+): Promise<'resumed' | 'applied' | 'stopped'> {
+  while (true) {
+    const state = await getCopilotState();
+    if (!state.running) return 'stopped';
+    if (!state.paused) return 'resumed';
+
+    try {
+      const status = await sendToTab<{
+        applied?: boolean;
+        needsQuestions?: boolean;
+      }>(tabId, { type: 'CHECK_APPLY_STATUS' }, 2);
+      if (status.applied) {
+        await setCopilotState({ paused: false, needsLogin: false });
+        await appendCopilotLog(
+          'Apply success detected after your answers — continuing',
+          'success'
+        );
+        return 'applied';
+      }
+      if (status.needsQuestions === false) {
+        await setCopilotState({ paused: false, needsLogin: false });
+        await appendCopilotLog(
+          'Questions cleared — retrying apply',
+          'success'
+        );
+        return 'resumed';
+      }
+    } catch {
+      /* tab may be navigating */
+    }
+
+    await wait(1200);
+  }
+}
+
+/**
  * Before each apply: require Naukri login. If logged out, pause and wait for Resume.
  */
 async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
   for (let attempt = 0; attempt < 8; attempt++) {
     if (!(await waitWhilePaused())) return false;
 
-    // Give the header a moment to render Login vs profile.
-    await wait(attempt === 0 ? 800 : 400);
+    // Give the React header time to swap Login → profile drawer.
+    await wait(attempt === 0 ? 1500 : 700);
 
     const login = await sendToTab<{ loggedIn: boolean }>(tabId, {
       type: 'CHECK_LOGIN',
@@ -82,7 +123,7 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
 
     await setCopilotState({ paused: true, needsLogin: true });
     await appendCopilotLog(
-      'Paused — please log into Naukri to continue. Use the popup, then press Resume.',
+      'Paused — please log into Naukri to continue. Open login in a new tab, then press Continue.',
       'warn'
     );
     await sendToTab(tabId, { type: 'SHOW_LOGIN_PROMPT' }).catch(() => undefined);
@@ -90,7 +131,7 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
     if (!(await waitWhilePaused())) return false;
 
     await appendCopilotLog('Resumed — checking Naukri login again…');
-    await wait(1500);
+    await wait(2000);
   }
 
   await appendCopilotLog(
@@ -263,7 +304,10 @@ export async function runBot(handlers: BotHandlers): Promise<{
 
       const dayOk = await canApplyToday(prefs.dailyApplyLimit);
       if (!dayOk) {
-        await appendCopilotLog('Daily apply limit reached', 'warn');
+        await appendCopilotLog(
+          `Daily apply limit reached (${prefs.dailyApplyLimit}/day). Raise the limit in the Atlas popup or try again tomorrow.`,
+          'warn'
+        );
         break;
       }
 
@@ -298,11 +342,27 @@ export async function runBot(handlers: BotHandlers): Promise<{
       if (result.needsUserInput) {
         await setCopilotState({ paused: true, currentTitle: base.title });
         await appendCopilotLog(
-          `Paused — Naukri is asking questions for "${base.title}". Answer them on the page, then press Resume.`,
+          `Paused — Naukri is asking questions for "${base.title}". Answer them on the page; Atlas will continue when you save, or press Resume.`,
           'warn'
         );
 
-        if (!(await waitWhilePaused())) break;
+        const pauseOutcome = await waitWhilePausedForQuestions(tab.id);
+        if (pauseOutcome === 'stopped') break;
+
+        if (pauseOutcome === 'applied') {
+          await handlers.persistApplicationRecorded({
+            ...base,
+            status: 'applied',
+            appliedAt: new Date().toISOString(),
+            metadata: { source: 'auto_apply' },
+          });
+          await incrementAppliedToday();
+          const st = await getCopilotState();
+          await setCopilotState({ applied: st.applied + 1 });
+          await appendCopilotLog(`Applied: ${base.title}`, 'success');
+          await wait(randomDelay());
+          continue;
+        }
 
         await appendCopilotLog(
           `Resumed — retrying apply for "${base.title}"`,
@@ -320,61 +380,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
           job?: Partial<JobPayload>;
         }>(tab.id, { type: 'RUN_EASY_APPLY' });
 
-        if (retry.needsUserInput) {
-          await setCopilotState({ paused: true });
-          await appendCopilotLog(
-            'Still waiting on Naukri questions. Finish them, then press Resume again.',
-            'warn'
-          );
-          if (!(await waitWhilePaused())) break;
-
-          if (!(await ensureNaukriLoggedIn(tab.id))) break;
-
-          const retry2 = await sendToTab<{
-            ok: boolean;
-            skipped?: boolean;
-            needsUserInput?: boolean;
-            reason?: string;
-            job?: Partial<JobPayload>;
-          }>(tab.id, { type: 'RUN_EASY_APPLY' });
-
-          if (retry2.ok) {
-            await handlers.persistApplicationRecorded({
-              ...base,
-              title: retry2.job?.title || base.title,
-              company: retry2.job?.company || base.company,
-              status: 'applied',
-              appliedAt: new Date().toISOString(),
-              metadata: { source: 'auto_apply' },
-            });
-            await incrementAppliedToday();
-            const st = await getCopilotState();
-            await setCopilotState({ applied: st.applied + 1 });
-            await appendCopilotLog(`Applied: ${base.title}`, 'success');
-          } else if (retry2.needsUserInput) {
-            const st = await getCopilotState();
-            await setCopilotState({ skipped: st.skipped + 1 });
-            await handlers.persistJobDetected({
-              ...base,
-              metadata: {
-                source: 'auto_scan',
-                skipped: true,
-                skipReason: 'User questions not completed',
-              },
-            });
-            await appendCopilotLog(
-              `Skipped: ${base.title} — questions still open. Continuing scan.`,
-              'warn'
-            );
-          } else {
-            const st = await getCopilotState();
-            await setCopilotState({ skipped: st.skipped + 1 });
-            await appendCopilotLog(
-              `Skipped: ${base.title} — ${retry2.reason || 'unavailable'}`,
-              'warn'
-            );
-          }
-        } else if (retry.ok) {
+        if (retry.ok) {
           await handlers.persistApplicationRecorded({
             ...base,
             title: retry.job?.title || base.title,
@@ -387,6 +393,74 @@ export async function runBot(handlers: BotHandlers): Promise<{
           const st = await getCopilotState();
           await setCopilotState({ applied: st.applied + 1 });
           await appendCopilotLog(`Applied: ${base.title}`, 'success');
+        } else if (retry.needsUserInput) {
+          await setCopilotState({ paused: true });
+          await appendCopilotLog(
+            'Still waiting on Naukri questions. Finish them — Atlas will continue when saved, or press Resume.',
+            'warn'
+          );
+          const pause2 = await waitWhilePausedForQuestions(tab.id);
+          if (pause2 === 'stopped') break;
+
+          if (pause2 === 'applied') {
+            await handlers.persistApplicationRecorded({
+              ...base,
+              status: 'applied',
+              appliedAt: new Date().toISOString(),
+              metadata: { source: 'auto_apply' },
+            });
+            await incrementAppliedToday();
+            const st = await getCopilotState();
+            await setCopilotState({ applied: st.applied + 1 });
+            await appendCopilotLog(`Applied: ${base.title}`, 'success');
+          } else {
+            if (!(await ensureNaukriLoggedIn(tab.id))) break;
+
+            const retry2 = await sendToTab<{
+              ok: boolean;
+              skipped?: boolean;
+              needsUserInput?: boolean;
+              reason?: string;
+              job?: Partial<JobPayload>;
+            }>(tab.id, { type: 'RUN_EASY_APPLY' });
+
+            if (retry2.ok) {
+              await handlers.persistApplicationRecorded({
+                ...base,
+                title: retry2.job?.title || base.title,
+                company: retry2.job?.company || base.company,
+                status: 'applied',
+                appliedAt: new Date().toISOString(),
+                metadata: { source: 'auto_apply' },
+              });
+              await incrementAppliedToday();
+              const st = await getCopilotState();
+              await setCopilotState({ applied: st.applied + 1 });
+              await appendCopilotLog(`Applied: ${base.title}`, 'success');
+            } else if (retry2.needsUserInput) {
+              const st = await getCopilotState();
+              await setCopilotState({ skipped: st.skipped + 1 });
+              await handlers.persistJobDetected({
+                ...base,
+                metadata: {
+                  source: 'auto_scan',
+                  skipped: true,
+                  skipReason: 'User questions not completed',
+                },
+              });
+              await appendCopilotLog(
+                `Skipped: ${base.title} — questions still open. Continuing scan.`,
+                'warn'
+              );
+            } else {
+              const st = await getCopilotState();
+              await setCopilotState({ skipped: st.skipped + 1 });
+              await appendCopilotLog(
+                `Skipped: ${base.title} — ${retry2.reason || 'unavailable'}`,
+                'warn'
+              );
+            }
+          }
         } else {
           const st = await getCopilotState();
           await setCopilotState({ skipped: st.skipped + 1 });

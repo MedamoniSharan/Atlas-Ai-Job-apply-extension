@@ -126,6 +126,11 @@ async function runEasyApply(): Promise<{
 }> {
   const job = naukri.readJob(document) ?? undefined;
 
+  // Success page / already applied must win over leftover questionnaire DOM.
+  if (naukri.detectApplicationStatus(document) === 'applied') {
+    return { ok: true, job };
+  }
+
   const loginBlock = (() => {
     const text = (document.body?.innerText || '').toLowerCase();
     if (text.includes('login to apply') || text.includes('register to apply')) {
@@ -145,10 +150,6 @@ async function runEasyApply(): Promise<{
       reason: questionsBefore,
       job,
     };
-  }
-
-  if (naukri.detectApplicationStatus(document) === 'applied') {
-    return { ok: true, job };
   }
 
   const btn = naukri.findEasyApplyButton(document);
@@ -173,6 +174,10 @@ async function runEasyApply(): Promise<{
 
   btn.click();
   await new Promise((r) => setTimeout(r, 2200));
+
+  if (naukri.detectApplicationStatus(document) === 'applied') {
+    return { ok: true, job: naukri.readJob(document) ?? job };
+  }
 
   const questionsAfter = naukri.detectNeedsUserQuestions(document);
   if (questionsAfter) {
@@ -227,6 +232,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case 'SHOW_LOGIN_PROMPT': {
         sendResponse({ ok: true });
+        break;
+      }
+      case 'CHECK_APPLY_STATUS': {
+        sendResponse({
+          applied: naukri.detectApplicationStatus(document) === 'applied',
+          needsQuestions: Boolean(naukri.detectNeedsUserQuestions(document)),
+          href: window.location.href,
+        });
         break;
       }
       case 'RUN_SCAN_SCRAPE': {

@@ -83,6 +83,24 @@ describe('NaukriAdapter', () => {
     expect(adapter.detectNeedsUserQuestions(document)).toMatch(/mandatory/i);
   });
 
+  it('treats successfully-applied pages as applied, not questions', () => {
+    const adapter = new NaukriAdapter();
+    Object.defineProperty(document, 'location', {
+      value: { href: 'https://www.naukri.com/myapply/saveApply?strJobsarr=1' },
+      configurable: true,
+    });
+    document.body.innerHTML = `
+      <div>You have successfully applied to 'Development Interns'</div>
+      <aside class="sidebar">
+        <input type="text" />
+        <input type="text" />
+        <div>Any questions about interview prep?</div>
+      </aside>
+    `;
+    expect(adapter.detectApplicationStatus(document)).toBe('applied');
+    expect(adapter.detectNeedsUserQuestions(document)).toBeNull();
+  });
+
   it('treats Login/Register header as logged out', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `
@@ -96,6 +114,26 @@ describe('NaukriAdapter', () => {
   it('treats profile drawer as logged in', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `<div class="nI-gNb-drawer__icon"></div>`;
+    expect(adapter.isLoggedIn(document)).toBe(true);
+  });
+
+  it('treats hidden Login button + profile drawer as logged in', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <a id="login_Layer" class="nI-gNb-lg-rg__login" href="/login" style="display:none">Login</a>
+      <div class="nI-gNb-drawer">
+        <img class="nI-gNb-icon-img" src="https://img.naukimg.com/profile/photo.jpg" />
+        <span class="nI-gNb-info__subtxt">Sharan</span>
+      </div>
+    `;
+    expect(adapter.isLoggedIn(document)).toBe(true);
+  });
+
+  it('treats my.naukri profile link as logged in', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <a href="https://www.naukri.com/mnjuser/homepage">My Naukri</a>
+    `;
     expect(adapter.isLoggedIn(document)).toBe(true);
   });
 });

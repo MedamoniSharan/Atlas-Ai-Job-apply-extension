@@ -34,13 +34,25 @@ export const naukriSelectors: SelectorRegistry = {
     '[class*="apply-message"]',
     '.already-applied',
     '[class*="already-applied"]',
+    '[class*="apply-success"]',
+    '[class*="applied-success"]',
+    '.apply-status-message',
   ],
   loggedIn: [
     '.nI-gNb-drawer__icon',
     '.nI-gNb-drawer',
-    '[data-ga-track*="profile"]',
-    '.user-name',
     '.nI-gNb-icon-and-drawer',
+    '.nI-gNb-info__subtxt',
+    '.nI-gNb-info__name',
+    'img.nI-gNb-icon-img',
+    '[data-ga-track*="profile"]',
+    '[data-ga-track*="Profile"]',
+    '.user-name',
+    '[class*="user-name"]',
+    'a[href*="my.naukri.com"]',
+    'a[href*="mnjuser"]',
+    'a[href*="/mnj/"]',
+    'a[href*="logout"]',
   ],
   loggedOut: [
     '#login_Layer',
@@ -91,6 +103,86 @@ function cleanCompany(value?: string | null): string {
   return (
     cleanText(value)?.replace(/\s*Reviews?.*$/i, '').trim() || 'Unknown'
   );
+}
+
+function isElementVisible(el: Element | null | undefined): boolean {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  if (el.hidden || el.getAttribute('aria-hidden') === 'true') return false;
+
+  const inline = el.getAttribute('style') || '';
+  if (/display\s*:\s*none/i.test(inline) || /visibility\s*:\s*hidden/i.test(inline)) {
+    return false;
+  }
+
+  const view = el.ownerDocument?.defaultView;
+  if (view?.getComputedStyle) {
+    try {
+      const cs = view.getComputedStyle(el);
+      if (
+        cs.display === 'none' ||
+        cs.visibility === 'hidden' ||
+        cs.opacity === '0'
+      ) {
+        return false;
+      }
+    } catch {
+      /* jsdom / detached */
+    }
+  }
+
+  return true;
+}
+
+function hasLoggedInSignal(doc: Document): boolean {
+  if (queryFirst(naukriSelectors.loggedIn, doc)) return true;
+
+  // Profile photo / avatar in the global nav.
+  const avatars = Array.from(
+    doc.querySelectorAll(
+      '.nI-gNb-header img, .nI-gNb-gnb img, header img, [class*="drawer"] img'
+    )
+  );
+  for (const img of avatars) {
+    const src = (img.getAttribute('src') || '').toLowerCase();
+    if (
+      src.includes('profile') ||
+      src.includes('photo') ||
+      src.includes('avatar') ||
+      src.includes('ni-gnb') ||
+      /\/user|\/u\//i.test(src)
+    ) {
+      return true;
+    }
+  }
+
+  // Visible account name next to the avatar (not "Login").
+  const nameEls = Array.from(
+    doc.querySelectorAll(
+      '.nI-gNb-info__subtxt, .nI-gNb-info__name, .nI-gNb-drawer span, [class*="userName"]'
+    )
+  );
+  for (const el of nameEls) {
+    const text = cleanText(el.textContent) || '';
+    if (
+      text &&
+      !/^login$/i.test(text) &&
+      !/^register$/i.test(text) &&
+      text.length >= 2 &&
+      isElementVisible(el)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function hasVisibleLoggedOutSignal(doc: Document): boolean {
+  for (const selector of naukriSelectors.loggedOut) {
+    const el = doc.querySelector(selector);
+    if (el && isElementVisible(el)) return true;
+  }
+  return false;
 }
 
 function absoluteUrl(src?: string | null): string | undefined {
@@ -154,14 +246,13 @@ export class NaukriAdapter implements PlatformAdapter {
   }
 
   isLoggedIn(doc: Document = document): boolean {
-    // Explicit logged-out header controls.
-    if (queryFirst(naukriSelectors.loggedOut, doc)) {
-      return false;
-    }
+    // Prefer positive account signals. Naukri often keeps #login_Layer in the
+    // DOM (hidden) even after login, which used to cause false "logged out".
+    if (hasLoggedInSignal(doc)) return true;
 
-    // Require a positive logged-in signal. Never use cookies — Naukri sets
-    // cookies even when logged out, which previously caused false positives.
-    return Boolean(queryFirst(naukriSelectors.loggedIn, doc));
+    if (hasVisibleLoggedOutSignal(doc)) return false;
+
+    return false;
   }
 
   readJob(doc: Document = document): Partial<JobPayload> | null {
@@ -314,9 +405,30 @@ export class NaukriAdapter implements PlatformAdapter {
   detectApplicationStatus(
     doc: Document = document
   ): JobPayload['status'] | null {
+    const href = doc.location?.href ?? '';
+    if (
+      /\/myapply\/saveApply/i.test(href) ||
+      /\/myapply\//i.test(href) ||
+      /appliedSuccessfully|applySuccess/i.test(href)
+    ) {
+      return 'applied';
+    }
+
     if (queryFirst(naukriSelectors.applySuccess, doc)) {
       return 'applied';
     }
+
+    const text = (doc.body?.innerText || '').toLowerCase();
+    if (
+      /you have successfully applied/.test(text) ||
+      /successfully applied to/.test(text) ||
+      /application (has been )?submitted/.test(text) ||
+      /you have already applied/.test(text) ||
+      /already applied for this job/.test(text)
+    ) {
+      return 'applied';
+    }
+
     return null;
   }
 
@@ -346,6 +458,11 @@ export class NaukriAdapter implements PlatformAdapter {
    * that require the user to answer before apply can succeed.
    */
   detectNeedsUserQuestions(doc: Document = document): string | null {
+    // Never treat a completed apply page as "still needs questions".
+    if (this.detectApplicationStatus(doc) === 'applied') {
+      return null;
+    }
+
     const text = (doc.body?.innerText || '').toLowerCase();
 
     if (

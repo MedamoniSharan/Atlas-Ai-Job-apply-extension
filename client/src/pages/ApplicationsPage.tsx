@@ -322,7 +322,7 @@ export function ApplicationsPage() {
   };
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       {needsPrefs && (
         <div className="panel onboarding-panel">
           <h3>Set job preferences</h3>

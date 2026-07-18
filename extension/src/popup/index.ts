@@ -1,5 +1,6 @@
 import type { JobPreferences, WorkMode } from '@atlas/shared';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
+import type { CopilotAlert, CopilotState } from '../core/copilotState';
 
 const authStateEl = document.getElementById('auth-state')!;
 const healthStateEl = document.getElementById('health-state')!;
@@ -11,6 +12,41 @@ const prefsMsg = document.getElementById('prefs-msg')!;
 const emailInput = document.getElementById('email') as HTMLInputElement;
 const passwordInput = document.getElementById('password') as HTMLInputElement;
 const apiBaseInput = document.getElementById('api-base') as HTMLInputElement;
+const alertEl = document.getElementById('copilot-alert')!;
+const alertTitleEl = document.getElementById('copilot-alert-title')!;
+const alertMsgEl = document.getElementById('copilot-alert-msg')!;
+const alertDismissBtn = document.getElementById('copilot-alert-dismiss')!;
+
+function alertTitle(alert: CopilotAlert): string {
+  switch (alert.kind) {
+    case 'daily_limit':
+      return 'Daily apply limit reached';
+    case 'login':
+      return 'Naukri login needed';
+    case 'questions':
+      return 'Answer Naukri questions';
+    case 'error':
+      return 'Co-pilot error';
+    default:
+      return 'Co-pilot alert';
+  }
+}
+
+function renderAlert(alert: CopilotAlert | null | undefined) {
+  if (!alert?.message) {
+    alertEl.classList.add('hidden');
+    alertEl.classList.remove('is-error', 'flash');
+    return;
+  }
+  alertEl.classList.remove('hidden');
+  alertEl.classList.toggle('is-error', alert.level === 'error');
+  // retrigger flash animation
+  alertEl.classList.remove('flash');
+  void alertEl.offsetWidth;
+  alertEl.classList.add('flash');
+  alertTitleEl.textContent = alertTitle(alert);
+  alertMsgEl.textContent = alert.message;
+}
 
 function parseList(value: string): string[] {
   return value
@@ -98,6 +134,7 @@ async function refreshUi() {
       applyQueueDepth?: number;
     };
     preferences?: JobPreferences;
+    copilot?: CopilotState;
   }>({ type: 'GET_STATUS' });
 
   apiBaseInput.value = status.auth.apiBaseUrl;
@@ -110,6 +147,14 @@ async function refreshUi() {
       ? ` · Apply ${status.health.applyQueueDepth}`
       : ''
   }`;
+
+  renderAlert(status.copilot?.alert);
+
+  if (status.copilot?.running) {
+    scanStateEl.textContent = status.copilot.paused
+      ? `Co-pilot paused · matched ${status.copilot.matched}, applied ${status.copilot.applied}`
+      : `Co-pilot running · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
+  }
 
   loginForm.classList.toggle('hidden', signedIn);
   authedSection.classList.toggle('hidden', !signedIn);
@@ -125,6 +170,18 @@ async function refreshUi() {
     if (prefs) fillPrefsForm(prefs);
   }
 }
+
+alertDismissBtn.addEventListener('click', async () => {
+  await send({ type: 'COPILOT_DISMISS_ALERT' });
+  renderAlert(null);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.copilotState) return;
+  const next = changes.copilotState.newValue as CopilotState | undefined;
+  renderAlert(next?.alert);
+});
+
 
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();

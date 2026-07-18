@@ -23,7 +23,9 @@ import {
   processApplyQueue,
 } from '../core/applyQueue';
 import {
+  clearCopilotAlert,
   clearCopilotLogs,
+  getCopilotState,
   setCopilotState,
 } from '../core/copilotState';
 import {
@@ -120,10 +122,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           const health = await reportHealth();
           const prefs = await getCachedPreferences();
           const applyQueueDepth = await getApplyQueueDepth();
+          const copilot = await getCopilotState();
           sendResponse({
             auth,
             health: { ...health, applyQueueDepth },
             preferences: prefs,
+            copilot,
           });
           break;
         }
@@ -213,6 +217,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             break;
           }
           await clearCopilotLogs();
+          await clearCopilotAlert();
           void runBot({
             persistJobDetected: async (payload) => {
               await persistAndSync(
@@ -227,6 +232,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
               );
             },
           });
+          sendResponse({ ok: true });
+          break;
+        }
+        case 'COPILOT_DISMISS_ALERT': {
+          await clearCopilotAlert();
           sendResponse({ ok: true });
           break;
         }
@@ -249,6 +259,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           await setCopilotState({
             runInBackground: Boolean(message.runInBackground),
           });
+          sendResponse({ ok: true });
+          break;
+        }
+        case 'OPEN_NAUKRI_LOGIN': {
+          const loginUrl =
+            typeof message.loginUrl === 'string' && message.loginUrl
+              ? message.loginUrl
+              : 'https://www.naukri.com/nlogin/login';
+          await chrome.tabs.create({ url: loginUrl, active: true });
           sendResponse({ ok: true });
           break;
         }
