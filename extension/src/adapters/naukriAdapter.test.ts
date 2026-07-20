@@ -210,7 +210,7 @@ describe('NaukriAdapter', () => {
     expect(job?.aboutCompany).toMatch(/Moglix/i);
     expect(job?.companyLogo).toContain('naukimg.com');
   });
-  it('marks company-site apply jobs in search results', () => {
+  it('skips company-site apply jobs from search results', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `
       <div class="srp-jobtuple-wrapper" data-job-id="111">
@@ -225,13 +225,8 @@ describe('NaukriAdapter', () => {
       </div>
     `;
     const jobs = adapter.readSearchResults(document);
-    expect(jobs).toHaveLength(2);
-    expect(jobs.find((j) => j.title === 'Easy Apply Role')?.companySiteApply).toBe(
-      false
-    );
-    expect(jobs.find((j) => j.title === 'External Role')?.companySiteApply).toBe(
-      true
-    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.title).toBe('Easy Apply Role');
   });
 
   it('detects company-site apply on job detail pages', () => {

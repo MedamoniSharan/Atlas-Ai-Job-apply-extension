@@ -18,7 +18,6 @@ export type CopilotToast = {
   id: string;
   title: string;
   message: string;
-  kind?: 'success' | 'warn';
   at: string;
 };
 
@@ -233,14 +232,12 @@ export async function raiseCopilotAlert(
 
 export async function raiseCopilotToast(
   title: string,
-  message: string,
-  kind: CopilotToast['kind'] = 'success'
+  message: string
 ): Promise<CopilotToast> {
   const toast: CopilotToast = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     title,
     message,
-    kind,
     at: new Date().toISOString(),
   };
   await setCopilotState({ toast });

@@ -117,15 +117,6 @@ async function runEasyApply(): Promise<{
   reason?: string;
   job?: Partial<JobPayload>;
 }> {
-  // Never click Apply from the search list — only on an opened job page.
-  if (!isJobDetailPage()) {
-    return {
-      ok: false,
-      skipped: true,
-      reason: 'Job page not open yet',
-    };
-  }
-
   const job = naukri.readJob(document) ?? undefined;
 
   // Success page / already applied must win over leftover questionnaire DOM.
@@ -252,139 +243,6 @@ async function runEasyApply(): Promise<{
   };
 }
 
-function normalizeHref(href: string): string {
-  try {
-    const u = new URL(href, window.location.href);
-    return `${u.origin}${u.pathname}`.replace(/\/$/, '');
-  } catch {
-    return href.split('?')[0]?.replace(/\/$/, '') || href;
-  }
-}
-
-function findSearchJobCard(opts: {
-  externalJobId?: string;
-  url?: string;
-}): { root: Element; titleEl: HTMLAnchorElement } | null {
-  const cards = Array.from(
-    document.querySelectorAll(
-      '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id], [class*="jobTuple"]'
-    )
-  );
-  const wantUrl = opts.url ? normalizeHref(opts.url) : '';
-  const wantId = opts.externalJobId?.trim() || '';
-
-  for (const card of cards) {
-    const titleEl =
-      (card.querySelector('a.title') as HTMLAnchorElement | null) ??
-      (card.querySelector('a[href*="job-listings"]') as HTMLAnchorElement | null);
-    if (!titleEl?.href) continue;
-    const href = normalizeHref(titleEl.href);
-    const id =
-      card.getAttribute('data-job-id') ||
-      href.match(/-(\d{6,})(?:\/|$)/)?.[1] ||
-      '';
-    if (wantId && id && id === wantId) {
-      return { root: card, titleEl };
-    }
-    if (wantUrl && href === wantUrl) {
-      return { root: card, titleEl };
-    }
-  }
-  return null;
-}
-
-function listCardsVisible(): boolean {
-  return (
-    document.querySelectorAll(
-      '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id], a.title[href*="job-listings"]'
-    ).length > 0 && !isJobDetailPage()
-  );
-}
-
-function isJobDetailPage(): boolean {
-  const path = window.location.pathname || '';
-  if (/\/job-listings\//i.test(path) || /\/jobdescription/i.test(path)) {
-    return true;
-  }
-  // Naukri sometimes keeps a soft URL but renders the JD pane.
-  if (
-    document.querySelector(
-      '.jd-header-title, h1.jd-header-title, [class*="jd-header-title"], .styles_jd-header-title'
-    )
-  ) {
-    return true;
-  }
-  return false;
-}
-
-async function waitForJobDetail(timeoutMs = 12000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (isJobDetailPage()) return true;
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  return isJobDetailPage();
-}
-
-async function clickSearchJob(opts: {
-  externalJobId?: string;
-  url?: string;
-}): Promise<{ ok: boolean; reason?: string; navigated?: boolean }> {
-  const found = findSearchJobCard(opts);
-  if (!found) {
-    return { ok: false, reason: 'Job card not found on list' };
-  }
-  const href = found.titleEl.href;
-  found.root.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  await new Promise((r) => setTimeout(r, 700));
-
-  // Prefer a real user-like click; React apps often need a full MouseEvent.
-  found.titleEl.dispatchEvent(
-    new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      buttons: 1,
-    })
-  );
-  // Also call native click as backup.
-  found.titleEl.click();
-
-  let opened = await waitForJobDetail(5000);
-  if (!opened && href) {
-    // SPA swallowed the click — navigate explicitly to the job URL.
-    window.location.href = href;
-    opened = await waitForJobDetail(10000);
-  }
-
-  if (!opened) {
-    return {
-      ok: false,
-      reason: 'Click did not open job detail page',
-      navigated: false,
-    };
-  }
-  return { ok: true, navigated: true };
-}
-
-async function historyBackToList(
-  timeoutMs = 8000
-): Promise<{ ok: boolean; reason?: string }> {
-  if (listCardsVisible()) {
-    return { ok: true };
-  }
-  history.back();
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    await new Promise((r) => setTimeout(r, 350));
-    if (listCardsVisible()) return { ok: true };
-  }
-  return {
-    ok: listCardsVisible(),
-    reason: listCardsVisible() ? undefined : 'Back did not restore search list',
-  };
-}
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     switch (message?.type) {
@@ -407,8 +265,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'READ_JOB_DETAIL': {
-        // Let "Read more" expansions and lazy JD blocks settle.
-        await new Promise((r) => setTimeout(r, 350));
         const job = naukri.readJob(document);
         sendResponse({ job: job ?? null });
         break;
@@ -433,25 +289,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id]'
         ).length;
         sendResponse({ ok: true, before, after });
-        break;
-      }
-      case 'CLICK_SEARCH_JOB': {
-        const result = await clickSearchJob({
-          externalJobId: message.externalJobId,
-          url: message.url,
-        });
-        sendResponse(result);
-        break;
-      }
-      case 'HISTORY_BACK': {
-        const result = await historyBackToList(
-          typeof message.timeoutMs === 'number' ? message.timeoutMs : 8000
-        );
-        sendResponse(result);
-        break;
-      }
-      case 'IS_JOB_DETAIL': {
-        sendResponse({ ok: true, isDetail: isJobDetailPage() });
         break;
       }
       case 'RUN_EASY_APPLY': {
