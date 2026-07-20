@@ -47,6 +47,21 @@ export function ApplicationDetailDrawer({
 
   if (!app) return null;
 
+  const detailLabels =
+    app.metadata?.detailLabels &&
+    typeof app.metadata.detailLabels === 'object' &&
+    !Array.isArray(app.metadata.detailLabels)
+      ? (app.metadata.detailLabels as Record<string, string>)
+      : null;
+  const sections =
+    app.metadata?.sections &&
+    typeof app.metadata.sections === 'object' &&
+    !Array.isArray(app.metadata.sections)
+      ? (app.metadata.sections as Record<string, string>)
+      : null;
+  const pageText =
+    typeof app.metadata?.pageText === 'string' ? app.metadata.pageText : null;
+
   const facts = [
     { label: 'Experience', value: app.experience },
     { label: 'Salary', value: app.salary },
@@ -67,7 +82,30 @@ export function ApplicationDetailDrawer({
           ? [app.rating, app.reviews].filter(Boolean).join(' · ')
           : undefined,
     },
+    ...(detailLabels
+      ? Object.entries(detailLabels).map(([label, value]) => ({ label, value }))
+      : []),
   ].filter((f) => f.value?.trim());
+
+  // Dedupe facts by label (prefer first / structured fields).
+  const seenLabels = new Set<string>();
+  const uniqueFacts = facts.filter((f) => {
+    const key = f.label.toLowerCase();
+    if (seenLabels.has(key)) return false;
+    seenLabels.add(key);
+    return true;
+  });
+
+  const sectionEntries = sections
+    ? Object.entries(sections).filter(
+        ([key, text]) =>
+          text.trim().length > 20 &&
+          key !== 'aboutCompany' &&
+          key !== 'jobDescription' &&
+          key !== 'keySkills' &&
+          key !== 'jobHighlights'
+      )
+    : [];
 
   return (
     <div className="job-drawer" role="presentation">
@@ -130,11 +168,11 @@ export function ApplicationDetailDrawer({
             </p>
           ) : null}
 
-          {facts.length > 0 ? (
+          {uniqueFacts.length > 0 ? (
             <section className="job-drawer__section">
               <h3>Job details</h3>
               <dl className="job-drawer__meta">
-                {facts.map((f) => (
+                {uniqueFacts.map((f) => (
                   <MetaRow key={f.label} label={f.label} value={f.value} />
                 ))}
               </dl>
@@ -172,6 +210,18 @@ export function ApplicationDetailDrawer({
             </section>
           ) : null}
 
+          {sectionEntries.map(([key, text]) => (
+            <section key={key} className="job-drawer__section">
+              <h3>
+                {key
+                  .replace(/([A-Z])/g, ' $1')
+                  .replace(/^./, (c) => c.toUpperCase())
+                  .trim()}
+              </h3>
+              <p className="job-drawer__prose">{text}</p>
+            </section>
+          ))}
+
           {app.aboutCompany ? (
             <section className="job-drawer__section">
               <h3>About company</h3>
@@ -179,10 +229,18 @@ export function ApplicationDetailDrawer({
             </section>
           ) : null}
 
+          {!app.description && pageText ? (
+            <section className="job-drawer__section">
+              <h3>Page content</h3>
+              <p className="job-drawer__prose">{pageText}</p>
+            </section>
+          ) : null}
+
           {!app.description &&
           !app.aboutCompany &&
           !app.skills?.length &&
-          facts.length === 0 ? (
+          !pageText &&
+          uniqueFacts.length === 0 ? (
             <p className="job-drawer__empty">
               Full details will appear after Atlas opens this job on Naukri.
               Open the listing to view everything on the site.

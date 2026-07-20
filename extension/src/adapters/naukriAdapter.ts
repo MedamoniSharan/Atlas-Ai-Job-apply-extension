@@ -430,15 +430,139 @@ function scrapeSkills(doc: Document): string[] {
   return uniqueStrings(filtered, 40);
 }
 
+/** Expand "Read more" / "Show more" so hidden JD text is in the DOM. */
+function expandCollapsedContent(doc: Document): void {
+  const buttons = Array.from(
+    doc.querySelectorAll('button, a, span[role="button"], [class*="read-more"], [class*="show-more"]')
+  );
+  for (const el of buttons) {
+    const label = cleanText(el.textContent)?.toLowerCase() || '';
+    if (
+      !/^(read more|show more|view more|see more|\+ more|more)$/i.test(label) &&
+      !/read more|show more|view more|see more/.test(label)
+    ) {
+      continue;
+    }
+    if (label.length > 40) continue;
+    try {
+      (el as HTMLElement).click();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function scrapeNamedSections(doc: Document): Record<string, string> {
+  const specs: Array<{ key: string; heading: RegExp; max: number }> = [
+    { key: 'jobDescription', heading: /^job description$/i, max: 8000 },
+    {
+      key: 'roleAndResponsibilities',
+      heading: /^role\s*&\s*responsibilities$/i,
+      max: 6000,
+    },
+    {
+      key: 'preferredCandidate',
+      heading: /^preferred candidate profile$/i,
+      max: 5000,
+    },
+    { key: 'benefits', heading: /^(benefits|perks)$/i, max: 3000 },
+    { key: 'education', heading: /^education$/i, max: 1500 },
+    { key: 'aboutCompany', heading: /^about (the )?company$/i, max: 6000 },
+    { key: 'keySkills', heading: /^(key\s*)?skills$/i, max: 2000 },
+    { key: 'jobHighlights', heading: /^job highlights$/i, max: 2000 },
+    { key: 'additionalDetails', heading: /^additional (details|information)$/i, max: 3000 },
+  ];
+
+  const out: Record<string, string> = {};
+  for (const spec of specs) {
+    const text = sectionByHeading(doc, spec.heading, spec.max);
+    if (text && text.length > 20) out[spec.key] = text;
+  }
+  return out;
+}
+
+/** Collect every Label → value pair visible in JD detail rows. */
+function scrapeAllLabeledDetails(doc: Document): Record<string, string> {
+  const out: Record<string, string> = {};
+  const nodes = Array.from(
+    doc.querySelectorAll(
+      '[class*="details"] label, [class*="other-details"] label, [class*="job-details"] label, [class*="JD"] label, dt, .label, [class*="label"]'
+    )
+  );
+
+  for (const node of nodes) {
+    let label = cleanText(node.textContent) || '';
+    if (!label || label.length > 60) continue;
+
+    let value: string | undefined;
+    if (label.includes(':')) {
+      const parts = label.split(':');
+      label = cleanText(parts[0]) || label;
+      value = cleanText(parts.slice(1).join(':'));
+    }
+
+    if (!value) {
+      const sibling =
+        (node.nextElementSibling as HTMLElement | null) ??
+        (node.parentElement?.querySelector(
+          'span:not(.label), a, [class*="value"], dd'
+        ) as HTMLElement | null);
+      value = cleanText(sibling?.textContent);
+    }
+
+    if (!value || value.length < 1 || value.length > 500) continue;
+    if (value.toLowerCase() === label.toLowerCase()) continue;
+    if (/^(read more|show more|report|login)$/i.test(value)) continue;
+
+    const key = label.replace(/\s+/g, ' ').trim();
+    if (!out[key]) out[key] = value;
+  }
+
+  return out;
+}
+
+/**
+ * Main JD column text (fallback dump of everything Naukri renders in the
+ * job detail content area).
+ */
+function scrapeJobPageText(doc: Document): string | undefined {
+  const roots = [
+    doc.querySelector('[class*="styles_jhc__"], [class*="jd-container"], #root'),
+    doc.querySelector('main, [role="main"], .jd-header')?.parentElement,
+    doc.body,
+  ].filter(Boolean) as Element[];
+
+  for (const root of roots) {
+    const clone = root.cloneNode(true) as Element;
+    clone
+      .querySelectorAll(
+        'script, style, nav, footer, iframe, [class*="chat"], [class*="similar"], [class*="recommend"], [class*="sidebar"], [class*="footer"], [id*="chat"]'
+      )
+      .forEach((el) => el.remove());
+    const text = cleanText(clone.textContent);
+    if (text && text.length > 200) {
+      // Drop noisy chrome that often prefixes the page.
+      const trimmed = text
+        .replace(/^[\s\S]{0,200}?(?=Job description|Role|Keyskills|Job highlights)/i, '')
+        .trim();
+      return (trimmed.length > 200 ? trimmed : text).slice(0, 18000);
+    }
+  }
+  return undefined;
+}
+
 function scrapeFullDescription(doc: Document): string | undefined {
-  const sections = [
-    sectionByHeading(doc, /^role\s*&\s*responsibilities$/i, 5000),
-    sectionByHeading(doc, /^preferred candidate profile$/i, 4000),
-    sectionByHeading(doc, /^job description$/i, 6000),
+  const sections = scrapeNamedSections(doc);
+  const ordered = [
+    sections.jobDescription,
+    sections.roleAndResponsibilities,
+    sections.preferredCandidate,
+    sections.benefits,
+    sections.additionalDetails,
   ].filter(Boolean) as string[];
 
-  if (sections.length) {
-    return uniqueStrings(sections, 6).join('\n\n').slice(0, 10000);
+  if (ordered.length) {
+    return uniqueStrings(ordered, 8).join('\n\n').slice(0, 18000);
   }
 
   const selectors = [
@@ -451,20 +575,22 @@ function scrapeFullDescription(doc: Document): string | undefined {
   for (const selector of selectors) {
     const el = doc.querySelector(selector);
     const text = cleanText(el?.textContent);
-    if (text && text.length > 80) return text.slice(0, 10000);
+    if (text && text.length > 80) return text.slice(0, 18000);
   }
 
-  return undefined;
+  return scrapeJobPageText(doc)?.slice(0, 18000);
 }
 
 function scrapeAboutCompany(doc: Document): string | undefined {
+  const fromSections = scrapeNamedSections(doc).aboutCompany;
   return (
-    sectionByHeading(doc, /^about (the )?company$/i, 3500) ||
+    fromSections ||
+    sectionByHeading(doc, /^about (the )?company$/i, 7000) ||
     cleanText(
       doc.querySelector(
         '[class*="about-company"], [class*="comp-detail"], [class*="company-info"]'
       )?.textContent
-    )?.slice(0, 3500)
+    )?.slice(0, 7000)
   );
 }
 
@@ -516,12 +642,11 @@ export function detectCompanySiteApply(root: Document | Element): boolean {
 
   // Search cards often put CTA text in the tuple without a clean button node.
   if (!(root instanceof Document)) {
-    const blob = cleanText((root as HTMLElement).innerText?.slice(0, 1500));
+    const blob = cleanText((root as HTMLElement).innerText?.slice(0, 2000)) || '';
     if (
       blob &&
-      /apply\s+(on|to)\s+(the\s+)?company(\s+web)?\s*site/i.test(blob) &&
-      !/\beasy apply\b/i.test(blob) &&
-      !/(^|\n)\s*apply\s*(\n|$)/i.test(blob)
+      COMPANY_SITE_APPLY_RE.test(blob) &&
+      !/\beasy apply\b/i.test(blob)
     ) {
       return true;
     }
@@ -592,6 +717,9 @@ export class NaukriAdapter implements PlatformAdapter {
   }
 
   readJob(doc: Document = document): Partial<JobPayload> | null {
+    // Reveal truncated JD blocks before scraping.
+    expandCollapsedContent(doc);
+
     const title = textOf(naukriSelectors.title, doc);
     const company = textOf(naukriSelectors.company, doc);
     if (!title || !company) return null;
@@ -633,16 +761,32 @@ export class NaukriAdapter implements PlatformAdapter {
     const { postedAt, openings, applicants } = parseHeaderStats(doc);
     const highlights = scrapeHighlights(doc);
     const skills = scrapeSkills(doc);
+    const namedSections = scrapeNamedSections(doc);
     const description = scrapeFullDescription(doc);
-    const aboutCompany = scrapeAboutCompany(doc);
+    const aboutCompany =
+      namedSections.aboutCompany || scrapeAboutCompany(doc);
+    const detailLabels = scrapeAllLabeledDetails(doc);
+    const pageText = scrapeJobPageText(doc);
 
-    const role = labeledDetail(doc, ['Role']);
-    const industry = labeledDetail(doc, ['Industry Type', 'Industry']);
-    const department = labeledDetail(doc, ['Department']);
-    const employmentType = labeledDetail(doc, ['Employment Type']);
-    const roleCategory = labeledDetail(doc, ['Role Category']);
+    const role =
+      labeledDetail(doc, ['Role']) ||
+      detailLabels['Role'] ||
+      detailLabels['role'];
+    const industry =
+      labeledDetail(doc, ['Industry Type', 'Industry']) ||
+      detailLabels['Industry Type'] ||
+      detailLabels['Industry'];
+    const department =
+      labeledDetail(doc, ['Department']) || detailLabels['Department'];
+    const employmentType =
+      labeledDetail(doc, ['Employment Type']) ||
+      detailLabels['Employment Type'];
+    const roleCategory =
+      labeledDetail(doc, ['Role Category']) || detailLabels['Role Category'];
     const education =
       labeledDetail(doc, ['Education']) ||
+      detailLabels['Education'] ||
+      namedSections.education ||
       sectionByHeading(doc, /^education$/i, 500);
 
     // Avoid capturing "Role Category" as Role when Role row is missing.
@@ -652,6 +796,21 @@ export class NaukriAdapter implements PlatformAdapter {
         : role && !/category/i.test(role)
           ? role
           : undefined;
+
+    const metadata: Record<string, unknown> = {
+      scrapedAt: new Date().toISOString(),
+      scrapedFrom: 'job_detail',
+    };
+    if (Object.keys(namedSections).length) {
+      metadata.sections = namedSections;
+    }
+    if (Object.keys(detailLabels).length) {
+      metadata.detailLabels = detailLabels;
+    }
+    // Keep a truncated page dump so the dashboard can show anything we missed.
+    if (pageText && pageText.length > (description?.length || 0) + 80) {
+      metadata.pageText = pageText.slice(0, 16000);
+    }
 
     return {
       platform: this.platform,
@@ -679,6 +838,7 @@ export class NaukriAdapter implements PlatformAdapter {
       education,
       aboutCompany,
       status: 'detected',
+      metadata,
     };
   }
 
@@ -757,10 +917,7 @@ export class NaukriAdapter implements PlatformAdapter {
         .filter((s): s is string => Boolean(s))
         .slice(0, 12);
 
-      // Skip employer-site / external apply jobs during scan.
-      if (detectCompanySiteApply(root)) {
-        continue;
-      }
+      const companySiteApply = detectCompanySiteApply(root);
 
       results.push({
         title,
@@ -777,7 +934,7 @@ export class NaukriAdapter implements PlatformAdapter {
         rating,
         reviews,
         postedAt,
-        companySiteApply: false,
+        companySiteApply,
       });
     }
 

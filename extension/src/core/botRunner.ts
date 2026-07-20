@@ -160,17 +160,133 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
   return false;
 }
 
+async function isOnSearchList(tabId: number): Promise<boolean> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab.url || '';
+    if (!/naukri\.com/i.test(url)) return false;
+    if (/\/job-listings\//i.test(url) || /\/jobdescription/i.test(url)) {
+      return false;
+    }
+    // Prefer content-script check when possible.
+    const probe = await sendToTab<{ jobs?: unknown[] }>(
+      tabId,
+      { type: 'RUN_SCAN_SCRAPE' },
+      2
+    ).catch(() => null);
+    return Boolean(probe && Array.isArray(probe.jobs));
+  } catch {
+    return false;
+  }
+}
+
 async function goBackToList(
   tabId: number,
   searchUrl: string,
   stealth: boolean
 ): Promise<void> {
+  await appendCopilotLog('Back to list');
+  try {
+    const back = await sendToTab<{ ok: boolean; reason?: string }>(
+      tabId,
+      { type: 'HISTORY_BACK', timeoutMs: 8000 },
+      4
+    );
+    if (back.ok && (await isOnSearchList(tabId))) {
+      await wait(1200);
+      return;
+    }
+  } catch {
+    /* fall through to search URL reload */
+  }
+
+  // Fallback when history.back fails (SPA replaced history).
   await chrome.tabs.update(tabId, {
     url: searchUrl,
     active: !stealth,
   });
   await waitForTabComplete(tabId);
   await wait(2000);
+}
+
+async function isOnJobDetail(tabId: number): Promise<boolean> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab.url || '';
+    if (/\/job-listings\//i.test(url) || /\/jobdescription/i.test(url)) {
+      return true;
+    }
+    const probe = await sendToTab<{ isDetail?: boolean }>(
+      tabId,
+      { type: 'IS_JOB_DETAIL' },
+      3
+    ).catch(() => null);
+    return Boolean(probe?.isDetail);
+  } catch {
+    return false;
+  }
+}
+
+async function openJobFromList(
+  tabId: number,
+  job: SearchResultJob,
+  searchUrl: string,
+  stealth: boolean
+): Promise<boolean> {
+  // Ensure we are on the list before clicking.
+  if (!(await isOnSearchList(tabId))) {
+    await goBackToList(tabId, searchUrl, stealth);
+  }
+
+  await appendCopilotLog(`Opening job: ${job.title}`);
+  const clicked = await sendToTab<{
+    ok: boolean;
+    reason?: string;
+    navigated?: boolean;
+  }>(
+    tabId,
+    {
+      type: 'CLICK_SEARCH_JOB',
+      externalJobId: job.externalJobId,
+      url: job.url,
+    },
+    6
+  ).catch(() => ({ ok: false, reason: 'Click failed', navigated: false }));
+
+  // Wait for real navigation / JD render.
+  let opened = clicked.ok && (await isOnJobDetail(tabId));
+  if (!opened) {
+    for (let i = 0; i < 10 && !opened; i++) {
+      await wait(400);
+      opened = await isOnJobDetail(tabId);
+    }
+  }
+
+  if (!opened) {
+    await appendCopilotLog(
+      `List click failed — opening job URL: ${job.title}`,
+      'warn'
+    );
+    const state = await getCopilotState();
+    await chrome.tabs.update(tabId, {
+      url: job.url,
+      active: !state.runInBackground,
+    });
+    await waitForTabComplete(tabId);
+    await wait(2000);
+    opened = await isOnJobDetail(tabId);
+  } else {
+    await waitForTabComplete(tabId);
+    await wait(1500);
+  }
+
+  if (!opened) {
+    await appendCopilotLog(`Could not open job page: ${job.title}`, 'error');
+    return false;
+  }
+
+  await appendCopilotLog(`Opened: ${job.title}`, 'success');
+  return true;
 }
 
 type EasyApplyResult = {
@@ -203,6 +319,11 @@ async function markApplied(
     const st = await getCopilotState();
     await setCopilotState({ skipped: st.skipped + 1 });
     await appendCopilotLog(`Already applied — skipped: ${base.title}`, 'info');
+    await raiseCopilotToast(
+      'Job skipped',
+      `${base.title}${base.company ? ` · ${base.company}` : ''} — already applied`,
+      'warn'
+    );
     return;
   }
 
@@ -219,7 +340,8 @@ async function markApplied(
   await appendCopilotLog(`Applied: ${base.title}`, 'success');
   await raiseCopilotToast(
     'Job applied successfully',
-    base.company ? `${base.title} · ${base.company}` : base.title
+    base.company ? `${base.title} · ${base.company}` : base.title,
+    'success'
   );
 }
 
@@ -241,6 +363,11 @@ async function markSkipped(
   const st = await getCopilotState();
   await setCopilotState({ skipped: st.skipped + 1 });
   await appendCopilotLog(`Skipped: ${base.title} — ${reason}`, 'warn');
+  await raiseCopilotToast(
+    'Job skipped',
+    `${base.title}${base.company ? ` · ${base.company}` : ''} — ${reason}`,
+    'warn'
+  );
 }
 
 async function applyOneJob(
@@ -261,39 +388,67 @@ async function applyOneJob(
 
   await updateScannedJob(id, { status: 'applying' });
   await setCopilotState({ currentTitle: job.title });
-  await appendCopilotLog(`Opening: ${job.title}`);
 
-  const state = await getCopilotState();
-  await chrome.tabs.update(tabId, {
-    url: job.url,
-    active: !state.runInBackground,
-  });
-  await waitForTabComplete(tabId);
-  await wait(2000);
+  const opened = await openJobFromList(tabId, job, searchUrl, stealth);
+  if (!opened) {
+    await markSkipped(handlers, detectPayload, id, 'Could not open job page');
+    if (!(await isOnSearchList(tabId))) {
+      await goBackToList(tabId, searchUrl, stealth);
+    }
+    return 'continue';
+  }
 
   if (!(await waitWhilePaused())) return 'stop';
   if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
 
-  // Collect full JD fields while on the detail page.
+  // Safety: never Easy Apply while still on the search list.
+  if (!(await isOnJobDetail(tabId))) {
+    await markSkipped(handlers, detectPayload, id, 'Job page not open');
+    await goBackToList(tabId, searchUrl, stealth);
+    return 'continue';
+  }
+
+  // Collect full JD fields while on the detail page (retry until content loads).
   let detailJob: Partial<JobPayload> | undefined;
-  try {
-    const detail = await sendToTab<{ job?: Partial<JobPayload> | null }>(
-      tabId,
-      { type: 'READ_JOB_DETAIL' },
-      4
-    );
-    detailJob = detail.job ?? undefined;
-  } catch {
-    /* page may still be loading */
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (!(await waitWhilePaused())) return 'stop';
+    try {
+      const detail = await sendToTab<{ job?: Partial<JobPayload> | null }>(
+        tabId,
+        { type: 'READ_JOB_DETAIL' },
+        4
+      );
+      detailJob = detail.job ?? undefined;
+    } catch {
+      detailJob = undefined;
+    }
+    const hasBody =
+      Boolean(detailJob?.description && detailJob.description.length > 80) ||
+      Boolean(detailJob?.skills?.length) ||
+      Boolean(detailJob?.aboutCompany) ||
+      Boolean(
+        (detailJob?.metadata as { pageText?: string } | undefined)?.pageText
+      );
+    if (detailJob?.title && detailJob?.company && (hasBody || attempt >= 3)) {
+      break;
+    }
+    await wait(700 + attempt * 400);
   }
   const enriched = mergeJobFields(detailJob, job, {
     status: 'detected',
     metadata: { source: 'auto_scan' },
   });
   await handlers.persistJobDetected(enriched);
+  if (enriched.description || enriched.skills?.length) {
+    await appendCopilotLog(
+      `Collected job details for "${enriched.title}"`,
+      'info'
+    );
+  }
 
   if (!prefs.autoApplyEnabled) {
     await markSkipped(handlers, enriched, id, 'Auto-apply is off');
+    await wait(randomDelay());
     await goBackToList(tabId, searchUrl, stealth);
     return 'continue';
   }
@@ -549,23 +704,21 @@ export async function runBot(handlers: BotHandlers): Promise<{
     const seenKeys = new Set<string>();
     let hitLimit = false;
 
-    // Human-like: scan list → process matches → back to list → scroll → repeat.
+    // Human-like: scan list → click card → apply/skip → back → scroll → repeat.
     for (let round = 0; round < MAX_SCROLL_ROUNDS; round++) {
       if (!(await waitWhilePaused())) break;
       if (!(await ensureNaukriLoggedIn(tab.id))) break;
 
       // Ensure we are on the search list before scraping.
-      const tabInfo = await chrome.tabs.get(tab.id);
-      if (!tabInfo.url || !/naukri\.com/i.test(tabInfo.url) || /job-listings/i.test(tabInfo.url)) {
+      if (!(await isOnSearchList(tab.id))) {
         await goBackToList(tab.id, searchUrl, stealth);
         if (!(await ensureNaukriLoggedIn(tab.id))) break;
       }
 
-      await appendCopilotLog(
-        round === 0 ? 'Scanning jobs on list' : `Scrolling list (round ${round + 1})`
-      );
-
-      if (round > 0) {
+      if (round === 0) {
+        await appendCopilotLog('Scanning jobs on list');
+      } else {
+        await appendCopilotLog(`Scrolling for more… (round ${round + 1})`);
         await sendToTab(tab.id, { type: 'SCROLL_SEARCH_RESULTS' }).catch(
           () => undefined
         );
@@ -575,39 +728,17 @@ export async function runBot(handlers: BotHandlers): Promise<{
       const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tab.id, {
         type: 'RUN_SCAN_SCRAPE',
       });
-      const visible = (scrape.jobs ?? []).filter(
-        (job) => !job.companySiteApply && matchesPreferences(job, prefs)
+      const allVisible = (scrape.jobs ?? []).filter((job) =>
+        matchesPreferences(job, prefs)
       );
 
-      const appliedSet = await fetchAppliedSet(visible);
+      const appliedSet = await fetchAppliedSet(allVisible);
       const fresh: SearchResultJob[] = [];
 
-      for (const job of visible) {
+      for (const job of allVisible) {
         const id = jobKey(job);
         if (seenKeys.has(id)) continue;
         seenKeys.add(id);
-
-        if (isAlreadyInDb(job, appliedSet)) {
-          await upsertScannedJobs(
-            [
-              {
-                id,
-                title: job.title,
-                company: job.company,
-                url: job.url,
-                externalJobId: job.externalJobId,
-              },
-            ],
-            'already_applied'
-          );
-          const st = await getCopilotState();
-          await setCopilotState({ skipped: st.skipped + 1 });
-          await appendCopilotLog(
-            `Already applied (Atlas) — skipped: ${job.title}`,
-            'info'
-          );
-          continue;
-        }
 
         await upsertScannedJobs([
           {
@@ -618,11 +749,47 @@ export async function runBot(handlers: BotHandlers): Promise<{
             externalJobId: job.externalJobId,
           },
         ]);
+
+        if (isAlreadyInDb(job, appliedSet)) {
+          await updateScannedJob(id, { status: 'already_applied' });
+          const st = await getCopilotState();
+          await setCopilotState({ skipped: st.skipped + 1 });
+          await appendCopilotLog(
+            `Already applied (Atlas) — skipped on list: ${job.title}`,
+            'info'
+          );
+          await raiseCopilotToast(
+            'Job skipped',
+            `${job.title} · ${job.company} — already applied`,
+            'warn'
+          );
+          continue;
+        }
+
+        // Skip company-site cards on the list — do not open them.
+        if (job.companySiteApply) {
+          const payload = mergeJobFields(undefined, job, {
+            status: 'detected',
+            metadata: {
+              source: 'auto_scan',
+              skipped: true,
+              skipReason: 'External / company-site apply',
+            },
+          });
+          await markSkipped(
+            handlers,
+            payload,
+            id,
+            'External / company-site apply'
+          );
+          continue;
+        }
+
         fresh.push(job);
       }
 
       await appendCopilotLog(
-        `List round ${round + 1}: ${fresh.length} new match(es) to process`,
+        `List round ${round + 1}: ${fresh.length} Easy Apply match(es) to open`,
         fresh.length ? 'success' : 'warn'
       );
 
@@ -630,6 +797,10 @@ export async function runBot(handlers: BotHandlers): Promise<{
         if (!(await waitWhilePaused())) {
           hitLimit = true;
           break;
+        }
+        // After previous job we should already be on the list; verify.
+        if (!(await isOnSearchList(tab.id))) {
+          await goBackToList(tab.id, searchUrl, stealth);
         }
         const outcome = await applyOneJob(
           tab.id,

@@ -10,6 +10,11 @@ export function mergeJobFields(
 ): JobPayload {
   const title = primary?.title || fallback?.title || 'Unknown';
   const company = primary?.company || fallback?.company || 'Unknown';
+  const metadata = {
+    ...((fallback?.metadata as Record<string, unknown> | undefined) ?? {}),
+    ...((primary?.metadata as Record<string, unknown> | undefined) ?? {}),
+    ...((extras.metadata as Record<string, unknown> | undefined) ?? {}),
+  };
   return {
     platform: 'naukri',
     title,
@@ -45,5 +50,6 @@ export function mergeJobFields(
     aboutCompany: primary?.aboutCompany || fallback?.aboutCompany,
     status: 'detected',
     ...extras,
+    metadata: Object.keys(metadata).length ? metadata : extras.metadata,
   };
 }

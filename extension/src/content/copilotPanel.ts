@@ -36,11 +36,25 @@ function statusLabel(status: ScannedJobItem['status']): string {
     case 'applied':
       return 'Applied';
     case 'already_applied':
-      return 'Already';
+      return 'Already applied';
     case 'skipped':
       return 'Skipped';
     default:
       return status;
+  }
+}
+
+function statusMark(status: ScannedJobItem['status']): string {
+  switch (status) {
+    case 'applied':
+      return '✓';
+    case 'already_applied':
+    case 'skipped':
+      return '✕';
+    case 'applying':
+      return '…';
+    default:
+      return '○';
   }
 }
 
@@ -286,18 +300,18 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} .atlas-jobs {
         overflow: auto;
-        padding: 0 8px 8px;
+        padding: 0 8px 10px;
         display: grid;
-        gap: 4px;
-        max-height: 210px;
+        gap: 5px;
+        max-height: 240px;
         scrollbar-width: thin;
         scrollbar-color: #33485e transparent;
       }
       #${ROOT_ID} .job-row {
         display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 10px;
-        align-items: center;
+        grid-template-columns: 22px 1fr auto;
+        gap: 8px;
+        align-items: start;
         padding: 8px 9px;
         border-radius: 10px;
         background: rgba(255,255,255,.03);
@@ -312,6 +326,44 @@ export function mountCopilotPanel() {
       #${ROOT_ID} .job-row.applying {
         background: var(--atlas-teal-dim);
         border-color: rgba(43,176,166,.35);
+      }
+      #${ROOT_ID} .job-row.applied {
+        background: rgba(43,176,166,.08);
+      }
+      #${ROOT_ID} .job-row.skipped,
+      #${ROOT_ID} .job-row.already_applied {
+        background: rgba(227,168,93,.07);
+      }
+      #${ROOT_ID} .job-check {
+        width: 20px;
+        height: 20px;
+        margin-top: 1px;
+        border-radius: 6px;
+        display: inline-grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+        flex-shrink: 0;
+        background: #243446;
+        color: #8fa3b8;
+        border: 1px solid #33485e;
+      }
+      #${ROOT_ID} .job-check.applied {
+        background: rgba(43,176,166,.25);
+        border-color: rgba(43,176,166,.45);
+        color: #9ef0e7;
+      }
+      #${ROOT_ID} .job-check.skipped,
+      #${ROOT_ID} .job-check.already_applied {
+        background: rgba(227,168,93,.2);
+        border-color: rgba(227,168,93,.4);
+        color: #f0d2a0;
+      }
+      #${ROOT_ID} .job-check.applying {
+        background: rgba(43,176,166,.2);
+        border-color: rgba(43,176,166,.35);
+        color: #9ef0e7;
       }
       #${ROOT_ID} .job-title {
         font-weight: 650;
@@ -328,6 +380,14 @@ export function mountCopilotPanel() {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      #${ROOT_ID} .job-reason {
+        margin-top: 3px;
+        font-size: 10px;
+        color: #c4a574;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       #${ROOT_ID} .job-badge {
         font-size: 10px;
         font-weight: 700;
@@ -337,6 +397,7 @@ export function mountCopilotPanel() {
         white-space: nowrap;
         background: #243446;
         color: #a9bdd0;
+        margin-top: 1px;
       }
       #${ROOT_ID} .job-badge.pending { background: #243446; color: #a9bdd0; }
       #${ROOT_ID} .job-badge.applied { background: rgba(43,176,166,.2); color: #9ef0e7; }
@@ -500,6 +561,11 @@ export function mountCopilotPanel() {
           0 0 0 1px rgba(255,255,255,.04) inset;
         animation: atlas-toast-in .28s ease-out;
       }
+      #${ROOT_ID} .atlas-toast.is-warn {
+        background: #1f1810;
+        border-color: rgba(227,168,93,.5);
+        color: #f7efe2;
+      }
       #${ROOT_ID} .atlas-toast.is-out {
         animation: atlas-toast-out .22s ease-in forwards;
       }
@@ -523,6 +589,10 @@ export function mountCopilotPanel() {
         line-height: 1;
         margin-top: 1px;
       }
+      #${ROOT_ID} .atlas-toast.is-warn .atlas-toast-icon {
+        background: rgba(227,168,93,.22);
+        color: #e3a85d;
+      }
       #${ROOT_ID} .atlas-toast-copy {
         min-width: 0;
       }
@@ -532,6 +602,9 @@ export function mountCopilotPanel() {
         font-weight: 750;
         color: #9ef0e7;
         line-height: 1.25;
+      }
+      #${ROOT_ID} .atlas-toast.is-warn .atlas-toast-title {
+        color: #f0d2a0;
       }
       #${ROOT_ID} .atlas-toast-msg {
         margin: 3px 0 0;
@@ -614,11 +687,11 @@ export function mountCopilotPanel() {
       <p class="atlas-notice" id="atlas-notice"></p>
       <section class="atlas-section">
         <div class="atlas-section-head">
-          <span>Scanned jobs</span>
+          <span>Checklist</span>
           <span id="atlas-jobs-count">0</span>
         </div>
         <div class="atlas-jobs" id="atlas-jobs">
-          <div class="atlas-empty">Matched jobs will appear here as Atlas scans the list.</div>
+          <div class="atlas-empty">Jobs show here as Applied ✓ or Skipped ✕ while Atlas runs.</div>
         </div>
       </section>
       <section class="atlas-log-wrap">
@@ -694,10 +767,11 @@ export function mountCopilotPanel() {
     lastToastId = toast.id;
     toastHost.innerHTML = '';
     const el = document.createElement('div');
-    el.className = 'atlas-toast';
+    const isWarn = toast.kind === 'warn';
+    el.className = `atlas-toast${isWarn ? ' is-warn' : ''}`;
     el.setAttribute('role', 'status');
     el.innerHTML = `
-      <div class="atlas-toast-icon" aria-hidden="true">✓</div>
+      <div class="atlas-toast-icon" aria-hidden="true">${isWarn ? '!' : '✓'}</div>
       <div class="atlas-toast-copy">
         <p class="atlas-toast-title">${escapeHtml(toast.title)}</p>
         <p class="atlas-toast-msg">${escapeHtml(toast.message)}</p>
@@ -741,34 +815,58 @@ export function mountCopilotPanel() {
   }
 
   function renderJobs(jobs: ScannedJobItem[]) {
-    jobsCountEl.textContent = String(jobs.length);
+    const appliedCount = jobs.filter((j) => j.status === 'applied').length;
+    const skippedCount = jobs.filter(
+      (j) => j.status === 'skipped' || j.status === 'already_applied'
+    ).length;
+    jobsCountEl.textContent =
+      jobs.length === 0
+        ? '0'
+        : `${jobs.length} · ✓${appliedCount} ✕${skippedCount}`;
+
     if (!jobs.length) {
       jobsEl.innerHTML =
-        '<div class="atlas-empty">Matched jobs will appear here as Atlas scans the list.</div>';
+        '<div class="atlas-empty">Jobs show here as Applied ✓ or Skipped ✕ while Atlas runs.</div>';
       return;
     }
+    // Newest outcomes first: applying, then applied, skipped, queued.
     const order: Record<ScannedJobItem['status'], number> = {
       applying: 0,
-      pending: 1,
-      applied: 2,
+      applied: 1,
+      skipped: 2,
       already_applied: 3,
-      skipped: 4,
+      pending: 4,
     };
     const sorted = [...jobs].sort(
       (a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9)
     );
     jobsEl.innerHTML = sorted
-      .slice(0, 50)
-      .map(
-        (j) => `
-      <div class="job-row ${j.status}" title="${escapeHtml(j.skipReason || `${j.title} · ${j.company}`)}">
+      .slice(0, 60)
+      .map((j) => {
+        const reason =
+          j.status === 'skipped' || j.status === 'already_applied'
+            ? j.skipReason ||
+              (j.status === 'already_applied' ? 'Already applied' : '')
+            : '';
+        return `
+      <div class="job-row ${j.status}" title="${escapeHtml(
+          reason || `${j.title} · ${j.company}`
+        )}">
+        <span class="job-check ${j.status}" aria-hidden="true">${statusMark(
+          j.status
+        )}</span>
         <div>
           <div class="job-title">${escapeHtml(j.title)}</div>
           <div class="job-company">${escapeHtml(j.company)}</div>
+          ${
+            reason
+              ? `<div class="job-reason">${escapeHtml(reason)}</div>`
+              : ''
+          }
         </div>
         <span class="job-badge ${j.status}">${statusLabel(j.status)}</span>
-      </div>`
-      )
+      </div>`;
+      })
       .join('');
   }
 
