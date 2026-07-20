@@ -789,6 +789,16 @@ export class NaukriAdapter implements PlatformAdapter {
     return detectCompanySiteApply(doc);
   }
 
+  /** True when Naukri says this job was applied earlier (not a fresh apply). */
+  isAlreadyApplied(doc: Document = document): boolean {
+    const text = (doc.body?.innerText || '').toLowerCase();
+    return (
+      /you have already applied/.test(text) ||
+      /already applied for this job/.test(text) ||
+      /already applied to this/.test(text)
+    );
+  }
+
   detectApplicationStatus(
     doc: Document = document
   ): JobPayload['status'] | null {
@@ -811,7 +821,8 @@ export class NaukriAdapter implements PlatformAdapter {
       /successfully applied to/.test(text) ||
       /application (has been )?submitted/.test(text) ||
       /you have already applied/.test(text) ||
-      /already applied for this job/.test(text)
+      /already applied for this job/.test(text) ||
+      /already applied to this/.test(text)
     ) {
       return 'applied';
     }

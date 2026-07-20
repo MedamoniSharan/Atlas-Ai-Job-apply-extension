@@ -160,13 +160,11 @@ async function refreshUi() {
   authedSection.classList.toggle('hidden', !signedIn);
 
   if (signedIn) {
-    const prefs =
-      status.preferences ??
-      (
-        await send<{ success: boolean; data: JobPreferences }>({
-          type: 'GET_PREFERENCES',
-        })
-      ).data;
+    // Always pull from DB so popup matches dashboard preferences.
+    const prefsRes = await send<{ success: boolean; data: JobPreferences }>({
+      type: 'GET_PREFERENCES',
+    });
+    const prefs = prefsRes?.data ?? status.preferences;
     if (prefs) fillPrefsForm(prefs);
   }
 }

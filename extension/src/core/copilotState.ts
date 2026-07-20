@@ -14,11 +14,35 @@ export type CopilotAlert = {
   at: string;
 };
 
+export type CopilotToast = {
+  id: string;
+  title: string;
+  message: string;
+  at: string;
+};
+
 export type CopilotLogEntry = {
   id: string;
   at: string;
   level: CopilotLogLevel;
   message: string;
+};
+
+export type ScannedJobStatus =
+  | 'pending'
+  | 'applying'
+  | 'applied'
+  | 'skipped'
+  | 'already_applied';
+
+export type ScannedJobItem = {
+  id: string;
+  title: string;
+  company: string;
+  url: string;
+  externalJobId?: string;
+  status: ScannedJobStatus;
+  skipReason?: string;
 };
 
 export type CopilotState = {
@@ -33,11 +57,16 @@ export type CopilotState = {
   currentTitle?: string;
   lastMessage?: string;
   alert?: CopilotAlert | null;
+  /** Short-lived success toast for apply events. */
+  toast?: CopilotToast | null;
+  /** Jobs discovered on the search list (human-like browse flow). */
+  scannedJobs: ScannedJobItem[];
 };
 
 const LOG_KEY = 'copilotLogs';
 const STATE_KEY = 'copilotState';
 const MAX_LOGS = 80;
+const MAX_SCANNED = 120;
 
 export const DEFAULT_COPILOT_STATE: CopilotState = {
   running: false,
@@ -49,6 +78,8 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   applied: 0,
   skipped: 0,
   alert: null,
+  toast: null,
+  scannedJobs: [],
 };
 
 export async function getCopilotState(): Promise<CopilotState> {
@@ -56,6 +87,8 @@ export async function getCopilotState(): Promise<CopilotState> {
   return {
     ...DEFAULT_COPILOT_STATE,
     ...((data[STATE_KEY] as CopilotState | undefined) ?? {}),
+    scannedJobs:
+      (data[STATE_KEY] as CopilotState | undefined)?.scannedJobs ?? [],
   };
 }
 
@@ -66,6 +99,43 @@ export async function setCopilotState(
   const next = { ...current, ...partial };
   await chrome.storage.local.set({ [STATE_KEY]: next });
   return next;
+}
+
+export function jobKey(job: {
+  externalJobId?: string;
+  url: string;
+}): string {
+  return job.externalJobId || job.url;
+}
+
+export async function upsertScannedJobs(
+  jobs: Omit<ScannedJobItem, 'status'>[],
+  status: ScannedJobStatus = 'pending'
+): Promise<ScannedJobItem[]> {
+  const state = await getCopilotState();
+  const byId = new Map(state.scannedJobs.map((j) => [j.id, j]));
+  for (const job of jobs) {
+    if (!byId.has(job.id)) {
+      byId.set(job.id, { ...job, status });
+    }
+  }
+  const scannedJobs = [...byId.values()].slice(0, MAX_SCANNED);
+  await setCopilotState({
+    scannedJobs,
+    matched: scannedJobs.length,
+  });
+  return scannedJobs;
+}
+
+export async function updateScannedJob(
+  id: string,
+  patch: Partial<Pick<ScannedJobItem, 'status' | 'skipReason' | 'title'>>
+): Promise<void> {
+  const state = await getCopilotState();
+  const scannedJobs = state.scannedJobs.map((j) =>
+    j.id === id ? { ...j, ...patch } : j
+  );
+  await setCopilotState({ scannedJobs });
 }
 
 export async function getCopilotLogs(): Promise<CopilotLogEntry[]> {
@@ -158,6 +228,25 @@ export async function raiseCopilotAlert(
   await syncActionBadge(alert);
   await broadcastCopilotToNaukriTabs({ type: 'COPILOT_ALERT', alert });
   return alert;
+}
+
+export async function raiseCopilotToast(
+  title: string,
+  message: string
+): Promise<CopilotToast> {
+  const toast: CopilotToast = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title,
+    message,
+    at: new Date().toISOString(),
+  };
+  await setCopilotState({ toast });
+  await broadcastCopilotToNaukriTabs({ type: 'COPILOT_TOAST', toast });
+  return toast;
+}
+
+export async function clearCopilotToast(): Promise<void> {
+  await setCopilotState({ toast: null });
 }
 
 export async function clearCopilotAlert(): Promise<void> {

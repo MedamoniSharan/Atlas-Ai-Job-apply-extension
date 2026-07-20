@@ -16,6 +16,28 @@ const BUCKETS = new Set<ApplicationBucket>([
 
 const SOURCES = new Set(['all', 'manual', 'auto_scan', 'auto_apply']);
 
+applicationsRouter.post(
+  '/lookup',
+  requireAuth,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = req.body as {
+      externalJobIds?: unknown;
+      urls?: unknown;
+    };
+    const externalJobIds = Array.isArray(body.externalJobIds)
+      ? body.externalJobIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    const urls = Array.isArray(body.urls)
+      ? body.urls.filter((u): u is string => typeof u === 'string')
+      : [];
+    const result = await applicationsService.lookupAppliedJobs(req.user!.sub, {
+      externalJobIds,
+      urls,
+    });
+    res.json(ok(result));
+  })
+);
+
 applicationsRouter.get(
   '/',
   requireAuth,

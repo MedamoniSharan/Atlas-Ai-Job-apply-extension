@@ -1,30 +1,23 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Application } from '@atlas/shared';
 import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
+import { ApplicationDetailDrawer } from '../components/ApplicationDetailDrawer';
 
-type ColumnId = 'matched' | 'needs_you' | 'submitted' | 'skipped';
+type ColumnId = 'applied' | 'matched' | 'skipped';
 
 const COLUMNS: { id: ColumnId; title: string; hint: string }[] = [
-  { id: 'matched', title: 'In flight', hint: 'Matched from scan' },
-  { id: 'needs_you', title: 'Needs you', hint: 'Questions or login' },
-  { id: 'submitted', title: 'Submitted', hint: 'Applied successfully' },
+  { id: 'applied', title: 'Applied', hint: 'Applied successfully' },
+  { id: 'matched', title: 'Matched', hint: 'Matched from scan' },
   { id: 'skipped', title: 'Skipped', hint: 'Not applied' },
 ];
 
-function isNeedsYou(app: Application): boolean {
-  if (!app.metadata?.skipped) return false;
-  const reason = String(app.metadata.skipReason || '').toLowerCase();
-  return /question|mandatory|user input|login|answer/.test(reason);
-}
-
 function columnFor(app: Application): ColumnId {
-  if (isNeedsYou(app)) return 'needs_you';
   if (app.metadata?.skipped) return 'skipped';
   if (app.status === 'applied' || app.metadata?.source === 'auto_apply') {
-    return 'submitted';
+    return 'applied';
   }
   return 'matched';
 }
@@ -71,6 +64,7 @@ function TrackerLogo({ app }: { app: Application }) {
 
 export function TrackerPage() {
   const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Application | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['applications', 'tracker'],
@@ -89,9 +83,8 @@ export function TrackerPage() {
 
   const columns = useMemo(() => {
     const map: Record<ColumnId, Application[]> = {
+      applied: [],
       matched: [],
-      needs_you: [],
-      submitted: [],
       skipped: [],
     };
     for (const app of data?.items ?? []) {
@@ -128,7 +121,7 @@ export function TrackerPage() {
           <div>
             <h3>No applications yet</h3>
             <p>
-              Start the Naukri co-pilot to fill In flight, Submitted, and other
+              Start the Naukri co-pilot to fill Applied, Matched, and Skipped
               columns.
             </p>
           </div>
@@ -160,7 +153,19 @@ export function TrackerPage() {
                   <p className="tracker-col__empty">No cards</p>
                 ) : (
                   columns[col.id].map((app) => (
-                    <article key={app.id} className="tracker-card" role="listitem">
+                    <article
+                      key={app.id}
+                      className="tracker-card tracker-card--clickable"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelected(app)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelected(app);
+                        }
+                      }}
+                    >
                       <div className="tracker-card__top">
                         <TrackerLogo app={app} />
                         <time dateTime={app.appliedAt ?? app.createdAt}>
@@ -168,18 +173,7 @@ export function TrackerPage() {
                         </time>
                       </div>
                       <h3 className="tracker-card__company">{app.company}</h3>
-                      {app.url ? (
-                        <a
-                          className="tracker-card__title"
-                          href={app.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {app.title}
-                        </a>
-                      ) : (
-                        <p className="tracker-card__title">{app.title}</p>
-                      )}
+                      <p className="tracker-card__title">{app.title}</p>
                       <div className="tracker-card__meta">
                         {app.location ? <span>{app.location}</span> : null}
                         {app.experience ? <span>{app.experience}</span> : null}
@@ -200,6 +194,11 @@ export function TrackerPage() {
           ))}
         </div>
       )}
+
+      <ApplicationDetailDrawer
+        app={selected}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }

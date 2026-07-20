@@ -4,13 +4,17 @@ import {
   buildNaukriSearchUrl,
   matchesPreferences,
 } from '../adapters/naukriAdapter';
-import { fetchPreferences } from './apiClient';
+import { fetchPreferences, lookupAppliedJobs } from './apiClient';
 import { getCachedPreferences } from './storageManager';
 import { logger } from './logger';
 import {
   appendCopilotLog,
   getCopilotState,
+  jobKey,
+  raiseCopilotToast,
   setCopilotState,
+  updateScannedJob,
+  upsertScannedJobs,
 } from './copilotState';
 import { mergeJobFields } from './jobFields';
 
@@ -20,6 +24,15 @@ function wait(ms: number) {
 
 function randomDelay() {
   return 2500 + Math.floor(Math.random() * 4000);
+}
+
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`.replace(/\/$/, '');
+  } catch {
+    return url.split('?')[0]?.replace(/\/$/, '') || url;
+  }
 }
 
 async function waitForTabComplete(tabId: number, timeoutMs = 30000) {
@@ -147,6 +160,290 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
   return false;
 }
 
+async function goBackToList(
+  tabId: number,
+  searchUrl: string,
+  stealth: boolean
+): Promise<void> {
+  await chrome.tabs.update(tabId, {
+    url: searchUrl,
+    active: !stealth,
+  });
+  await waitForTabComplete(tabId);
+  await wait(2000);
+}
+
+type EasyApplyResult = {
+  ok: boolean;
+  skipped?: boolean;
+  alreadyApplied?: boolean;
+  needsUserInput?: boolean;
+  reason?: string;
+  job?: Partial<JobPayload>;
+};
+
+async function tryEasyApply(tabId: number): Promise<EasyApplyResult> {
+  return sendToTab<EasyApplyResult>(tabId, { type: 'RUN_EASY_APPLY' });
+}
+
+async function markApplied(
+  handlers: BotHandlers,
+  base: JobPayload,
+  id: string,
+  alreadyApplied: boolean
+) {
+  if (alreadyApplied) {
+    await handlers.persistApplicationRecorded({
+      ...base,
+      status: 'applied',
+      appliedAt: new Date().toISOString(),
+      metadata: { source: 'auto_apply', alreadyApplied: true },
+    });
+    await updateScannedJob(id, { status: 'already_applied' });
+    const st = await getCopilotState();
+    await setCopilotState({ skipped: st.skipped + 1 });
+    await appendCopilotLog(`Already applied — skipped: ${base.title}`, 'info');
+    return;
+  }
+
+  await handlers.persistApplicationRecorded({
+    ...base,
+    status: 'applied',
+    appliedAt: new Date().toISOString(),
+    metadata: { source: 'auto_apply' },
+  });
+  await incrementAppliedToday();
+  await updateScannedJob(id, { status: 'applied' });
+  const st = await getCopilotState();
+  await setCopilotState({ applied: st.applied + 1 });
+  await appendCopilotLog(`Applied: ${base.title}`, 'success');
+  await raiseCopilotToast(
+    'Job applied successfully',
+    base.company ? `${base.title} · ${base.company}` : base.title
+  );
+}
+
+async function markSkipped(
+  handlers: BotHandlers,
+  base: JobPayload,
+  id: string,
+  reason: string
+) {
+  await handlers.persistJobDetected({
+    ...base,
+    metadata: {
+      source: 'auto_scan',
+      skipped: true,
+      skipReason: reason,
+    },
+  });
+  await updateScannedJob(id, { status: 'skipped', skipReason: reason });
+  const st = await getCopilotState();
+  await setCopilotState({ skipped: st.skipped + 1 });
+  await appendCopilotLog(`Skipped: ${base.title} — ${reason}`, 'warn');
+}
+
+async function applyOneJob(
+  tabId: number,
+  job: SearchResultJob,
+  prefs: JobPreferences,
+  handlers: BotHandlers,
+  searchUrl: string,
+  stealth: boolean
+): Promise<'continue' | 'stop' | 'limit'> {
+  const id = jobKey(job);
+
+  const detectPayload = mergeJobFields(undefined, job, {
+    status: 'detected',
+    metadata: { source: 'auto_scan' },
+  });
+  await handlers.persistJobDetected(detectPayload);
+
+  await updateScannedJob(id, { status: 'applying' });
+  await setCopilotState({ currentTitle: job.title });
+  await appendCopilotLog(`Opening: ${job.title}`);
+
+  const state = await getCopilotState();
+  await chrome.tabs.update(tabId, {
+    url: job.url,
+    active: !state.runInBackground,
+  });
+  await waitForTabComplete(tabId);
+  await wait(2000);
+
+  if (!(await waitWhilePaused())) return 'stop';
+  if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
+
+  // Collect full JD fields while on the detail page.
+  let detailJob: Partial<JobPayload> | undefined;
+  try {
+    const detail = await sendToTab<{ job?: Partial<JobPayload> | null }>(
+      tabId,
+      { type: 'READ_JOB_DETAIL' },
+      4
+    );
+    detailJob = detail.job ?? undefined;
+  } catch {
+    /* page may still be loading */
+  }
+  const enriched = mergeJobFields(detailJob, job, {
+    status: 'detected',
+    metadata: { source: 'auto_scan' },
+  });
+  await handlers.persistJobDetected(enriched);
+
+  if (!prefs.autoApplyEnabled) {
+    await markSkipped(handlers, enriched, id, 'Auto-apply is off');
+    await goBackToList(tabId, searchUrl, stealth);
+    return 'continue';
+  }
+
+  const dayOk = await canApplyToday(prefs.dailyApplyLimit);
+  if (!dayOk) {
+    await updateScannedJob(id, { status: 'pending' });
+    await appendCopilotLog(
+      `Daily apply limit reached (${prefs.dailyApplyLimit}/day). Raise the limit in Atlas or try again tomorrow.`,
+      'warn'
+    );
+    await goBackToList(tabId, searchUrl, stealth);
+    return 'limit';
+  }
+
+  if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
+
+  let result = await tryEasyApply(tabId);
+  const base = mergeJobFields(result.job, enriched, {
+    url: job.url,
+    status: 'detected',
+    metadata: { source: 'auto_apply' },
+  });
+
+  if (result.needsUserInput) {
+    await setCopilotState({ paused: true, currentTitle: base.title });
+    await appendCopilotLog(
+      `Paused — Naukri is asking questions for "${base.title}". Answer them on the page; Atlas will continue when you save, or press Resume.`,
+      'warn'
+    );
+
+    const pauseOutcome = await waitWhilePausedForQuestions(tabId);
+    if (pauseOutcome === 'stopped') return 'stop';
+
+    if (pauseOutcome === 'applied') {
+      await markApplied(handlers, base, id, false);
+      await wait(randomDelay());
+      await goBackToList(tabId, searchUrl, stealth);
+      return 'continue';
+    }
+
+    await appendCopilotLog(
+      `Resumed — retrying apply for "${base.title}"`,
+      'success'
+    );
+    await wait(1500);
+    if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
+
+    result = await tryEasyApply(tabId);
+    if (result.needsUserInput) {
+      await setCopilotState({ paused: true });
+      await appendCopilotLog(
+        'Still waiting on Naukri questions. Finish them — Atlas will continue when saved, or press Resume.',
+        'warn'
+      );
+      const pause2 = await waitWhilePausedForQuestions(tabId);
+      if (pause2 === 'stopped') return 'stop';
+      if (pause2 === 'applied') {
+        await markApplied(handlers, base, id, false);
+      } else {
+        if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
+        result = await tryEasyApply(tabId);
+        if (result.ok) {
+          await markApplied(
+            handlers,
+            {
+              ...base,
+              title: result.job?.title || base.title,
+              company: result.job?.company || base.company,
+            },
+            id,
+            Boolean(result.alreadyApplied)
+          );
+        } else if (result.needsUserInput) {
+          await markSkipped(
+            handlers,
+            base,
+            id,
+            'User questions not completed'
+          );
+        } else {
+          await markSkipped(
+            handlers,
+            base,
+            id,
+            result.reason || 'Easy Apply unavailable'
+          );
+        }
+      }
+    } else if (result.ok) {
+      await markApplied(
+        handlers,
+        {
+          ...base,
+          title: result.job?.title || base.title,
+          company: result.job?.company || base.company,
+        },
+        id,
+        Boolean(result.alreadyApplied)
+      );
+    } else {
+      await markSkipped(
+        handlers,
+        base,
+        id,
+        result.reason || 'Easy Apply unavailable'
+      );
+    }
+  } else if (result.ok) {
+    await markApplied(handlers, base, id, Boolean(result.alreadyApplied));
+  } else {
+    await markSkipped(
+      handlers,
+      base,
+      id,
+      result.reason || 'Easy Apply unavailable'
+    );
+  }
+
+  await wait(randomDelay());
+  // Human-like: return to the search list before the next job.
+  await goBackToList(tabId, searchUrl, stealth);
+  if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
+  return 'continue';
+}
+
+async function fetchAppliedSet(
+  jobs: SearchResultJob[]
+): Promise<{ ids: Set<string>; urls: Set<string> }> {
+  const externalJobIds = jobs
+    .map((j) => j.externalJobId)
+    .filter((id): id is string => Boolean(id));
+  const urls = jobs.map((j) => normalizeUrl(j.url));
+  const res = await lookupAppliedJobs({ externalJobIds, urls });
+  if (!res.success) {
+    return { ids: new Set(), urls: new Set() };
+  }
+  return {
+    ids: new Set(res.data.externalJobIds),
+    urls: new Set(res.data.urls.map(normalizeUrl)),
+  };
+}
+
+function isAlreadyInDb(
+  job: SearchResultJob,
+  applied: { ids: Set<string>; urls: Set<string> }
+): boolean {
+  if (job.externalJobId && applied.ids.has(job.externalJobId)) return true;
+  return applied.urls.has(normalizeUrl(job.url));
+}
 
 export type BotHandlers = {
   persistJobDetected: (payload: JobPayload) => Promise<void>;
@@ -154,6 +451,8 @@ export type BotHandlers = {
 };
 
 let botRunning = false;
+
+const MAX_SCROLL_ROUNDS = 10;
 
 export async function stopBot(): Promise<void> {
   await setCopilotState({
@@ -185,6 +484,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
   botRunning = true;
 
   try {
+    // Always load preferences from DB (same as dashboard).
     const prefsRes = await fetchPreferences();
     const prefs: JobPreferences = prefsRes.success
       ? prefsRes.data
@@ -211,6 +511,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
       applied: 0,
       skipped: 0,
       currentTitle: '',
+      scannedJobs: [],
       runInBackground: existing.runInBackground,
     });
 
@@ -241,248 +542,116 @@ export async function runBot(handlers: BotHandlers): Promise<{
       return { ok: true, message: 'Stopped.' };
     }
 
-    // Must be logged into Naukri before scanning/applying.
     if (!(await ensureNaukriLoggedIn(tab.id))) {
       return { ok: false, message: 'Not logged into Naukri.' };
     }
 
-    await appendCopilotLog('Scanning jobs');
-    const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tab.id, {
-      type: 'RUN_SCAN_SCRAPE',
-    });
-    const matched = (scrape.jobs ?? []).filter(
-      (job) => !job.companySiteApply && matchesPreferences(job, prefs)
-    );
-    await setCopilotState({ matched: matched.length });
-    await appendCopilotLog(
-      `Found ${matched.length} matching job(s)`,
-      matched.length ? 'success' : 'warn'
-    );
+    const seenKeys = new Set<string>();
+    let hitLimit = false;
 
-    for (const job of matched) {
+    // Human-like: scan list → process matches → back to list → scroll → repeat.
+    for (let round = 0; round < MAX_SCROLL_ROUNDS; round++) {
       if (!(await waitWhilePaused())) break;
-
-      const detectPayload = mergeJobFields(undefined, job, {
-        status: 'detected',
-        metadata: { source: 'auto_scan' },
-      });
-      await handlers.persistJobDetected(detectPayload);
-
-      await setCopilotState({ currentTitle: job.title });
-      await appendCopilotLog(`Opening: ${job.title}`);
-
-      const state = await getCopilotState();
-      await chrome.tabs.update(tab.id, {
-        url: job.url,
-        active: !state.runInBackground,
-      });
-      await waitForTabComplete(tab.id);
-      await wait(2000);
-
-      if (!(await waitWhilePaused())) break;
-
       if (!(await ensureNaukriLoggedIn(tab.id))) break;
 
-      if (!prefs.autoApplyEnabled) {
-        await appendCopilotLog(
-          `Matched (apply off): ${job.title}`,
-          'info'
-        );
-        continue;
+      // Ensure we are on the search list before scraping.
+      const tabInfo = await chrome.tabs.get(tab.id);
+      if (!tabInfo.url || !/naukri\.com/i.test(tabInfo.url) || /job-listings/i.test(tabInfo.url)) {
+        await goBackToList(tab.id, searchUrl, stealth);
+        if (!(await ensureNaukriLoggedIn(tab.id))) break;
       }
 
-      const dayOk = await canApplyToday(prefs.dailyApplyLimit);
-      if (!dayOk) {
-        await appendCopilotLog(
-          `Daily apply limit reached (${prefs.dailyApplyLimit}/day). Raise the limit in the Atlas popup or try again tomorrow.`,
-          'warn'
+      await appendCopilotLog(
+        round === 0 ? 'Scanning jobs on list' : `Scrolling list (round ${round + 1})`
+      );
+
+      if (round > 0) {
+        await sendToTab(tab.id, { type: 'SCROLL_SEARCH_RESULTS' }).catch(
+          () => undefined
         );
-        break;
+        await wait(1800);
       }
 
-      if (!(await ensureNaukriLoggedIn(tab.id))) break;
-
-      const result = await sendToTab<{
-        ok: boolean;
-        skipped?: boolean;
-        needsUserInput?: boolean;
-        reason?: string;
-        job?: Partial<JobPayload>;
-      }>(tab.id, { type: 'RUN_EASY_APPLY' });
-
-      const base = mergeJobFields(result.job, job, {
-        url: job.url,
-        status: 'detected',
-        metadata: { source: 'auto_apply' },
+      const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tab.id, {
+        type: 'RUN_SCAN_SCRAPE',
       });
+      const visible = (scrape.jobs ?? []).filter(
+        (job) => !job.companySiteApply && matchesPreferences(job, prefs)
+      );
 
-      if (result.needsUserInput) {
-        await setCopilotState({ paused: true, currentTitle: base.title });
-        await appendCopilotLog(
-          `Paused — Naukri is asking questions for "${base.title}". Answer them on the page; Atlas will continue when you save, or press Resume.`,
-          'warn'
-        );
+      const appliedSet = await fetchAppliedSet(visible);
+      const fresh: SearchResultJob[] = [];
 
-        const pauseOutcome = await waitWhilePausedForQuestions(tab.id);
-        if (pauseOutcome === 'stopped') break;
+      for (const job of visible) {
+        const id = jobKey(job);
+        if (seenKeys.has(id)) continue;
+        seenKeys.add(id);
 
-        if (pauseOutcome === 'applied') {
-          await handlers.persistApplicationRecorded({
-            ...base,
-            status: 'applied',
-            appliedAt: new Date().toISOString(),
-            metadata: { source: 'auto_apply' },
-          });
-          await incrementAppliedToday();
+        if (isAlreadyInDb(job, appliedSet)) {
+          await upsertScannedJobs(
+            [
+              {
+                id,
+                title: job.title,
+                company: job.company,
+                url: job.url,
+                externalJobId: job.externalJobId,
+              },
+            ],
+            'already_applied'
+          );
           const st = await getCopilotState();
-          await setCopilotState({ applied: st.applied + 1 });
-          await appendCopilotLog(`Applied: ${base.title}`, 'success');
-          await wait(randomDelay());
+          await setCopilotState({ skipped: st.skipped + 1 });
+          await appendCopilotLog(
+            `Already applied (Atlas) — skipped: ${job.title}`,
+            'info'
+          );
           continue;
         }
 
-        await appendCopilotLog(
-          `Resumed — retrying apply for "${base.title}"`,
-          'success'
-        );
-        await wait(1500);
-
-        if (!(await ensureNaukriLoggedIn(tab.id))) break;
-
-        const retry = await sendToTab<{
-          ok: boolean;
-          skipped?: boolean;
-          needsUserInput?: boolean;
-          reason?: string;
-          job?: Partial<JobPayload>;
-        }>(tab.id, { type: 'RUN_EASY_APPLY' });
-
-        if (retry.ok) {
-          await handlers.persistApplicationRecorded({
-            ...base,
-            title: retry.job?.title || base.title,
-            company: retry.job?.company || base.company,
-            status: 'applied',
-            appliedAt: new Date().toISOString(),
-            metadata: { source: 'auto_apply' },
-          });
-          await incrementAppliedToday();
-          const st = await getCopilotState();
-          await setCopilotState({ applied: st.applied + 1 });
-          await appendCopilotLog(`Applied: ${base.title}`, 'success');
-        } else if (retry.needsUserInput) {
-          await setCopilotState({ paused: true });
-          await appendCopilotLog(
-            'Still waiting on Naukri questions. Finish them — Atlas will continue when saved, or press Resume.',
-            'warn'
-          );
-          const pause2 = await waitWhilePausedForQuestions(tab.id);
-          if (pause2 === 'stopped') break;
-
-          if (pause2 === 'applied') {
-            await handlers.persistApplicationRecorded({
-              ...base,
-              status: 'applied',
-              appliedAt: new Date().toISOString(),
-              metadata: { source: 'auto_apply' },
-            });
-            await incrementAppliedToday();
-            const st = await getCopilotState();
-            await setCopilotState({ applied: st.applied + 1 });
-            await appendCopilotLog(`Applied: ${base.title}`, 'success');
-          } else {
-            if (!(await ensureNaukriLoggedIn(tab.id))) break;
-
-            const retry2 = await sendToTab<{
-              ok: boolean;
-              skipped?: boolean;
-              needsUserInput?: boolean;
-              reason?: string;
-              job?: Partial<JobPayload>;
-            }>(tab.id, { type: 'RUN_EASY_APPLY' });
-
-            if (retry2.ok) {
-              await handlers.persistApplicationRecorded({
-                ...base,
-                title: retry2.job?.title || base.title,
-                company: retry2.job?.company || base.company,
-                status: 'applied',
-                appliedAt: new Date().toISOString(),
-                metadata: { source: 'auto_apply' },
-              });
-              await incrementAppliedToday();
-              const st = await getCopilotState();
-              await setCopilotState({ applied: st.applied + 1 });
-              await appendCopilotLog(`Applied: ${base.title}`, 'success');
-            } else if (retry2.needsUserInput) {
-              const st = await getCopilotState();
-              await setCopilotState({ skipped: st.skipped + 1 });
-              await handlers.persistJobDetected({
-                ...base,
-                metadata: {
-                  source: 'auto_scan',
-                  skipped: true,
-                  skipReason: 'User questions not completed',
-                },
-              });
-              await appendCopilotLog(
-                `Skipped: ${base.title} — questions still open. Continuing scan.`,
-                'warn'
-              );
-            } else {
-              const st = await getCopilotState();
-              await setCopilotState({ skipped: st.skipped + 1 });
-              await appendCopilotLog(
-                `Skipped: ${base.title} — ${retry2.reason || 'unavailable'}`,
-                'warn'
-              );
-            }
-          }
-        } else {
-          const st = await getCopilotState();
-          await setCopilotState({ skipped: st.skipped + 1 });
-          await handlers.persistJobDetected({
-            ...base,
-            metadata: {
-              source: 'auto_scan',
-              skipped: true,
-              skipReason: retry.reason || 'Easy Apply unavailable',
-            },
-          });
-          await appendCopilotLog(
-            `Skipped: ${base.title} — ${retry.reason || 'unavailable'}`,
-            'warn'
-          );
-        }
-      } else if (result.ok) {
-        await handlers.persistApplicationRecorded({
-          ...base,
-          status: 'applied',
-          appliedAt: new Date().toISOString(),
-          metadata: { source: 'auto_apply' },
-        });
-        await incrementAppliedToday();
-        const st = await getCopilotState();
-        await setCopilotState({ applied: st.applied + 1 });
-        await appendCopilotLog(`Applied: ${base.title}`, 'success');
-      } else {
-        await handlers.persistJobDetected({
-          ...base,
-          metadata: {
-            source: 'auto_scan',
-            skipped: true,
-            skipReason: result.reason || 'Easy Apply unavailable',
+        await upsertScannedJobs([
+          {
+            id,
+            title: job.title,
+            company: job.company,
+            url: job.url,
+            externalJobId: job.externalJobId,
           },
-        });
-        const st = await getCopilotState();
-        await setCopilotState({ skipped: st.skipped + 1 });
-        await appendCopilotLog(
-          `Skipped: ${base.title} — ${result.reason || 'unavailable'}`,
-          'warn'
-        );
+        ]);
+        fresh.push(job);
       }
 
-      await wait(randomDelay());
+      await appendCopilotLog(
+        `List round ${round + 1}: ${fresh.length} new match(es) to process`,
+        fresh.length ? 'success' : 'warn'
+      );
+
+      for (const job of fresh) {
+        if (!(await waitWhilePaused())) {
+          hitLimit = true;
+          break;
+        }
+        const outcome = await applyOneJob(
+          tab.id,
+          job,
+          prefs,
+          handlers,
+          searchUrl,
+          stealth
+        );
+        if (outcome === 'stop' || outcome === 'limit') {
+          hitLimit = true;
+          break;
+        }
+      }
+
+      if (hitLimit) break;
+
+      // If this round found nothing new after a scroll, stop.
+      if (round > 0 && fresh.length === 0) {
+        await appendCopilotLog('No more new matching jobs on the list', 'info');
+        break;
+      }
     }
 
     const finalState = await getCopilotState();

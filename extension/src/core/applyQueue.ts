@@ -7,10 +7,12 @@ import {
   setApplyDayStats,
   setApplyQueue,
 } from './storageManager';
+import { lookupAppliedJobs } from './apiClient';
 import { logger } from './logger';
 import {
   appendCopilotLog,
   getCopilotState,
+  raiseCopilotToast,
   setCopilotState,
 } from './copilotState';
 import { mergeJobFields } from './jobFields';
@@ -21,6 +23,15 @@ function wait(ms: number) {
 
 function randomDelay() {
   return 3000 + Math.floor(Math.random() * 5000);
+}
+
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`.replace(/\/$/, '');
+  } catch {
+    return url.split('?')[0]?.replace(/\/$/, '') || url;
+  }
 }
 
 async function waitForTabComplete(tabId: number, timeoutMs = 25000) {
@@ -64,8 +75,27 @@ export async function enqueueApplyJobs(
 
   const queue = await getApplyQueue();
   const existing = new Set(queue.map((q) => q.url));
-  const toAdd = items
-    .filter((i) => i.url && !existing.has(i.url))
+
+  const candidates = items.filter((i) => i.url && !existing.has(i.url));
+  const lookup = await lookupAppliedJobs({
+    externalJobIds: candidates
+      .map((c) => c.externalJobId)
+      .filter((id): id is string => Boolean(id)),
+    urls: candidates.map((c) => c.url),
+  });
+  const appliedIds = new Set(
+    lookup.success ? lookup.data.externalJobIds : []
+  );
+  const appliedUrls = new Set(
+    lookup.success ? lookup.data.urls.map(normalizeUrl) : []
+  );
+
+  const toAdd = candidates
+    .filter((i) => {
+      if (i.externalJobId && appliedIds.has(i.externalJobId)) return false;
+      if (appliedUrls.has(normalizeUrl(i.url))) return false;
+      return true;
+    })
     .slice(0, remaining);
   if (toAdd.length === 0) return 0;
 
@@ -113,6 +143,26 @@ export async function processApplyQueue(
       await setApplyQueue(queue);
 
       try {
+        const appliedLookup = await lookupAppliedJobs({
+          externalJobIds: item.externalJobId ? [item.externalJobId] : [],
+          urls: [item.url],
+        });
+        if (appliedLookup.success) {
+          const already =
+            (item.externalJobId &&
+              appliedLookup.data.externalJobIds.includes(item.externalJobId)) ||
+            appliedLookup.data.urls
+              .map(normalizeUrl)
+              .includes(normalizeUrl(item.url));
+          if (already) {
+            await appendCopilotLog(
+              `Already applied — skipped: ${item.title}`,
+              'info'
+            );
+            continue;
+          }
+        }
+
         if (activeTabId == null) {
           const tab = await chrome.tabs.create({
             url: item.url,
@@ -168,6 +218,7 @@ export async function processApplyQueue(
         const result = await sendToTab<{
           ok: boolean;
           skipped?: boolean;
+          alreadyApplied?: boolean;
           reason?: string;
           job?: Partial<JobPayload>;
         }>(activeTabId, { type: 'RUN_EASY_APPLY' });
@@ -179,18 +230,35 @@ export async function processApplyQueue(
         });
 
         if (result.ok) {
-          await handlers.persistApplicationRecorded({
-            ...base,
-            status: 'applied',
-            appliedAt: new Date().toISOString(),
-            metadata: { source: 'auto_apply' },
-          });
-          stats = {
-            date: stats.date,
-            count: stats.count + 1,
-          };
-          await setApplyDayStats(stats);
-          processed += 1;
+          if (result.alreadyApplied) {
+            await handlers.persistApplicationRecorded({
+              ...base,
+              status: 'applied',
+              appliedAt: new Date().toISOString(),
+              metadata: { source: 'auto_apply', alreadyApplied: true },
+            });
+            await appendCopilotLog(
+              `Already applied — skipped: ${base.title}`,
+              'info'
+            );
+          } else {
+            await handlers.persistApplicationRecorded({
+              ...base,
+              status: 'applied',
+              appliedAt: new Date().toISOString(),
+              metadata: { source: 'auto_apply' },
+            });
+            stats = {
+              date: stats.date,
+              count: stats.count + 1,
+            };
+            await setApplyDayStats(stats);
+            processed += 1;
+            await raiseCopilotToast(
+              'Job applied successfully',
+              base.company ? `${base.title} · ${base.company}` : base.title
+            );
+          }
         } else {
           await handlers.persistJobDetected({
             ...base,

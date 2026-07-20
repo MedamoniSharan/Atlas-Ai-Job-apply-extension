@@ -24,21 +24,14 @@ function emitJob(adapter = resolveAdapter(window.location.href)) {
   const status =
     adapter.detectApplicationStatus(document) ?? job.status ?? 'detected';
   const payload: JobPayload = {
+    ...job,
     platform: adapter.platform,
     title: job.title,
     company: job.company,
-    location: job.location,
     url: job.url ?? window.location.href,
-    externalJobId: job.externalJobId,
-    companyLogo: job.companyLogo,
-    description: job.description,
-    experience: job.experience,
-    salary: job.salary,
-    skills: job.skills,
-    rating: job.rating,
     status,
     appliedAt: status === 'applied' ? new Date().toISOString() : undefined,
-    metadata: { source: 'manual' },
+    metadata: { ...(job.metadata ?? {}), source: 'manual' },
   };
 
   const fp = fingerprint(payload);
@@ -119,6 +112,7 @@ function patchHistory() {
 async function runEasyApply(): Promise<{
   ok: boolean;
   skipped?: boolean;
+  alreadyApplied?: boolean;
   needsUserInput?: boolean;
   reason?: string;
   job?: Partial<JobPayload>;
@@ -127,7 +121,11 @@ async function runEasyApply(): Promise<{
 
   // Success page / already applied must win over leftover questionnaire DOM.
   if (naukri.detectApplicationStatus(document) === 'applied') {
-    return { ok: true, job };
+    return {
+      ok: true,
+      alreadyApplied: naukri.isAlreadyApplied(document),
+      job,
+    };
   }
 
   if (naukri.isCompanySiteApply(document)) {
@@ -184,7 +182,11 @@ async function runEasyApply(): Promise<{
   await new Promise((r) => setTimeout(r, 2200));
 
   if (naukri.detectApplicationStatus(document) === 'applied') {
-    return { ok: true, job: naukri.readJob(document) ?? job };
+    return {
+      ok: true,
+      alreadyApplied: naukri.isAlreadyApplied(document),
+      job: naukri.readJob(document) ?? job,
+    };
   }
 
   const questionsAfter = naukri.detectNeedsUserQuestions(document);
@@ -214,7 +216,11 @@ async function runEasyApply(): Promise<{
   }
 
   if (naukri.detectApplicationStatus(document) === 'applied') {
-    return { ok: true, job: naukri.readJob(document) ?? job };
+    return {
+      ok: true,
+      alreadyApplied: naukri.isAlreadyApplied(document),
+      job: naukri.readJob(document) ?? job,
+    };
   }
 
   const afterLabel = (btn.textContent || '').toLowerCase();
@@ -222,11 +228,19 @@ async function runEasyApply(): Promise<{
     /applied|applied successfully/.test(afterLabel) ||
     btn.hasAttribute('disabled')
   ) {
-    return { ok: true, job: naukri.readJob(document) ?? job };
+    return {
+      ok: true,
+      alreadyApplied: naukri.isAlreadyApplied(document),
+      job: naukri.readJob(document) ?? job,
+    };
   }
 
   // No questionnaire detected — treat as applied for Easy Apply.
-  return { ok: true, job: naukri.readJob(document) ?? job };
+  return {
+    ok: true,
+    alreadyApplied: naukri.isAlreadyApplied(document),
+    job: naukri.readJob(document) ?? job,
+  };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -250,10 +264,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
         break;
       }
+      case 'READ_JOB_DETAIL': {
+        const job = naukri.readJob(document);
+        sendResponse({ job: job ?? null });
+        break;
+      }
       case 'RUN_SCAN_SCRAPE': {
         const jobs: SearchResultJob[] = naukri.readSearchResults(document);
         logger.info('Scan scrape complete', { count: jobs.length });
         sendResponse({ jobs });
+        break;
+      }
+      case 'SCROLL_SEARCH_RESULTS': {
+        const before = document.querySelectorAll(
+          '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id]'
+        ).length;
+        const step = Math.max(480, Math.floor(window.innerHeight * 0.85));
+        window.scrollBy({ top: step, behavior: 'smooth' });
+        await new Promise((r) => setTimeout(r, 1200));
+        // Nudge again so lazy-loaded cards appear.
+        window.scrollBy({ top: Math.floor(step * 0.4), behavior: 'smooth' });
+        await new Promise((r) => setTimeout(r, 900));
+        const after = document.querySelectorAll(
+          '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id]'
+        ).length;
+        sendResponse({ ok: true, before, after });
         break;
       }
       case 'RUN_EASY_APPLY': {

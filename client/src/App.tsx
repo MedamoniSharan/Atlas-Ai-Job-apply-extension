@@ -206,7 +206,10 @@ export function AppLayout() {
             <button
               type="button"
               className="sidebar__signout"
-              onClick={clearSession}
+              onClick={() => {
+                clearSession();
+                navigate('/', { replace: true });
+              }}
             >
               Sign out
             </button>

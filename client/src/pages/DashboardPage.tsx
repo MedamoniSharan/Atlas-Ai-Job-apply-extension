@@ -6,18 +6,18 @@ import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import { ExtensionOnboarding } from '../components/ExtensionOnboarding';
+import { ApplicationDetailDrawer } from '../components/ApplicationDetailDrawer';
 import { useAuthStore } from '../store/authStore';
 import type { ShellOutletContext } from '../App';
 
-type DashFilter = 'all' | 'matched' | 'applied' | 'skipped' | 'needs_you';
+type DashFilter = 'all' | 'applied' | 'matched' | 'skipped';
 
 const PASTELS = ['yellow', 'green', 'lilac', 'rose'] as const;
 
 function sourceLabel(app: Application): string {
-  if (isNeedsYou(app)) return 'Needs you';
   if (app.metadata?.skipped) return 'Skipped';
-  if (app.status === 'applied') return 'Submitted';
-  if (app.metadata?.source === 'auto_apply') return 'Submitted';
+  if (app.status === 'applied') return 'Applied';
+  if (app.metadata?.source === 'auto_apply') return 'Applied';
   if (app.metadata?.source === 'auto_scan') return 'Matched';
   if (app.status === 'detected') return 'Matched';
   return app.status;
@@ -25,17 +25,10 @@ function sourceLabel(app: Application): string {
 
 function statusClass(app: Application): string {
   const label = sourceLabel(app).toLowerCase();
-  if (label === 'submitted') return 'dash-status dash-status--submitted';
-  if (label === 'needs you') return 'dash-status dash-status--needs';
+  if (label === 'applied') return 'dash-status dash-status--submitted';
   if (label === 'skipped') return 'dash-status dash-status--skipped';
   if (label === 'matched') return 'dash-status dash-status--matched';
   return 'dash-status';
-}
-
-function isNeedsYou(app: Application): boolean {
-  if (!app.metadata?.skipped) return false;
-  const reason = String(app.metadata.skipReason || '').toLowerCase();
-  return /question|mandatory|user input|login|answer/.test(reason);
 }
 
 function estimateMatch(app: Application): number {
@@ -123,7 +116,6 @@ function MatchRing({ value }: { value: number }) {
 }
 
 function bucketForFilter(filter: DashFilter): 'all' | 'matched' | 'applied' | 'skipped' {
-  if (filter === 'needs_you') return 'skipped';
   return filter;
 }
 
@@ -137,6 +129,7 @@ export function DashboardPage() {
   const [limit] = useState(12);
   const [filter, setFilter] = useState<DashFilter>('all');
   const [q, setQ] = useState(search);
+  const [selected, setSelected] = useState<Application | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -195,8 +188,7 @@ export function DashboardPage() {
     !onboarding.hasApplications;
 
   const rawItems = data?.items ?? [];
-  const items =
-    filter === 'needs_you' ? rawItems.filter(isNeedsYou) : rawItems;
+  const items = rawItems;
 
   const topMatches = (matchData?.items ?? [])
     .filter((a) => !a.metadata?.skipped)
@@ -205,12 +197,7 @@ export function DashboardPage() {
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
   const from = total === 0 || items.length === 0 ? 0 : (page - 1) * limit + 1;
-  const to =
-    filter === 'needs_you'
-      ? from === 0
-        ? 0
-        : from + items.length - 1
-      : Math.min(page * limit, total);
+  const to = Math.min(page * limit, total);
 
   return (
     <div className="dash">
@@ -252,6 +239,15 @@ export function DashboardPage() {
                 <article
                   key={app.id}
                   className={`dash-match-card dash-match-card--${pastel}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(app)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelected(app);
+                    }
+                  }}
                 >
                   <div className="dash-match-card__top">
                     <p className="dash-match-card__company">{app.company}</p>
@@ -266,6 +262,7 @@ export function DashboardPage() {
                         href={app.url}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Apply
                       </a>
@@ -303,9 +300,8 @@ export function DashboardPage() {
           {(
             [
               ['all', 'All'],
-              ['matched', 'In flight'],
-              ['needs_you', 'Needs you'],
-              ['applied', 'Submitted'],
+              ['applied', 'Applied'],
+              ['matched', 'Matched'],
               ['skipped', 'Skipped'],
             ] as const
           ).map(([id, label]) => (
@@ -364,19 +360,17 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {items.map((app) => (
-                    <tr key={app.id}>
+                    <tr
+                      key={app.id}
+                      className="dash-table__row--clickable"
+                      onClick={() => setSelected(app)}
+                    >
                       <td>
                         <div className="dash-position">
                           <CompanyLogo app={app} size="sm" />
                           <div>
                             <strong>{app.company}</strong>
-                            {app.url ? (
-                              <a href={app.url} target="_blank" rel="noreferrer">
-                                {app.title}
-                              </a>
-                            ) : (
-                              <span>{app.title}</span>
-                            )}
+                            <span className="dash-position__title">{app.title}</span>
                             {app.metadata?.skipReason ? (
                               <div className="dash-skip">{app.metadata.skipReason}</div>
                             ) : null}
@@ -402,7 +396,7 @@ export function DashboardPage() {
             <div className="dash-pagination">
               <p>
                 Showing {from}–{to}
-                {filter === 'needs_you' ? '' : ` of ${total}`}
+                {` of ${total}`}
                 {isFetching && !isLoading ? ' · Updating…' : ''}
               </p>
               <div className="dash-pagination__controls">
@@ -430,6 +424,11 @@ export function DashboardPage() {
           </>
         )}
       </section>
+
+      <ApplicationDetailDrawer
+        app={selected}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }

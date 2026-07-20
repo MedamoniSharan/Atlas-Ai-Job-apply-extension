@@ -142,6 +142,23 @@ export async function fetchPreferences(): Promise<ApiResponse<JobPreferences>> {
   return result;
 }
 
+/** Jobs already applied in Atlas DB (shared with dashboard). */
+export async function lookupAppliedJobs(input: {
+  externalJobIds?: string[];
+  urls?: string[];
+}): Promise<ApiResponse<{ externalJobIds: string[]; urls: string[] }>> {
+  return request<{ externalJobIds: string[]; urls: string[] }>(
+    '/api/v1/applications/lookup',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        externalJobIds: input.externalJobIds ?? [],
+        urls: input.urls ?? [],
+      }),
+    }
+  );
+}
+
 export async function savePreferences(
   prefs: JobPreferences
 ): Promise<ApiResponse<JobPreferences>> {

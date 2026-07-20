@@ -120,7 +120,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         case 'GET_STATUS': {
           const auth = await getAuthState();
           const health = await reportHealth();
-          const prefs = await getCachedPreferences();
+          // Always prefer DB preferences so extension stays in sync with dashboard.
+          const remotePrefs = auth.accessToken
+            ? await fetchPreferences()
+            : null;
+          const prefs = remotePrefs?.success
+            ? remotePrefs.data
+            : await getCachedPreferences();
           const applyQueueDepth = await getApplyQueueDepth();
           const copilot = await getCopilotState();
           sendResponse({
