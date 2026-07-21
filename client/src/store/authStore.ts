@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '@atlas/shared';
+import {
+  clearAuthFromExtension,
+  syncAuthToExtension,
+} from '../lib/extensionAuthBridge';
 
 type AuthState = {
   accessToken: string | null;
@@ -20,10 +24,14 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       user: null,
-      setSession: ({ accessToken, refreshToken, user }) =>
-        set({ accessToken, refreshToken, user }),
-      clearSession: () =>
-        set({ accessToken: null, refreshToken: null, user: null }),
+      setSession: ({ accessToken, refreshToken, user }) => {
+        set({ accessToken, refreshToken, user });
+        syncAuthToExtension({ accessToken, refreshToken });
+      },
+      clearSession: () => {
+        set({ accessToken: null, refreshToken: null, user: null });
+        clearAuthFromExtension();
+      },
     }),
     { name: 'atlas-auth' }
   )

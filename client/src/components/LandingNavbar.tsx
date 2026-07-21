@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Menu, X } from 'lucide-react';
+import { CosmosMark } from './CosmosLogo';
 
 const CHROME_STORE_URL = import.meta.env.VITE_CHROME_EXTENSION_URL ?? '';
 
@@ -53,16 +54,8 @@ function ChromeGlyph({ size = 14 }: { size?: number }) {
   );
 }
 
-function TsentaMark() {
-  return (
-    <span className="capsule-mark">
-      <span className="capsule-mark__icon" aria-hidden="true">
-        <span className="capsule-mark__leaf capsule-mark__leaf--a" />
-        <span className="capsule-mark__leaf capsule-mark__leaf--b" />
-      </span>
-      <span className="capsule-mark__word">tsenta</span>
-    </span>
-  );
+function BrandMark() {
+  return <CosmosMark />;
 }
 
 export function LandingNavbar() {
@@ -100,7 +93,7 @@ export function LandingNavbar() {
     <header className="capsule-shell">
       <nav className="capsule-nav" aria-label="Main navigation" ref={navRef}>
         <Link className="capsule-brand" to="/" aria-label="Tsenta home">
-          <TsentaMark />
+          <BrandMark />
         </Link>
 
         <div className="capsule-links">

@@ -5,6 +5,7 @@ import {
   type WorkMode,
 } from '@atlas/shared';
 import { fetchPreferences, savePreferences } from '../lib/api';
+import { CosmosLoader } from './CosmosLogo';
 
 function parseList(value: string): string[] {
   return value
@@ -84,7 +85,12 @@ export function PreferencesForm({
   }
 
   if (loading) {
-    return <p className="muted">Loading preferences…</p>;
+    return (
+      <CosmosLoader
+        label="Loading preferences…"
+        className="cosmos-loader--inline"
+      />
+    );
   }
 
   return (

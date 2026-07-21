@@ -1,4 +1,5 @@
 import type { JobPayload, JobPreferences } from '@atlas/shared';
+import { sanitizeJobMetaFields, stripEmbeddedLabels } from '@atlas/shared';
 import {
   PlatformAdapter,
   SelectorRegistry,
@@ -240,7 +241,9 @@ function labeledDetail(doc: Document, labels: string[]): string | undefined {
     if (!matched) continue;
 
     if (labelText.includes(':')) {
-      const after = cleanText(node.textContent)?.split(':').slice(1).join(':');
+      const after = stripEmbeddedLabels(
+        cleanText(node.textContent)?.split(':').slice(1).join(':')
+      );
       if (after && after.length > 1) return after;
     }
 
@@ -249,7 +252,7 @@ function labeledDetail(doc: Document, labels: string[]): string | undefined {
       (node.parentElement?.querySelector(
         'span, a, [class*="value"], dd'
       ) as HTMLElement | null);
-    const siblingText = cleanText(sibling?.textContent);
+    const siblingText = stripEmbeddedLabels(cleanText(sibling?.textContent));
     if (siblingText && siblingText.toLowerCase() !== matched) return siblingText;
   }
 
@@ -261,7 +264,7 @@ function labeledDetail(doc: Document, labels: string[]): string | undefined {
       'i'
     );
     const match = body.match(re);
-    const value = cleanText(match?.[1]);
+    const value = stripEmbeddedLabels(cleanText(match?.[1]));
     if (value && !wanted.includes(value.toLowerCase())) return value;
   }
 
@@ -653,6 +656,20 @@ export class NaukriAdapter implements PlatformAdapter {
           ? role
           : undefined;
 
+    const sanitized = sanitizeJobMetaFields({
+      experience: cleanText(experience),
+      salary: cleanText(salary),
+      postedAt,
+      openings,
+      applicants,
+      role: roleClean || (role && !/category/i.test(role) ? role : undefined),
+      industry,
+      department,
+      employmentType,
+      roleCategory,
+      education,
+    });
+
     return {
       platform: this.platform,
       title: cleanText(title) || title,
@@ -662,21 +679,21 @@ export class NaukriAdapter implements PlatformAdapter {
       url: href,
       companyLogo,
       description,
-      experience: cleanText(experience),
-      salary: cleanText(salary),
+      experience: sanitized.experience,
+      salary: sanitized.salary,
       skills: skills.length ? skills : undefined,
       rating,
       reviews,
-      postedAt,
-      openings,
-      applicants,
+      postedAt: sanitized.postedAt,
+      openings: sanitized.openings,
+      applicants: sanitized.applicants,
       highlights: highlights.length ? highlights : undefined,
-      role: roleClean || (role && !/category/i.test(role) ? role : undefined),
-      industry,
-      department,
-      employmentType,
-      roleCategory,
-      education,
+      role: sanitized.role,
+      industry: sanitized.industry,
+      department: sanitized.department,
+      employmentType: sanitized.employmentType,
+      roleCategory: sanitized.roleCategory,
+      education: sanitized.education,
       aboutCompany,
       status: 'detected',
     };

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { login, register } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { CosmosMark } from '../components/CosmosLogo';
 
 type Mode = 'login' | 'register';
 
@@ -39,7 +40,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
   return (
     <div className="auth-page">
       <div className="auth-panel">
-        <p className="brand">tsenta</p>
+        <CosmosMark className="auth-brand" word="tsenta" logoSize={28} />
         <h1>{mode === 'login' ? 'Welcome back' : 'Create account'}</h1>
         <p className="sub">
           Track applications synced from your browser extension.

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Application } from '@atlas/shared';
+import { sanitizeJobMetaFields } from '@atlas/shared';
 
 type ApplicationDetailDrawerProps = {
   app: Application | null;
@@ -47,19 +48,21 @@ export function ApplicationDetailDrawer({
 
   if (!app) return null;
 
+  const meta = sanitizeJobMetaFields(app);
+
   const facts = [
-    { label: 'Experience', value: app.experience },
-    { label: 'Salary', value: app.salary },
+    { label: 'Experience', value: meta.experience },
+    { label: 'Salary', value: meta.salary },
     { label: 'Location', value: app.location },
-    { label: 'Posted', value: app.postedAt },
-    { label: 'Openings', value: app.openings },
-    { label: 'Applicants', value: app.applicants },
-    { label: 'Role', value: app.role },
-    { label: 'Department', value: app.department },
-    { label: 'Industry', value: app.industry },
-    { label: 'Employment', value: app.employmentType },
-    { label: 'Role category', value: app.roleCategory },
-    { label: 'Education', value: app.education },
+    { label: 'Posted', value: meta.postedAt },
+    { label: 'Openings', value: meta.openings },
+    { label: 'Applicants', value: meta.applicants },
+    { label: 'Role', value: meta.role },
+    { label: 'Department', value: meta.department },
+    { label: 'Industry', value: meta.industry },
+    { label: 'Employment', value: meta.employmentType },
+    { label: 'Role category', value: meta.roleCategory },
+    { label: 'Education', value: meta.education },
     {
       label: 'Rating',
       value:
@@ -198,7 +201,10 @@ export function ApplicationDetailDrawer({
               target="_blank"
               rel="noreferrer"
             >
-              Open on Naukri
+              {app.metadata?.companySiteApply ||
+              /company site|external/i.test(app.metadata?.skipReason ?? '')
+                ? 'Apply on company site'
+                : 'Open on Naukri'}
             </a>
           ) : null}
           <button

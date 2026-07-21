@@ -2,7 +2,7 @@ import { Application, Platform } from '@atlas/shared';
 import { FilterQuery } from 'mongoose';
 import { ApplicationModel, IApplication } from './application.model';
 
-export type ApplicationBucket = 'all' | 'matched' | 'applied' | 'skipped';
+export type ApplicationBucket = 'all' | 'matched' | 'applied' | 'skipped' | 'company_site';
 
 export type ListApplicationsQuery = {
   page?: number;
@@ -79,12 +79,29 @@ function buildFilter(
       $or: [{ status: 'applied' }, { 'metadata.source': 'auto_apply' }],
       'metadata.skipped': { $ne: true },
     });
+  } else if (bucket === 'company_site') {
+    and.push({
+      $or: [
+        { 'metadata.companySiteApply': true },
+        {
+          'metadata.skipped': true,
+          'metadata.skipReason': { $regex: /company site|external/i },
+        },
+      ],
+      status: { $nin: ['applied'] },
+      'metadata.source': { $ne: 'auto_apply' },
+    });
   } else if (bucket === 'skipped') {
-    and.push({ 'metadata.skipped': true });
+    and.push({
+      'metadata.skipped': true,
+      'metadata.companySiteApply': { $ne: true },
+      'metadata.skipReason': { $not: { $regex: /company site|external/i } },
+    });
   } else if (bucket === 'matched') {
     and.push({
       status: { $in: ['detected', 'viewed', 'saved'] },
       'metadata.skipped': { $ne: true },
+      'metadata.companySiteApply': { $ne: true },
     });
   }
 

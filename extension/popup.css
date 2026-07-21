@@ -28,6 +28,19 @@ body {
   gap: 14px;
 }
 
+.popup-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.popup-brand .cosmos-logo {
+  flex-shrink: 0;
+  color: var(--text);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 header h1 {
   margin: 0;
   font-size: 1.25rem;

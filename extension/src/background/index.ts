@@ -117,6 +117,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ ok: true });
           break;
         }
+        case 'SYNC_AUTH_FROM_WEB': {
+          if (message.cleared) {
+            await clearAuth();
+            sendResponse({ ok: true });
+            break;
+          }
+
+          const accessToken =
+            typeof message.accessToken === 'string' ? message.accessToken : null;
+          const refreshToken =
+            typeof message.refreshToken === 'string'
+              ? message.refreshToken
+              : null;
+          const apiBaseUrl =
+            typeof message.apiBaseUrl === 'string' && message.apiBaseUrl
+              ? message.apiBaseUrl
+              : DEFAULT_API;
+
+          if (!accessToken || !refreshToken) {
+            sendResponse({ ok: false, error: 'Missing tokens' });
+            break;
+          }
+
+          const current = await getAuthState();
+          const unchanged =
+            current.accessToken === accessToken &&
+            current.refreshToken === refreshToken &&
+            current.apiBaseUrl === apiBaseUrl;
+
+          if (!unchanged) {
+            await setAuthState({ accessToken, refreshToken, apiBaseUrl });
+            await sendExtensionConnected();
+            await fetchPreferences();
+          }
+
+          sendResponse({ ok: true, synced: !unchanged });
+          break;
+        }
         case 'GET_STATUS': {
           const auth = await getAuthState();
           const health = await reportHealth();

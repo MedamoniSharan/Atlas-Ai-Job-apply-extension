@@ -53,10 +53,11 @@ export function ExtensionOnboarding({
         <li className="onboarding__step">
           <span className="onboarding__step-num">3</span>
           <div>
-            <strong>Sign in on extension</strong>
+            <strong>Stay signed in here</strong>
             <p className="muted">
-              Open the Atlas popup → use the same email and password → API base
-              URL: <code>http://localhost:4000</code>
+              Keep this dashboard tab open while you use the extension — Atlas
+              syncs your sign-in automatically. Manual sign-in in the popup is
+              only needed if you never open the web app.
             </p>
           </div>
         </li>

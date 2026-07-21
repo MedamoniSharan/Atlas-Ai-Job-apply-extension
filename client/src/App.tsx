@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from './store/authStore';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
 import { ensureSession, fetchApplications } from './lib/api';
+import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
 
 export type ShellOutletContext = {
   search: string;
@@ -77,11 +78,11 @@ export function AppLayout() {
   );
 
   if (!sessionReady) {
-    return null;
+    return <CosmosLoader label="Loading Tsenta…" className="cosmos-loader--shell" />;
   }
 
   if (!accessToken) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const needsPrefs = onboarding && !onboarding.preferencesCompleted;
@@ -116,9 +117,7 @@ export function AppLayout() {
 
       <aside className="sidebar" aria-label="Primary">
         <div className="sidebar__brand">
-          <span className="sidebar__mark" aria-hidden>
-            T
-          </span>
+          <CosmosLogo className="sidebar__logo" size={28} />
           <span className="sidebar__name">tsenta</span>
         </div>
 

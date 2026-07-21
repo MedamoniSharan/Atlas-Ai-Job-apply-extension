@@ -175,9 +175,14 @@ alertDismissBtn.addEventListener('click', async () => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.copilotState) return;
-  const next = changes.copilotState.newValue as CopilotState | undefined;
-  renderAlert(next?.alert);
+  if (area !== 'local') return;
+  if (changes.copilotState) {
+    const next = changes.copilotState.newValue as CopilotState | undefined;
+    renderAlert(next?.alert);
+  }
+  if (changes.accessToken || changes.refreshToken) {
+    void refreshUi();
+  }
 });
 
 

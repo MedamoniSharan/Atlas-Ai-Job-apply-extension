@@ -229,6 +229,10 @@ async function markSkipped(
   id: string,
   reason: string
 ) {
+  if (/company site|external/i.test(reason)) {
+    await markCompanySite(handlers, base, id);
+    return;
+  }
   await handlers.persistJobDetected({
     ...base,
     metadata: {
@@ -241,6 +245,28 @@ async function markSkipped(
   const st = await getCopilotState();
   await setCopilotState({ skipped: st.skipped + 1 });
   await appendCopilotLog(`Skipped: ${base.title} — ${reason}`, 'warn');
+}
+
+async function markCompanySite(
+  handlers: BotHandlers,
+  base: JobPayload,
+  id: string
+) {
+  await handlers.persistJobDetected({
+    ...base,
+    metadata: {
+      source: 'auto_scan',
+      companySiteApply: true,
+    },
+  });
+  await updateScannedJob(id, {
+    status: 'skipped',
+    skipReason: 'Apply on company site',
+  });
+  await appendCopilotLog(
+    `Company site — saved for manual apply: ${base.title}`,
+    'info'
+  );
 }
 
 async function applyOneJob(
@@ -276,13 +302,14 @@ async function applyOneJob(
 
   // Collect full JD fields while on the detail page.
   let detailJob: Partial<JobPayload> | undefined;
+  let companySiteApply = Boolean(job.companySiteApply);
   try {
-    const detail = await sendToTab<{ job?: Partial<JobPayload> | null }>(
-      tabId,
-      { type: 'READ_JOB_DETAIL' },
-      4
-    );
+    const detail = await sendToTab<{
+      job?: Partial<JobPayload> | null;
+      companySiteApply?: boolean;
+    }>(tabId, { type: 'READ_JOB_DETAIL' }, 4);
     detailJob = detail.job ?? undefined;
+    if (detail.companySiteApply) companySiteApply = true;
   } catch {
     /* page may still be loading */
   }
@@ -291,6 +318,12 @@ async function applyOneJob(
     metadata: { source: 'auto_scan' },
   });
   await handlers.persistJobDetected(enriched);
+
+  if (companySiteApply) {
+    await markCompanySite(handlers, enriched, id);
+    await goBackToList(tabId, searchUrl, stealth);
+    return 'continue';
+  }
 
   if (!prefs.autoApplyEnabled) {
     await markSkipped(handlers, enriched, id, 'Auto-apply is off');
@@ -575,8 +608,8 @@ export async function runBot(handlers: BotHandlers): Promise<{
       const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tab.id, {
         type: 'RUN_SCAN_SCRAPE',
       });
-      const visible = (scrape.jobs ?? []).filter(
-        (job) => !job.companySiteApply && matchesPreferences(job, prefs)
+      const visible = (scrape.jobs ?? []).filter((job) =>
+        matchesPreferences(job, prefs)
       );
 
       const appliedSet = await fetchAppliedSet(visible);

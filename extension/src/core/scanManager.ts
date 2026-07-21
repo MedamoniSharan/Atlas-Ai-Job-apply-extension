@@ -115,14 +115,16 @@ export async function runScan(options: {
     type: 'RUN_SCAN_SCRAPE',
   });
 
-  const matched = (scrape.jobs ?? []).filter(
-    (job) => !job.companySiteApply && matchesPreferences(job, prefs)
+  const matched = (scrape.jobs ?? []).filter((job) =>
+    matchesPreferences(job, prefs)
   );
 
   for (const job of matched) {
     const payload = mergeJobFields(undefined, job, {
       status: 'detected',
-      metadata: { source: 'auto_scan' },
+      metadata: job.companySiteApply
+        ? { source: 'auto_scan', companySiteApply: true }
+        : { source: 'auto_scan' },
     });
     await options.persistAndSync(
       'JobDetected',
@@ -130,10 +132,11 @@ export async function runScan(options: {
     );
   }
 
+  const easyApply = matched.filter((job) => !job.companySiteApply);
   let queuedForApply = 0;
-  if (prefs.autoApplyEnabled && matched.length > 0) {
+  if (prefs.autoApplyEnabled && easyApply.length > 0) {
     queuedForApply = await enqueueApplyJobs(
-      matched.map((j) => ({
+      easyApply.map((j) => ({
         url: j.url,
         title: j.title,
         company: j.company,

@@ -157,7 +157,7 @@ export type ApplicationsQuery = {
   page?: number;
   limit?: number;
   q?: string;
-  bucket?: 'all' | 'matched' | 'applied' | 'skipped';
+  bucket?: 'all' | 'matched' | 'applied' | 'skipped' | 'company_site';
   platform?: string;
   source?: 'all' | 'manual' | 'auto_scan' | 'auto_apply';
 };

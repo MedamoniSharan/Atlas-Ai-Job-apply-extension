@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom';
-import { ChromeInstallCta } from '../components/ChromeInstallCta';
 import { HeroAutoApply } from '../components/HeroAutoApply';
 import { JobSearchSteps } from '../components/JobSearchSteps';
 import { LandingNavbar } from '../components/LandingNavbar';
+import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { SproutJobsMarquee } from '../components/SproutJobsMarquee';
 import { TrustedCompanyMarquee } from '../components/TrustedCompanyMarquee';
 import { useAuthStore } from '../store/authStore';
@@ -27,7 +27,7 @@ export function LandingPage() {
       <JobSearchSteps />
 
       <div id="get-extension">
-        <ChromeInstallCta />
+        <CosmosDreamFooter />
       </div>
     </div>
   );

@@ -7,14 +7,21 @@ import { useApplicationSocket } from '../lib/socket';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import { ExtensionOnboarding } from '../components/ExtensionOnboarding';
 import { ApplicationDetailDrawer } from '../components/ApplicationDetailDrawer';
+import { CosmosLoader } from '../components/CosmosLogo';
 import { useAuthStore } from '../store/authStore';
 import type { ShellOutletContext } from '../App';
 
-type DashFilter = 'all' | 'applied' | 'matched' | 'skipped';
+type DashFilter = 'all' | 'applied' | 'matched' | 'skipped' | 'company_site';
 
 const PASTELS = ['yellow', 'green', 'lilac', 'rose'] as const;
 
+function isCompanySiteJob(app: Application): boolean {
+  if (app.metadata?.companySiteApply) return true;
+  return /company site|external/i.test(app.metadata?.skipReason ?? '');
+}
+
 function sourceLabel(app: Application): string {
+  if (isCompanySiteJob(app)) return 'Company site';
   if (app.metadata?.skipped) return 'Skipped';
   if (app.status === 'applied') return 'Applied';
   if (app.metadata?.source === 'auto_apply') return 'Applied';
@@ -25,6 +32,7 @@ function sourceLabel(app: Application): string {
 
 function statusClass(app: Application): string {
   const label = sourceLabel(app).toLowerCase();
+  if (label === 'company site') return 'dash-status dash-status--company-site';
   if (label === 'applied') return 'dash-status dash-status--submitted';
   if (label === 'skipped') return 'dash-status dash-status--skipped';
   if (label === 'matched') return 'dash-status dash-status--matched';
@@ -115,7 +123,9 @@ function MatchRing({ value }: { value: number }) {
   );
 }
 
-function bucketForFilter(filter: DashFilter): 'all' | 'matched' | 'applied' | 'skipped' {
+function bucketForFilter(
+  filter: DashFilter
+): 'all' | 'matched' | 'applied' | 'skipped' | 'company_site' {
   return filter;
 }
 
@@ -191,7 +201,7 @@ export function DashboardPage() {
   const items = rawItems;
 
   const topMatches = (matchData?.items ?? [])
-    .filter((a) => !a.metadata?.skipped)
+    .filter((a) => !a.metadata?.skipped && !isCompanySiteJob(a))
     .slice(0, 4);
 
   const total = data?.total ?? 0;
@@ -302,6 +312,7 @@ export function DashboardPage() {
               ['all', 'All'],
               ['applied', 'Applied'],
               ['matched', 'Matched'],
+              ['company_site', 'Company site'],
               ['skipped', 'Skipped'],
             ] as const
           ).map(([id, label]) => (
@@ -330,7 +341,12 @@ export function DashboardPage() {
           ) : null}
         </div>
 
-        {isLoading && <p className="dash-empty">Loading applications…</p>}
+        {isLoading && (
+          <CosmosLoader
+            label="Loading applications…"
+            className="cosmos-loader--inline"
+          />
+        )}
         {error && (
           <p className="error">
             {error instanceof Error ? error.message : 'Failed to load'}
@@ -371,7 +387,8 @@ export function DashboardPage() {
                           <div>
                             <strong>{app.company}</strong>
                             <span className="dash-position__title">{app.title}</span>
-                            {app.metadata?.skipReason ? (
+                            {app.metadata?.skipReason &&
+                            !isCompanySiteJob(app) ? (
                               <div className="dash-skip">{app.metadata.skipReason}</div>
                             ) : null}
                           </div>

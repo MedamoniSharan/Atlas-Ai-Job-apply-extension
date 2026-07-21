@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import { ExtensionOnboarding } from '../components/ExtensionOnboarding';
 import { PreferencesForm } from '../components/PreferencesForm';
+import { CosmosLoader } from '../components/CosmosLogo';
 import { ONBOARDING_QUERY_KEY } from '../lib/onboarding';
 
 export function GetStartedPage() {
@@ -16,7 +17,10 @@ export function GetStartedPage() {
   if (isLoading) {
     return (
       <div className="dash">
-        <p className="dash-empty">Loading setup…</p>
+        <CosmosLoader
+          label="Loading setup…"
+          className="cosmos-loader--inline"
+        />
       </div>
     );
   }

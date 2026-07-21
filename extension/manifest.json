@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Atlas Job Assistant",
+  "name": "Tsenta Job Assistant",
   "version": "1.0.0",
-  "description": "Scan and apply to Naukri jobs from your preferences, synced to Atlas",
+  "description": "Scan and apply to Naukri jobs from your preferences, synced to Tsenta",
   "permissions": ["storage", "alarms", "activeTab", "tabs"],
   "host_permissions": [
     "http://localhost:4000/*",
+    "http://localhost:5173/*",
+    "http://127.0.0.1:5173/*",
     "https://www.naukri.com/*",
     "https://naukri.com/*"
   ],
@@ -14,12 +16,20 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Atlas"
+    "default_title": "Tsenta"
   },
   "content_scripts": [
     {
       "matches": ["https://www.naukri.com/*", "https://naukri.com/*"],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*"
+      ],
+      "js": ["webBridge.js"],
       "run_at": "document_idle"
     }
   ],

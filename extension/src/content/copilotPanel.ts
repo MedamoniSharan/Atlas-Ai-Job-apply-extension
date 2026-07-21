@@ -11,6 +11,7 @@ import {
   getCopilotState,
 } from '../core/copilotState';
 import { NaukriAdapter } from '../adapters/naukriAdapter';
+import { cosmosLogoSvg } from '../shared/cosmosLogo';
 
 const ROOT_ID = 'atlas-copilot-root';
 const naukri = new NaukriAdapter();
@@ -111,24 +112,25 @@ export function mountCopilotPanel() {
         gap: 9px;
         min-width: 0;
       }
-      #${ROOT_ID} .atlas-brand span.dot {
-        width: 9px; height: 9px; border-radius: 50%;
-        background: var(--atlas-teal);
-        box-shadow: 0 0 0 3px var(--atlas-teal-dim);
+      #${ROOT_ID} .atlas-brand .atlas-cosmos-logo {
+        width: 22px;
+        height: 22px;
         flex-shrink: 0;
-        transition: background .2s ease, box-shadow .2s ease;
+        color: var(--atlas-teal);
+        transform-box: fill-box;
+        transform-origin: center;
+        transition: color .2s ease;
       }
-      #${ROOT_ID}.is-running .atlas-brand span.dot {
-        animation: atlas-pulse 1.6s ease-in-out infinite;
+      #${ROOT_ID}.is-running .atlas-brand .atlas-cosmos-logo {
+        animation: atlas-logo-spin 1.6s ease-in-out infinite;
       }
-      #${ROOT_ID}.is-paused .atlas-brand span.dot {
-        background: var(--atlas-warn);
-        box-shadow: 0 0 0 3px rgba(227,168,93,.2);
+      #${ROOT_ID}.is-paused .atlas-brand .atlas-cosmos-logo {
+        color: var(--atlas-warn);
         animation: none;
       }
-      @keyframes atlas-pulse {
-        0%, 100% { box-shadow: 0 0 0 3px var(--atlas-teal-dim); }
-        50% { box-shadow: 0 0 0 6px rgba(43,176,166,.08); }
+      @keyframes atlas-logo-spin {
+        0%, 100% { transform: scale(1) rotate(0deg); }
+        50% { transform: scale(1.08) rotate(180deg); }
       }
       #${ROOT_ID} .atlas-brand-copy {
         display: grid;
@@ -566,9 +568,9 @@ export function mountCopilotPanel() {
     <div class="atlas-panel">
       <div class="atlas-head">
         <div class="atlas-brand">
-          <span class="dot"></span>
+          ${cosmosLogoSvg(22, 'atlas-cosmos-logo')}
           <div class="atlas-brand-copy">
-            <span class="atlas-brand-text">ATLAS CO-PILOT</span>
+            <span class="atlas-brand-text">TSENTA CO-PILOT</span>
             <span class="atlas-brand-sub" id="atlas-status-label">Idle — press Start</span>
           </div>
         </div>

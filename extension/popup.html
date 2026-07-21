@@ -2,14 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Atlas</title>
+    <title>Tsenta</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="popup">
-      <header>
-        <h1>Atlas</h1>
-        <p class="tagline">Job Assistant</p>
+      <header class="popup-brand">
+        <svg class="cosmos-logo" width="28" height="28" viewBox="0 0 24 24" role="img" aria-label="Tsenta" fill="none">
+          <circle cx="12" cy="3.73" r="3.2" fill="currentColor"></circle>
+          <circle cx="19.16" cy="7.87" r="3.2" fill="currentColor"></circle>
+          <circle cx="19.16" cy="16.13" r="3.2" fill="currentColor"></circle>
+          <circle cx="12" cy="20.27" r="3.2" fill="currentColor"></circle>
+          <circle cx="4.84" cy="16.13" r="3.2" fill="currentColor"></circle>
+          <circle cx="4.84" cy="7.87" r="3.2" fill="currentColor"></circle>
+        </svg>
+        <div>
+          <h1>Tsenta</h1>
+          <p class="tagline">Job Assistant</p>
+        </div>
       </header>
 
       <section id="status" class="status">
@@ -47,6 +57,10 @@
           <input id="api-base" type="url" placeholder="http://localhost:4000" />
         </label>
         <button type="submit">Sign in</button>
+        <p class="hint">
+          Already signed in on the Tsenta dashboard? Keep that tab open — your
+          session syncs here automatically.
+        </p>
         <p id="form-error" class="error"></p>
       </form>
 

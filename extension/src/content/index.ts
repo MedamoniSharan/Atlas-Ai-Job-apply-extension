@@ -266,7 +266,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case 'READ_JOB_DETAIL': {
         const job = naukri.readJob(document);
-        sendResponse({ job: job ?? null });
+        sendResponse({
+          job: job ?? null,
+          companySiteApply: naukri.isCompanySiteApply(document),
+        });
         break;
       }
       case 'RUN_SCAN_SCRAPE': {

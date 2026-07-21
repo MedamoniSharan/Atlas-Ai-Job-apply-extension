@@ -5,6 +5,7 @@ import type { Application } from '@atlas/shared';
 import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 import { ApplicationDetailDrawer } from '../components/ApplicationDetailDrawer';
+import { CosmosLoader } from '../components/CosmosLogo';
 
 type ColumnId = 'applied' | 'matched' | 'skipped';
 
@@ -109,7 +110,12 @@ export function TrackerPage() {
         </Link>
       </div>
 
-      {isLoading && <p className="dash-empty">Loading tracker…</p>}
+      {isLoading && (
+        <CosmosLoader
+          label="Loading tracker…"
+          className="cosmos-loader--inline"
+        />
+      )}
       {error && (
         <p className="error">
           {error instanceof Error ? error.message : 'Failed to load'}

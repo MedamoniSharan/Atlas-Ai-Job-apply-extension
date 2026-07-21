@@ -12,6 +12,7 @@ const BUCKETS = new Set<ApplicationBucket>([
   'matched',
   'applied',
   'skipped',
+  'company_site',
 ]);
 
 const SOURCES = new Set(['all', 'manual', 'auto_scan', 'auto_apply']);

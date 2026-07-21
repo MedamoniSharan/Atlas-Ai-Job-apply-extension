@@ -107,6 +107,7 @@ export const applicationMetadataSchema = z
     source: z.enum(['manual', 'auto_scan', 'auto_apply']).optional(),
     skipReason: z.string().optional(),
     skipped: z.boolean().optional(),
+    companySiteApply: z.boolean().optional(),
   })
   .passthrough();
 
