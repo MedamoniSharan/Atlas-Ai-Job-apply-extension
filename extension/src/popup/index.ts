@@ -228,7 +228,7 @@ document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
   }
   prefsMsg.textContent = 'Saved. Opening Naukri Co-Pilot…';
   scanStateEl.textContent =
-    'Open the bottom-left Tsenta Co-Pilot on Naukri and press Start.';
+    'Open the bottom-left Cosmo Co-Pilot on Naukri and press Start.';
   await chrome.tabs.create({ url: 'https://www.naukri.com', active: true });
 });
 

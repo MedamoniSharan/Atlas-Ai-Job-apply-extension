@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login, register } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosMark } from '../components/CosmosLogo';
@@ -78,7 +78,7 @@ function AuthPromoPanel() {
     <aside className="auth-promo" aria-labelledby="auth-promo-heading">
       <div className="auth-promo__content">
         <header className="auth-promo__brand-row">
-          <Link to="/" className="auth-brand" aria-label="Tsenta home">
+          <Link to="/" className="auth-brand" aria-label="Cosmo home">
             <CosmosMark logoSize={28} />
           </Link>
         </header>
@@ -104,7 +104,7 @@ function AuthPromoPanel() {
           </p>
         </section>
 
-        <ul className="auth-promo__companies" aria-label="Companies hiring on Tsenta">
+        <ul className="auth-promo__companies" aria-label="Companies hiring on Cosmo">
           {companyLogos.map((company) => (
             <li key={company.name} className="auth-promo__company-tile">
               <img
@@ -125,6 +125,7 @@ function AuthPromoPanel() {
 
 export function AuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const setSession = useAuthStore((s) => s.setSession);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -151,7 +152,16 @@ export function AuthPage({ mode }: { mode: Mode }) {
       }
 
       setSession(result.data);
-      navigate(mode === 'register' ? '/get-started' : '/dashboard');
+      const next = new URLSearchParams(location.search).get('next');
+      if (next && next.startsWith('/')) {
+        const [pathname, hash] = next.split('#');
+        navigate({
+          pathname: pathname || '/',
+          hash: hash || undefined,
+        });
+      } else {
+        navigate(mode === 'register' ? '/get-started' : '/dashboard');
+      }
     } finally {
       setLoading(false);
     }
@@ -163,7 +173,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
 
       <main className="auth-form-shell">
         <section className="auth-form-panel" aria-labelledby="auth-form-title">
-          <div className="auth-form-panel__mobile-brand" aria-label="Tsenta home">
+          <div className="auth-form-panel__mobile-brand" aria-label="Cosmo home">
             <Link to="/" className="auth-brand">
               <CosmosMark logoSize={24} />
             </Link>
@@ -268,7 +278,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
                   type="button"
                   aria-label="Password help"
                   onClick={() =>
-                    setNotice('Use the password associated with your Tsenta account.')
+                    setNotice('Use the password associated with your Cosmo account.')
                   }
                 >
                   <span aria-hidden="true">?</span>

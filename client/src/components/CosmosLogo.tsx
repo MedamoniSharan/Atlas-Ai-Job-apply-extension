@@ -10,7 +10,7 @@ type CosmosLogoProps = {
 export function CosmosLogo({
   className = '',
   size = 24,
-  label = 'Tsenta',
+  label = 'Cosmo',
 }: CosmosLogoProps) {
   return (
     <svg
@@ -38,15 +38,16 @@ export function CosmosIconMark({
     <CosmosLogo
       className={className}
       size={size}
-      label="Tsenta mark"
+      label="Cosmo mark"
     />
   );
 }
 
-export function TsentaWordmark({ className = '' }: { className?: string }) {
+/** Large footer wordmark — company name */
+export function CosmovaiWordmark({ className = '' }: { className?: string }) {
   return (
-    <span className={`tsenta-wordmark ${className}`.trim()} aria-label="Tsenta">
-      tsenta
+    <span className={`cosmovai-wordmark ${className}`.trim()} aria-label="cosmovai">
+      cosmovai
     </span>
   );
 }
@@ -59,7 +60,7 @@ type CosmosMarkProps = {
 
 export function CosmosMark({
   className = '',
-  word = 'tsenta',
+  word = 'cosmo',
   logoSize = 24,
 }: CosmosMarkProps) {
   return (

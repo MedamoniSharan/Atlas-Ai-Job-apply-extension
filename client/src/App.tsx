@@ -78,7 +78,7 @@ export function AppLayout() {
   );
 
   if (!sessionReady) {
-    return <CosmosLoader label="Loading Tsenta…" className="cosmos-loader--shell" />;
+    return <CosmosLoader label="Loading Cosmo…" className="cosmos-loader--shell" />;
   }
 
   if (!accessToken) {
@@ -118,7 +118,7 @@ export function AppLayout() {
       <aside className="sidebar" aria-label="Primary">
         <div className="sidebar__brand">
           <CosmosLogo className="sidebar__logo" size={28} />
-          <span className="sidebar__name">tsenta</span>
+          <span className="sidebar__name">cosmo</span>
         </div>
 
         <nav className="sidebar__nav">
@@ -183,7 +183,7 @@ export function AppLayout() {
         <div className="sidebar__footer">
           <a
             className="sidebar__help"
-            href="mailto:support@tsenta.com?subject=Tsenta%20feedback"
+            href="mailto:support@cosmovai.com?subject=Cosmo%20feedback"
           >
             <span className="sidebar__help-icon" aria-hidden>
               ?
@@ -226,7 +226,7 @@ export function AppLayout() {
                   : 'Install the Chrome extension'}
               </strong>{' '}
               {needsPrefs
-                ? 'so Tsenta can scan and apply on Naukri.'
+                ? 'so Cosmo can scan and apply on Naukri.'
                 : 'to start scanning applications from Naukri.'}
             </p>
             <NavLink className="setup-banner__cta" to="/get-started">

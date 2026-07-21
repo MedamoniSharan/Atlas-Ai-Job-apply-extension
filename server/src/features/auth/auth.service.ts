@@ -17,6 +17,8 @@ function toUser(doc: {
   _id: { toString(): string };
   email: string;
   name: string;
+  plan?: 'free' | 'pro' | 'max';
+  planExpiresAt?: Date | null;
   createdAt?: Date;
   extensionConnectedAt?: Date;
 }): User {
@@ -24,6 +26,8 @@ function toUser(doc: {
     id: doc._id.toString(),
     email: doc.email,
     name: doc.name,
+    plan: doc.plan ?? 'free',
+    planExpiresAt: doc.planExpiresAt?.toISOString(),
     createdAt: doc.createdAt?.toISOString(),
     extensionConnectedAt: doc.extensionConnectedAt?.toISOString(),
   };
@@ -33,6 +37,8 @@ async function issueTokens(user: {
   _id: { toString(): string };
   email: string;
   name: string;
+  plan?: 'free' | 'pro' | 'max';
+  planExpiresAt?: Date | null;
   createdAt?: Date;
 }): Promise<AuthTokens> {
   const payload = { sub: user._id.toString(), email: user.email };

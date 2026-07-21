@@ -1,113 +1,77 @@
-import * as React from 'react';
-import { Link } from 'react-router-dom';
-import { Check, Sparkles, X } from 'lucide-react';
-
-type BillingPeriod = 'annual' | 'monthly';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Check, Sparkles } from 'lucide-react';
+import type { PaidPlan } from '@atlas/shared';
+import { useAuthStore } from '../store/authStore';
+import {
+  downloadPaymentInvoice,
+  startPlanCheckout,
+} from '../lib/razorpayCheckout';
 
 type Feature = {
   label: string;
-  included?: boolean;
 };
 
 type Plan = {
   name: string;
   description: string;
-  annualPrice: string;
-  monthlyPrice: string;
-  annualNote?: string;
+  price: string;
+  priceNote: string;
+  strikePrice?: string;
+  lockNote?: string;
+  cta: string;
   features: Feature[];
   highlighted?: boolean;
+  badge?: string;
+  paidPlan?: PaidPlan;
 };
 
-const annualPlans: Plan[] = [
+const plans: Plan[] = [
   {
     name: 'Free',
-    description: 'Great for occasional applications.',
-    annualPrice: '$0',
-    monthlyPrice: '$0',
-    annualNote: '*billed at $0 per year.',
+    description: 'Start applying with core automation.',
+    price: '₹0',
+    priceNote: '/ forever',
+    cta: 'Get started',
     features: [
-      { label: '20 auto-applies per month' },
-      { label: 'Application tracker' },
-      { label: 'AI cover letters', included: false },
+      { label: '50 Automated Applies' },
+      { label: '500 Multi-board Scans' },
     ],
   },
   {
     name: 'Pro',
-    description: 'For job seekers applying every week.',
-    annualPrice: '$19',
-    monthlyPrice: '$24',
-    annualNote: '*billed at $228 per year.',
+    description: 'For serious searches that need more volume.',
+    price: '₹99',
+    priceNote: '/ month',
+    strikePrice: '₹299/month',
+    lockNote: 'Price locks forever when you upgrade',
+    cta: 'Upgrade to Pro',
     highlighted: true,
+    badge: 'Most popular',
+    paidPlan: 'pro',
     features: [
-      { label: 'Unlimited auto-applies' },
-      { label: 'AI cover letters & answers' },
-      { label: 'Priority Naukri co-pilot' },
-      { label: 'Application analytics' },
+      { label: '300 Automated Applies' },
+      { label: '1500 Multi-board Scans' },
+      { label: 'Priority Bot Processing Queue' },
+      { label: 'Advanced ATS Keyword Injection' },
+      { label: 'Dedicated IP Routing' },
     ],
   },
   {
-    name: 'Pro + Coach',
-    description: 'For focused searches with extra guidance.',
-    annualPrice: '$39',
-    monthlyPrice: '$49',
-    annualNote: '*billed at $468 per year.',
+    name: 'Max',
+    description: 'Maximum applies and scans for heavy usage.',
+    price: '₹299',
+    priceNote: '/ month',
+    strikePrice: '₹799/month',
+    lockNote: 'Price locks forever when you upgrade',
+    cta: 'Upgrade to Max',
+    paidPlan: 'max',
     features: [
-      { label: 'Everything in Pro' },
-      { label: 'Resume critique credits' },
-      { label: 'Interview prep prompts' },
-      { label: 'Priority support' },
-    ],
-  },
-];
-
-const monthlyPlans: Plan[] = [
-  {
-    name: 'Free',
-    description: 'Great for occasional applications.',
-    annualPrice: '$0',
-    monthlyPrice: '$0',
-    features: [
-      { label: '20 auto-applies per month' },
-      { label: 'Application tracker' },
-      { label: 'AI cover letters', included: false },
-    ],
-  },
-  {
-    name: 'Starter',
-    description: 'For small but consistent searches.',
-    annualPrice: '$15',
-    monthlyPrice: '$15',
-    features: [
-      { label: '100 auto-applies per month' },
-      { label: 'AI cover letters' },
-      { label: 'Application analytics' },
-      { label: 'Naukri co-pilot' },
-    ],
-  },
-  {
-    name: 'Pro',
-    description: 'For job seekers applying every week.',
-    annualPrice: '$24',
-    monthlyPrice: '$24',
-    highlighted: true,
-    features: [
-      { label: 'Unlimited auto-applies' },
-      { label: 'AI cover letters & answers' },
-      { label: 'Priority Naukri co-pilot' },
-      { label: 'Application analytics' },
-    ],
-  },
-  {
-    name: 'Pro + Coach',
-    description: 'For focused searches with extra guidance.',
-    annualPrice: '$49',
-    monthlyPrice: '$49',
-    features: [
-      { label: 'Everything in Pro' },
-      { label: 'Resume critique credits' },
-      { label: 'Interview prep prompts' },
-      { label: 'Priority support' },
+      { label: '1000 Automated Applies' },
+      { label: '5000 Multi-board Scans' },
+      { label: 'Priority Bot Processing Queue' },
+      { label: 'Advanced ATS Keyword Injection' },
+      { label: 'Dedicated IP Routing' },
     ],
   },
 ];
@@ -140,100 +104,126 @@ function Divider() {
 }
 
 export function PricingPlans() {
-  const [billing, setBilling] = React.useState<BillingPeriod>('annual');
-  const plans = billing === 'annual' ? annualPlans : monthlyPlans;
+  const navigate = useNavigate();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const [busyPlan, setBusyPlan] = useState<PaidPlan | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
+
+  async function handleUpgrade(plan: PaidPlan) {
+    if (!accessToken) {
+      navigate(`/login?next=${encodeURIComponent('/#pricing')}`);
+      return;
+    }
+
+    setBusyPlan(plan);
+    setStatus(null);
+    setLastPaymentId(null);
+    try {
+      const result = await startPlanCheckout(plan);
+      setLastPaymentId(result.paymentId);
+      setStatus(
+        `Payment successful — ${plan === 'pro' ? 'Pro' : 'Max'} is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Checkout failed';
+      if (message !== 'Payment cancelled') {
+        setStatus(message);
+      }
+    } finally {
+      setBusyPlan(null);
+    }
+  }
 
   return (
     <section className="pricing-page" id="pricing" aria-labelledby="pricing-heading">
       <div className="pricing-shell">
         <header className="pricing-header">
-          <div className="pricing-eyebrow">
-            <span className="eyebrow-dot" />
-            Transparent pricing
-          </div>
-          <h2 id="pricing-heading">
-            Plans and Pricing
-          </h2>
+          <h2 id="pricing-heading">Plans and Pricing</h2>
           <p>
-            Apply faster with annual plans — unlock unlimited auto-applies and
-            save on your subscription.
+            Pick a plan that matches your apply volume — upgrade anytime and lock
+            your price forever.
           </p>
-          <div className="billing-toggle" aria-label="Billing period">
-            <button
-              type="button"
-              className={billing === 'annual' ? 'billing-option is-active' : 'billing-option'}
-              onClick={() => setBilling('annual')}
-              aria-pressed={billing === 'annual'}
-            >
-              <span>Bill annually</span>
-              <small>Unlimited</small>
-            </button>
-            <button
-              type="button"
-              className={billing === 'monthly' ? 'billing-option is-active' : 'billing-option'}
-              onClick={() => setBilling('monthly')}
-              aria-pressed={billing === 'monthly'}
-            >
-              <span>Bill monthly</span>
-            </button>
-          </div>
         </header>
 
-        <div
-          className={`pricing-grid${billing === 'monthly' ? ' pricing-grid--four' : ''}`}
-          aria-live="polite"
-        >
+        {status ? (
+          <div className="pricing-status" role="status">
+            <p>{status}</p>
+            {lastPaymentId ? (
+              <button
+                type="button"
+                className="pricing-action pricing-action-dark"
+                onClick={() => {
+                  void downloadPaymentInvoice(lastPaymentId).catch(() => {
+                    setStatus('Could not download invoice. Try again from billing.');
+                  });
+                }}
+              >
+                <span>Download invoice</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="pricing-grid" aria-live="polite">
           {plans.map((plan) => (
             <article
               className={plan.highlighted ? 'plan-card plan-card-highlighted' : 'plan-card'}
-              key={`${billing}-${plan.name}`}
+              key={plan.name}
             >
               <div className="plan-card-inner">
                 <div className="plan-card-top">
                   <div>
+                    {plan.badge ? (
+                      <p className="plan-badge">{plan.badge}</p>
+                    ) : null}
                     <h3>{plan.name}</h3>
                     <p>{plan.description}</p>
                   </div>
                   <div className="plan-price">
+                    {plan.strikePrice ? (
+                      <span className="plan-price-strike">{plan.strikePrice}</span>
+                    ) : null}
                     <strong>
-                      {billing === 'annual' ? plan.annualPrice : plan.monthlyPrice}
+                      {plan.price}
+                      <span className="plan-price-unit">{plan.priceNote}</span>
                     </strong>
-                    <span>
-                      per month, per user.
-                      {billing === 'annual' && plan.annualNote ? (
-                        <>
-                          <br />
-                          {plan.annualNote}
-                        </>
-                      ) : null}
-                    </span>
+                    {plan.lockNote ? (
+                      <span className="plan-price-lock">{plan.lockNote}</span>
+                    ) : null}
                   </div>
-                  <Link
-                    to="/register"
-                    className={`pricing-action${plan.highlighted ? ' pricing-action-dark' : ''}`}
-                  >
-                    <span>Get started</span>
-                  </Link>
+                  {plan.paidPlan ? (
+                    <button
+                      type="button"
+                      className={`pricing-action${plan.highlighted ? ' pricing-action-dark' : ''}`}
+                      disabled={busyPlan !== null}
+                      onClick={() => void handleUpgrade(plan.paidPlan!)}
+                    >
+                      <span>
+                        {busyPlan === plan.paidPlan
+                          ? 'Opening checkout…'
+                          : plan.cta}
+                      </span>
+                    </button>
+                  ) : (
+                    <Link
+                      to="/register"
+                      className={`pricing-action${plan.highlighted ? ' pricing-action-dark' : ''}`}
+                    >
+                      <span>{plan.cta}</span>
+                    </Link>
+                  )}
                 </div>
                 <Divider />
                 <div className="included-list">
                   <p className="included-label">What’s included:</p>
-                  {plan.features.map((feature) => {
-                    const included = feature.included !== false;
-                    return (
-                      <div
-                        className={`feature-row${included ? '' : ' feature-row--excluded'}`}
-                        key={feature.label}
-                      >
-                        {included ? (
-                          <Check size={18} strokeWidth={1.8} aria-hidden="true" />
-                        ) : (
-                          <X size={18} strokeWidth={1.8} aria-hidden="true" />
-                        )}
-                        <span>{feature.label}</span>
-                      </div>
-                    );
-                  })}
+                  {plan.features.map((feature) => (
+                    <div className="feature-row" key={feature.label}>
+                      <Check size={18} strokeWidth={1.8} aria-hidden="true" />
+                      <span>{feature.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </article>
@@ -255,10 +245,10 @@ export function PricingPlans() {
               <p className="team-kicker">For ambitious teams</p>
               <h3 id="team-heading">Team Plan</h3>
               <div className="team-price">Custom pricing</div>
-              <p className="team-note">Billed annually</p>
+              <p className="team-note">Talk to us for seats and volume</p>
               <a
                 className="pricing-action pricing-action-dark"
-                href="mailto:sales@tsenta.com?subject=Tsenta%20Team%20Plan"
+                href="mailto:sales@cosmovai.com?subject=Cosmo%20Team%20Plan"
               >
                 <span>Contact sales</span>
               </a>

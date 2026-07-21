@@ -16,15 +16,47 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const planTierSchema = z.enum(['free', 'pro', 'max']);
+
+export type PlanTier = z.infer<typeof planTierSchema>;
+
 export const userSchema = z.object({
   id: z.string(),
   email: z.string().email(),
   name: z.string(),
+  plan: planTierSchema.optional(),
+  planExpiresAt: z.string().datetime().optional(),
   createdAt: z.string().datetime().optional(),
   extensionConnectedAt: z.string().datetime().optional(),
 });
 
 export type User = z.infer<typeof userSchema>;
+
+export const paidPlanSchema = z.enum(['pro', 'max']);
+
+export type PaidPlan = z.infer<typeof paidPlanSchema>;
+
+export const createBillingOrderSchema = z.object({
+  plan: paidPlanSchema,
+});
+
+export type CreateBillingOrderInput = z.infer<typeof createBillingOrderSchema>;
+
+export const verifyBillingPaymentSchema = z.object({
+  razorpay_order_id: z.string().min(1),
+  razorpay_payment_id: z.string().min(1),
+  razorpay_signature: z.string().min(1),
+  plan: paidPlanSchema,
+});
+
+export type VerifyBillingPaymentInput = z.infer<
+  typeof verifyBillingPaymentSchema
+>;
+
+export const PLAN_PRICES_PAISE = {
+  pro: 9900,
+  max: 29900,
+} as const satisfies Record<PaidPlan, number>;
 
 export const workModeSchema = z.enum(['any', 'office', 'hybrid', 'remote']);
 

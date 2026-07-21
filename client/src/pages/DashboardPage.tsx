@@ -215,7 +215,7 @@ export function DashboardPage() {
         <div className="dash-callout">
           <div>
             <h3>Set job preferences</h3>
-            <p>Add titles or keywords so Tsenta can scan and apply on Naukri.</p>
+            <p>Add titles or keywords so Cosmo can scan and apply on Naukri.</p>
           </div>
           <Link className="dash-btn dash-btn--primary" to="/get-started">
             Complete preferences

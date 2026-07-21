@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useInView } from 'motion/react';
-import { CosmosIconMark, TsentaWordmark } from './CosmosLogo';
+import { CosmosIconMark, CosmovaiWordmark } from './CosmosLogo';
 import { Highlighter } from './ui/highlighter';
 
 const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'];
@@ -52,7 +52,7 @@ function FooterLogo({ size }: { size: number }) {
       ref={ref}
       className="footer-mark"
       to="/"
-      aria-label="Tsenta home"
+      aria-label="Cosmo home"
     >
       <CosmosIconMark
         key={spinKey}
@@ -111,8 +111,8 @@ export function CosmosDreamFooter() {
           </div>
         </div>
 
-        <Link className="wordmark-link" to="/" aria-label="Tsenta home">
-          <TsentaWordmark />
+        <Link className="wordmark-link" to="/" aria-label="cosmovai home">
+          <CosmovaiWordmark />
         </Link>
       </footer>
     </div>

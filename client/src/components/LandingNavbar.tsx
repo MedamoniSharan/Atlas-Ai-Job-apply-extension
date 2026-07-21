@@ -35,7 +35,7 @@ const moreItems = [
 ] as const;
 
 const contactItems = [
-  { title: 'Support', href: 'mailto:hello@tsenta.app' },
+  { title: 'Support', href: 'mailto:hello@cosmovai.com' },
   { title: 'Get Extension', href: '#get-extension' },
 ] as const;
 
@@ -92,7 +92,7 @@ export function LandingNavbar() {
   return (
     <header className="capsule-shell">
       <nav className="capsule-nav" aria-label="Main navigation" ref={navRef}>
-        <Link className="capsule-brand" to="/" aria-label="Tsenta home">
+        <Link className="capsule-brand" to="/" aria-label="Cosmo home">
           <BrandMark />
         </Link>
 

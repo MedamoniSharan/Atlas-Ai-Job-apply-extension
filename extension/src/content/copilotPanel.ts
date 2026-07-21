@@ -581,7 +581,7 @@ export function mountCopilotPanel() {
         <div class="atlas-brand">
           ${cosmosLogoSvg(22, 'atlas-cosmos-logo')}
           <div class="atlas-brand-copy">
-            <span class="atlas-brand-text">TSENTA CO-PILOT</span>
+            <span class="atlas-brand-text">COSMO CO-PILOT</span>
             <span class="atlas-brand-sub" id="atlas-status-label">Idle — press Start</span>
           </div>
         </div>

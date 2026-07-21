@@ -50,7 +50,7 @@ export function ChromeInstallCta() {
       </h2>
       <p className="chrome-cta__sub">
         Join thousands of professionals who&apos;ve accelerated their career
-        with Tsenta.
+        with Cosmo.
       </p>
       <a
         className="chrome-cta__btn"

@@ -33,7 +33,7 @@ createRoot(document.getElementById('root')!).render(
               element={
                 <ComingSoonPage
                   title="Browse jobs"
-                  blurb="Job browsing inside Tsenta is coming soon. Use the Naukri co-pilot to scan matches for now."
+                  blurb="Job browsing inside Cosmo is coming soon. Use the Naukri co-pilot to scan matches for now."
                 />
               }
             />

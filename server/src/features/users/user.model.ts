@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import type { JobPreferences } from '@atlas/shared';
 
+export type PlanTier = 'free' | 'pro' | 'max';
+
 export interface IUser extends Document {
   email: string;
   passwordHash: string;
@@ -9,6 +11,9 @@ export interface IUser extends Document {
   extensionConnectedAt?: Date;
   preferences?: JobPreferences;
   preferencesCompletedAt?: Date | null;
+  plan: PlanTier;
+  planExpiresAt?: Date | null;
+  razorpayCustomerId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +47,13 @@ const userSchema = new Schema<IUser>(
     extensionConnectedAt: { type: Date },
     preferences: { type: preferencesSchema, default: undefined },
     preferencesCompletedAt: { type: Date, default: null },
+    plan: {
+      type: String,
+      enum: ['free', 'pro', 'max'],
+      default: 'free',
+    },
+    planExpiresAt: { type: Date, default: null },
+    razorpayCustomerId: { type: String },
   },
   { timestamps: true }
 );

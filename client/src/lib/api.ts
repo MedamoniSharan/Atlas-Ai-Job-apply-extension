@@ -199,3 +199,74 @@ export async function savePreferences(prefs: JobPreferences) {
     body: JSON.stringify(prefs),
   });
 }
+
+export type PaidPlan = 'pro' | 'max';
+
+export async function createBillingOrder(plan: PaidPlan) {
+  return request<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+    plan: PaidPlan;
+  }>('/api/v1/billing/create-order', {
+    method: 'POST',
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export async function verifyBillingPayment(payload: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  plan: PaidPlan;
+}) {
+  return request<{
+    paymentId: string;
+    plan: PaidPlan;
+    planExpiresAt: string;
+    invoiceUrl: string;
+    invoiceNumber: string;
+  }>('/api/v1/billing/verify', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchBillingMe() {
+  return request<{
+    plan: 'free' | 'pro' | 'max';
+    planExpiresAt: string | null;
+    payments: Array<{
+      id: string;
+      plan: PaidPlan;
+      amountPaise: number;
+      currency: string;
+      invoiceNumber?: string;
+      invoiceUrl: string;
+      paidAt?: string;
+    }>;
+  }>('/api/v1/billing/me');
+}
+
+export async function downloadInvoice(paymentId: string): Promise<void> {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(
+    `${API_BASE}/api/v1/billing/invoices/${paymentId}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  if (!res.ok) {
+    throw new Error('Failed to download invoice');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cosmo-invoice-${paymentId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

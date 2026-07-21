@@ -11,6 +11,7 @@ import { applicationsRouter } from './features/applications/applications.routes'
 import { healthRouter } from './features/health/health.routes';
 import { onboardingRouter } from './features/onboarding/onboarding.routes';
 import { preferencesRouter } from './features/preferences/preferences.routes';
+import { billingRouter } from './features/billing/billing.routes';
 
 export function createApp() {
   const app = express();
@@ -51,6 +52,7 @@ export function createApp() {
   app.use('/api/v1/applications', applicationsRouter);
   app.use('/api/v1/onboarding', onboardingRouter);
   app.use('/api/v1/preferences', preferencesRouter);
+  app.use('/api/v1/billing', billingRouter);
 
   app.use(errorHandler);
   return app;

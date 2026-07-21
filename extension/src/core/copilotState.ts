@@ -206,7 +206,7 @@ async function syncActionBadge(alert: CopilotAlert | null | undefined) {
       color: alert.level === 'error' ? '#b42318' : '#b45309',
     });
     await chrome.action.setTitle({
-      title: `Tsenta — ${alert.message}`,
+      title: `Cosmo — ${alert.message}`,
     });
   } catch {
     /* action API may be unavailable in tests */
@@ -253,7 +253,7 @@ export async function clearCopilotAlert(): Promise<void> {
   await setCopilotState({ alert: null });
   await syncActionBadge(null);
   try {
-    await chrome.action.setTitle({ title: 'Tsenta' });
+    await chrome.action.setTitle({ title: 'Cosmo' });
   } catch {
     /* ignore */
   }

@@ -153,7 +153,7 @@ export function SproutJobsMarquee() {
     <section className="sprout-page" aria-labelledby="sprout-title">
       <div className="sprout-content">
         <header className="sprout-intro">
-          <div className="sprout-badge" aria-label="Tsenta platform promise">
+          <div className="sprout-badge" aria-label="Cosmo platform promise">
             <span className="sprout-mark" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path
@@ -173,13 +173,13 @@ export function SproutJobsMarquee() {
           </h2>
           <p className="sprout-description">
             Discover opportunities from top companies across every industry —
-            updated daily on Tsenta.
+            updated daily on Cosmo.
           </p>
         </header>
 
         <div
           className="sprout-marquee"
-          aria-label="Companies hiring on Tsenta"
+          aria-label="Companies hiring on Cosmo"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
