@@ -100,7 +100,7 @@ export function LandingNavbar() {
           <a className="capsule-link" href="#top">
             Home
           </a>
-          <a className="capsule-link" href="#get-extension">
+          <a className="capsule-link" href="#pricing">
             Pricing
           </a>
 
@@ -234,7 +234,7 @@ export function LandingNavbar() {
           <a href="#top" onClick={() => setMenuOpen(false)}>
             Home
           </a>
-          <a href="#get-extension" onClick={() => setMenuOpen(false)}>
+          <a href="#pricing" onClick={() => setMenuOpen(false)}>
             Pricing
           </a>
           <p className="capsule-drawer__label">Features</p>

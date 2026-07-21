@@ -28,7 +28,7 @@ export function CosmosDreamFooter() {
               target="_blank"
               rel="noreferrer"
             >
-              powered by codexcareer
+              powered by <span className="footer-powered__brand">codexcareer</span>
             </a>
           </div>
           <nav aria-label="More" className="footer-links">
@@ -51,7 +51,7 @@ export function CosmosDreamFooter() {
               target="_blank"
               rel="noreferrer"
             >
-              powered by codexcareer
+              powered by <span className="footer-powered__brand">codexcareer</span>
             </a>
           </div>
           <div className="mobile-nav-group">

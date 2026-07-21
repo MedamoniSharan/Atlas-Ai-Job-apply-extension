@@ -3,6 +3,7 @@ import { HeroAutoApply } from '../components/HeroAutoApply';
 import { JobSearchSteps } from '../components/JobSearchSteps';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
+import { PricingPlans } from '../components/PricingPlans';
 import { SproutJobsMarquee } from '../components/SproutJobsMarquee';
 import { TrustedCompanyMarquee } from '../components/TrustedCompanyMarquee';
 import { useAuthStore } from '../store/authStore';
@@ -25,6 +26,8 @@ export function LandingPage() {
       <SproutJobsMarquee />
 
       <JobSearchSteps />
+
+      <PricingPlans />
 
       <div id="get-extension">
         <CosmosDreamFooter />
