@@ -1,10 +1,67 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useInView } from 'motion/react';
 import { CosmosIconMark, TsentaWordmark } from './CosmosLogo';
-
-const CODEX_CAREER_URL = 'https://codexcareer.com/';
+import { Highlighter } from './ui/highlighter';
 
 const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'];
 const moreLinks = ['Careers', 'Terms', 'Privacy'];
+
+function PoweredByCodex() {
+  return (
+    <p className="footer-powered">
+      <span className="footer-powered__prefix">powered by</span>{' '}
+      <a
+        className="footer-powered__link"
+        href="https://codexcareer.com"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Highlighter
+          action="highlight"
+          color="#FFB347"
+          strokeWidth={1.8}
+          animationDuration={700}
+          iterations={2}
+          padding={3}
+          isView
+        >
+          <span className="footer-powered__brand">codexcareer</span>
+        </Highlighter>
+      </a>
+    </p>
+  );
+}
+
+function FooterLogo({ size }: { size: number }) {
+  const ref = useRef<HTMLAnchorElement>(null);
+  const [spinKey, setSpinKey] = useState(0);
+  const isInView = useInView(ref, {
+    once: false,
+    amount: 0.7,
+    margin: '0px 0px -10% 0px',
+  });
+
+  useEffect(() => {
+    if (!isInView) return;
+    setSpinKey((key) => key + 1);
+  }, [isInView]);
+
+  return (
+    <Link
+      ref={ref}
+      className="footer-mark"
+      to="/"
+      aria-label="Tsenta home"
+    >
+      <CosmosIconMark
+        key={spinKey}
+        size={size}
+        className={`cosmos-mark__logo${isInView ? ' cosmos-mark__logo--spin' : ''}`}
+      />
+    </Link>
+  );
+}
 
 export function CosmosDreamFooter() {
   return (
@@ -19,17 +76,8 @@ export function CosmosDreamFooter() {
             ))}
           </nav>
           <div className="footer-center">
-            <Link className="footer-mark" to="/" aria-label="Tsenta home">
-              <CosmosIconMark size={48} className="cosmos-mark__logo" />
-            </Link>
-            <a
-              className="footer-powered"
-              href={CODEX_CAREER_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              powered by <span className="footer-powered__brand">codexcareer</span>
-            </a>
+            <FooterLogo size={48} />
+            <PoweredByCodex />
           </div>
           <nav aria-label="More" className="footer-links">
             {moreLinks.map((link) => (
@@ -42,17 +90,8 @@ export function CosmosDreamFooter() {
 
         <div className="mobile-footer">
           <div className="footer-center footer-center--mobile">
-            <Link className="mobile-mark" to="/" aria-label="Tsenta home">
-              <CosmosIconMark size={32} className="cosmos-mark__logo" />
-            </Link>
-            <a
-              className="footer-powered"
-              href={CODEX_CAREER_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              powered by <span className="footer-powered__brand">codexcareer</span>
-            </a>
+            <FooterLogo size={32} />
+            <PoweredByCodex />
           </div>
           <div className="mobile-nav-group">
             <h3>Connect</h3>
