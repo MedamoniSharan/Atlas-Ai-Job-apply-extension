@@ -1109,6 +1109,10 @@ a.tracker-card__title:hover {
   justify-content: center;
 }
 
+.auth-panel button[type='submit'] {
+  width: 100%;
+}
+
 .secondary-btn {
   border: 1px solid var(--color-border-muted);
   border-radius: var(--radius-sm);
@@ -1152,22 +1156,36 @@ a.tracker-card__title:hover {
   box-shadow: var(--shadow-1);
   border-radius: var(--radius-xs);
   padding: var(--space-8);
+  --auth-mark-size: 28px;
+  --auth-mark-gap: 8px;
 }
 
 .auth-panel .brand,
 .auth-panel .auth-brand {
-  display: block;
+  display: inline-flex;
+  align-items: center;
   margin: 0 0 var(--space-3);
   color: var(--color-surface-raised);
 }
 
+.auth-panel h1,
+.auth-panel .sub,
+.auth-panel form,
+.auth-panel > .switch {
+  margin-left: calc(var(--auth-mark-size) + var(--auth-mark-gap));
+}
+
 .auth-panel h1 {
-  margin: 0 0 var(--space-1);
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: var(--space-1);
   font-size: 28px;
 }
 
 .auth-panel .sub {
-  margin: 0 0 var(--space-7);
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: var(--space-7);
   color: var(--color-text-secondary);
 }
 
@@ -1396,6 +1414,8 @@ a.tracker-card__title:hover {
 
 .switch {
   margin-top: var(--space-5);
+  margin-right: 0;
+  margin-bottom: 0;
   color: var(--color-text-secondary);
 }
 
@@ -1611,7 +1631,9 @@ a.tracker-card__title:hover {
 .capsule-brand:hover .cosmos-mark__logo,
 .sidebar__brand:hover .sidebar__logo,
 .sidebar__brand:hover .cosmos-mark__logo,
-.auth-brand:hover .cosmos-mark__logo {
+.auth-brand:hover .cosmos-mark__logo,
+.footer-mark:hover .cosmos-mark__logo,
+.mobile-mark:hover .cosmos-mark__logo {
   animation: cosmosIconSpin 1.4s ease-in-out forwards;
 }
 

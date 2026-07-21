@@ -17,7 +17,7 @@ export function CosmosDreamFooter() {
             ))}
           </nav>
           <Link className="footer-mark" to="/" aria-label="Tsenta home">
-            <CosmosIconMark size={48} />
+            <CosmosIconMark size={48} className="cosmos-mark__logo" />
           </Link>
           <nav aria-label="More" className="footer-links">
             {moreLinks.map((link) => (
@@ -30,7 +30,7 @@ export function CosmosDreamFooter() {
 
         <div className="mobile-footer">
           <Link className="mobile-mark" to="/" aria-label="Tsenta home">
-            <CosmosIconMark size={32} />
+            <CosmosIconMark size={32} className="cosmos-mark__logo" />
           </Link>
           <div className="mobile-nav-group">
             <h3>Connect</h3>
