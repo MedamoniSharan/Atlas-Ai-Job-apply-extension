@@ -3,6 +3,7 @@ import {
   createBillingOrder,
   downloadInvoice,
   fetchMe,
+  previewInvoice,
   verifyBillingPayment,
 } from './api';
 import { useAuthStore } from '../store/authStore';
@@ -169,4 +170,8 @@ export async function startPlanCheckout(
 
 export async function downloadPaymentInvoice(paymentId: string): Promise<void> {
   await downloadInvoice(paymentId);
+}
+
+export async function previewPaymentInvoice(paymentId: string): Promise<string> {
+  return previewInvoice(paymentId);
 }

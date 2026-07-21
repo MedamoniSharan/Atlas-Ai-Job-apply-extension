@@ -5,6 +5,7 @@ import type { PaidPlan } from '@atlas/shared';
 import { useAuthStore } from '../store/authStore';
 import {
   downloadPaymentInvoice,
+  previewPaymentInvoice,
   startPlanCheckout,
 } from '../lib/razorpayCheckout';
 import { CosmosLoader } from './CosmosLogo';
@@ -152,17 +153,38 @@ export function PricingPlans() {
           <div className="pricing-status" role="status">
             <p>{status}</p>
             {lastPaymentId ? (
-              <button
-                type="button"
-                className="pricing-action pricing-action-dark"
-                onClick={() => {
-                  void downloadPaymentInvoice(lastPaymentId).catch(() => {
-                    setStatus('Could not download invoice. Try again from billing.');
-                  });
-                }}
-              >
-                <span>Download invoice</span>
-              </button>
+              <div className="pricing-status__actions">
+                <button
+                  type="button"
+                  className="pricing-action"
+                  onClick={() => {
+                    void previewPaymentInvoice(lastPaymentId)
+                      .then((url) => {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      })
+                      .catch(() => {
+                        setStatus(
+                          'Could not preview invoice. Try again from Profile.'
+                        );
+                      });
+                  }}
+                >
+                  <span>Preview invoice</span>
+                </button>
+                <button
+                  type="button"
+                  className="pricing-action pricing-action-dark"
+                  onClick={() => {
+                    void downloadPaymentInvoice(lastPaymentId).catch(() => {
+                      setStatus(
+                        'Could not download invoice. Try again from Profile.'
+                      );
+                    });
+                  }}
+                >
+                  <span>Download invoice</span>
+                </button>
+              </div>
             ) : null}
           </div>
         ) : null}

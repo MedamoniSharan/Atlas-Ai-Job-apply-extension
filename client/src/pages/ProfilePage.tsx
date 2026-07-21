@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Download, Eye, FileText, Sparkles, X } from 'lucide-react';
 import type { PaidPlan, PlanTier } from '@atlas/shared';
 import { fetchBillingMe } from '../lib/api';
-import { startPlanCheckout } from '../lib/razorpayCheckout';
+import {
+  downloadPaymentInvoice,
+  previewPaymentInvoice,
+  startPlanCheckout,
+} from '../lib/razorpayCheckout';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader } from '../components/CosmosLogo';
 
@@ -29,11 +33,22 @@ const PLAN_FEATURES: Record<PlanTier, string[]> = {
   ],
 };
 
+function formatInr(amountPaise: number): string {
+  return `₹${(amountPaise / 100).toFixed(0)}`;
+}
+
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [busyPlan, setBusyPlan] = useState<PaidPlan | null>(null);
+  const [busyInvoiceId, setBusyInvoiceId] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<'preview' | 'download' | null>(
+    null
+  );
   const [status, setStatus] = useState<string | null>(null);
+  const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState('Invoice preview');
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['billing', 'me'],
@@ -45,13 +60,21 @@ export function ProfilePage() {
     staleTime: 30_000,
   });
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
   async function upgrade(plan: PaidPlan) {
     setBusyPlan(plan);
     setStatus(null);
+    setLastPaymentId(null);
     try {
       const result = await startPlanCheckout(plan);
+      setLastPaymentId(result.paymentId);
       setStatus(
-        `${plan === 'pro' ? 'Premium' : 'UltraMag'} is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}.`
+        `${plan === 'pro' ? 'Premium' : 'UltraMag'} is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
       );
       await queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
     } catch (error) {
@@ -61,6 +84,44 @@ export function ProfilePage() {
     } finally {
       setBusyPlan(null);
     }
+  }
+
+  async function onPreview(paymentId: string, title?: string) {
+    setBusyInvoiceId(paymentId);
+    setBusyAction('preview');
+    try {
+      const url = await previewPaymentInvoice(paymentId);
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+      setPreviewTitle(title ?? 'Invoice preview');
+    } catch {
+      setStatus('Could not preview invoice. Try again.');
+    } finally {
+      setBusyInvoiceId(null);
+      setBusyAction(null);
+    }
+  }
+
+  async function onDownload(paymentId: string) {
+    setBusyInvoiceId(paymentId);
+    setBusyAction('download');
+    try {
+      await downloadPaymentInvoice(paymentId);
+    } catch {
+      setStatus('Could not download invoice. Try again.');
+    } finally {
+      setBusyInvoiceId(null);
+      setBusyAction(null);
+    }
+  }
+
+  function closePreview() {
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
   }
 
   if (isLoading) {
@@ -83,6 +144,7 @@ export function ProfilePage() {
 
   const plan = data.plan;
   const planLabel = PLAN_LABEL[plan];
+  const payments = data.payments ?? [];
 
   return (
     <div className="dash">
@@ -106,7 +168,7 @@ export function ProfilePage() {
         </div>
 
         <p className="muted profile-card__copy">
-          Job preferences live in Settings. Plan upgrades happen here.
+          Job preferences live in Settings. Plan upgrades and invoices live here.
         </p>
         <Link className="dash-btn dash-btn--ghost" to="/settings">
           Open Settings
@@ -126,9 +188,44 @@ export function ProfilePage() {
         </div>
 
         {status ? (
-          <p className="profile-plan__status" role="status">
-            {status}
-          </p>
+          <div className="profile-plan__status-row" role="status">
+            <p className="profile-plan__status">{status}</p>
+            {lastPaymentId ? (
+              <div className="profile-invoices__actions">
+                <button
+                  type="button"
+                  className="dash-btn dash-btn--ghost"
+                  disabled={busyInvoiceId === lastPaymentId}
+                  onClick={() => void onPreview(lastPaymentId)}
+                >
+                  {busyInvoiceId === lastPaymentId && busyAction === 'preview' ? (
+                    <CosmosLoader label="" size={18} className="cosmos-loader--inline" />
+                  ) : (
+                    <>
+                      <Eye size={14} strokeWidth={2.2} aria-hidden />
+                      Preview
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="dash-btn dash-btn--ghost"
+                  disabled={busyInvoiceId === lastPaymentId}
+                  onClick={() => void onDownload(lastPaymentId)}
+                >
+                  {busyInvoiceId === lastPaymentId &&
+                  busyAction === 'download' ? (
+                    <CosmosLoader label="" size={18} className="cosmos-loader--inline" />
+                  ) : (
+                    <>
+                      <Download size={14} strokeWidth={2.2} aria-hidden />
+                      Download
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="profile-plan__grid">
@@ -226,6 +323,121 @@ export function ProfilePage() {
           </article>
         </div>
       </div>
+
+      <div className="panel profile-invoices">
+        <div className="profile-plan__head">
+          <h2>Invoices</h2>
+          <p className="muted">
+            Preview or download watermarked PDFs for every successful payment.
+          </p>
+        </div>
+
+        {payments.length === 0 ? (
+          <p className="dash-empty">
+            No invoices yet. Upgrade a plan to generate one.
+          </p>
+        ) : (
+          <ul className="profile-invoices__list">
+            {payments.map((payment) => {
+              const title =
+                payment.invoiceNumber ?? `Payment ${payment.id.slice(-6)}`;
+              const busy = busyInvoiceId === payment.id;
+              return (
+                <li key={payment.id} className="profile-invoices__row">
+                  <div className="profile-invoices__meta">
+                    <span className="profile-invoices__icon" aria-hidden>
+                      <FileText size={16} strokeWidth={1.9} />
+                    </span>
+                    <div>
+                      <strong>{title}</strong>
+                      <p>
+                        {PLAN_LABEL[payment.plan]} ·{' '}
+                        {formatInr(payment.amountPaise)}
+                        {payment.paidAt
+                          ? ` · ${new Date(payment.paidAt).toLocaleDateString('en-IN')}`
+                          : null}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="profile-invoices__actions">
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn--ghost"
+                      disabled={busy}
+                      onClick={() => void onPreview(payment.id, title)}
+                    >
+                      {busy && busyAction === 'preview' ? (
+                        <CosmosLoader
+                          label=""
+                          size={18}
+                          className="cosmos-loader--inline"
+                        />
+                      ) : (
+                        <>
+                          <Eye size={14} strokeWidth={2.2} aria-hidden />
+                          Preview
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn--ghost"
+                      disabled={busy}
+                      onClick={() => void onDownload(payment.id)}
+                    >
+                      {busy && busyAction === 'download' ? (
+                        <CosmosLoader
+                          label=""
+                          size={18}
+                          className="cosmos-loader--inline"
+                        />
+                      ) : (
+                        <>
+                          <Download size={14} strokeWidth={2.2} aria-hidden />
+                          Download
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {previewUrl ? (
+        <div
+          className="invoice-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-label={previewTitle}
+        >
+          <div className="invoice-preview__backdrop" onClick={closePreview} />
+          <div className="invoice-preview__panel">
+            <header className="invoice-preview__head">
+              <div>
+                <h2>{previewTitle}</h2>
+                <p className="muted">PDF preview</p>
+              </div>
+              <button
+                type="button"
+                className="dash-btn dash-btn--ghost"
+                onClick={closePreview}
+                aria-label="Close preview"
+              >
+                <X size={16} strokeWidth={2} aria-hidden />
+                Close
+              </button>
+            </header>
+            <iframe
+              className="invoice-preview__frame"
+              title={previewTitle}
+              src={previewUrl}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

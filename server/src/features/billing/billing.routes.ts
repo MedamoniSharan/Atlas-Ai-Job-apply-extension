@@ -45,6 +45,9 @@ billingRouter.get(
   requireAuth,
   asyncHandler(async (req: AuthedRequest, res) => {
     const paymentId = String(req.params.paymentId);
+    const inline =
+      String(req.query.inline ?? '') === '1' ||
+      String(req.query.disposition ?? '') === 'inline';
     const { absolutePath, filename } = await billingService.getInvoiceStream(
       req.user!.sub,
       paymentId
@@ -52,7 +55,7 @@ billingRouter.get(
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${filename}"`
+      `${inline ? 'inline' : 'attachment'}; filename="${filename}"`
     );
     res.sendFile(absolutePath);
   })

@@ -253,18 +253,26 @@ export async function fetchBillingMe() {
   }>('/api/v1/billing/me');
 }
 
-export async function downloadInvoice(paymentId: string): Promise<void> {
+export async function fetchInvoiceBlob(
+  paymentId: string,
+  mode: 'inline' | 'attachment' = 'attachment'
+): Promise<Blob> {
   const token = useAuthStore.getState().accessToken;
+  const qs = mode === 'inline' ? '?inline=1' : '';
   const res = await fetch(
-    `${API_BASE}/api/v1/billing/invoices/${paymentId}`,
+    `${API_BASE}/api/v1/billing/invoices/${paymentId}${qs}`,
     {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }
   );
   if (!res.ok) {
-    throw new Error('Failed to download invoice');
+    throw new Error('Failed to load invoice');
   }
-  const blob = await res.blob();
+  return res.blob();
+}
+
+export async function downloadInvoice(paymentId: string): Promise<void> {
+  const blob = await fetchInvoiceBlob(paymentId, 'attachment');
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -273,4 +281,9 @@ export async function downloadInvoice(paymentId: string): Promise<void> {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function previewInvoice(paymentId: string): Promise<string> {
+  const blob = await fetchInvoiceBlob(paymentId, 'inline');
+  return URL.createObjectURL(blob);
 }
