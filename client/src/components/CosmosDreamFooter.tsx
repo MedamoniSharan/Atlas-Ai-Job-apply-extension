@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { CosmosIconMark, TsentaWordmark } from './CosmosLogo';
 
+const CODEX_CAREER_URL = 'https://codexcareer.com/';
+
 const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'];
 const moreLinks = ['Careers', 'Terms', 'Privacy'];
 
@@ -16,9 +18,19 @@ export function CosmosDreamFooter() {
               </a>
             ))}
           </nav>
-          <Link className="footer-mark" to="/" aria-label="Tsenta home">
-            <CosmosIconMark size={48} className="cosmos-mark__logo" />
-          </Link>
+          <div className="footer-center">
+            <Link className="footer-mark" to="/" aria-label="Tsenta home">
+              <CosmosIconMark size={48} className="cosmos-mark__logo" />
+            </Link>
+            <a
+              className="footer-powered"
+              href={CODEX_CAREER_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              powered by codexcareer
+            </a>
+          </div>
           <nav aria-label="More" className="footer-links">
             {moreLinks.map((link) => (
               <a key={link} href="#" onClick={(e) => e.preventDefault()}>
@@ -29,9 +41,19 @@ export function CosmosDreamFooter() {
         </div>
 
         <div className="mobile-footer">
-          <Link className="mobile-mark" to="/" aria-label="Tsenta home">
-            <CosmosIconMark size={32} className="cosmos-mark__logo" />
-          </Link>
+          <div className="footer-center footer-center--mobile">
+            <Link className="mobile-mark" to="/" aria-label="Tsenta home">
+              <CosmosIconMark size={32} className="cosmos-mark__logo" />
+            </Link>
+            <a
+              className="footer-powered"
+              href={CODEX_CAREER_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              powered by codexcareer
+            </a>
+          </div>
           <div className="mobile-nav-group">
             <h3>Connect</h3>
             {connectLinks.map((link) => (

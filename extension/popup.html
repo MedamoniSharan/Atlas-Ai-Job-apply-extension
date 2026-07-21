@@ -7,38 +7,54 @@
   </head>
   <body>
     <main class="popup">
-      <header class="popup-brand">
-        <svg class="cosmos-logo" width="28" height="28" viewBox="0 0 24 24" role="img" aria-label="Tsenta" fill="none">
-          <circle cx="12" cy="3.73" r="3.2" fill="currentColor"></circle>
-          <circle cx="19.16" cy="7.87" r="3.2" fill="currentColor"></circle>
-          <circle cx="19.16" cy="16.13" r="3.2" fill="currentColor"></circle>
-          <circle cx="12" cy="20.27" r="3.2" fill="currentColor"></circle>
-          <circle cx="4.84" cy="16.13" r="3.2" fill="currentColor"></circle>
-          <circle cx="4.84" cy="7.87" r="3.2" fill="currentColor"></circle>
-        </svg>
-        <div>
-          <h1>Tsenta</h1>
-          <p class="tagline">Job Assistant</p>
+      <header class="popup-header">
+        <div class="popup-brand">
+          <svg
+            class="cosmos-logo"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            role="img"
+            aria-label="Tsenta"
+            fill="none"
+          >
+            <path
+              fill="currentColor"
+              d="M12 8.145c1.715 0 3.107-1.375 3.107-3.072S13.717 2 12 2 8.893 3.375 8.893 5.072 10.283 8.145 12 8.145M12 22c1.715 0 3.107-1.375 3.107-3.072s-1.39-3.073-3.107-3.073-3.107 1.376-3.107 3.073S10.283 22 12 22M6.004 11.646c1.716 0 3.107-1.375 3.107-3.072S7.721 5.5 6.004 5.5 2.897 6.877 2.897 8.575s1.39 3.072 3.107 3.072M17.996 18.492c1.715 0 3.107-1.375 3.107-3.072s-1.39-3.073-3.107-3.073-3.107 1.376-3.107 3.073 1.39 3.072 3.107 3.072M17.996 11.646c1.715 0 3.107-1.374 3.107-3.072s-1.39-3.072-3.107-3.072-3.107 1.374-3.107 3.072 1.39 3.072 3.107 3.072M6.004 18.492c1.716 0 3.107-1.375 3.107-3.073s-1.39-3.072-3.107-3.072-3.107 1.378-3.107 3.074 1.39 3.072 3.107 3.072z"
+            />
+          </svg>
+          <div>
+            <h1>Tsenta</h1>
+            <p class="tagline">Job Assistant</p>
+          </div>
         </div>
-      </header>
 
-      <section id="status" class="status">
-        <p id="auth-state">Checking…</p>
-        <p id="health-state"></p>
-        <p id="scan-state"></p>
-      </section>
+        <section id="status" class="status">
+          <div class="status-pills">
+            <span class="status-pill" id="auth-state">Checking…</span>
+            <span class="status-pill" id="health-state"></span>
+          </div>
+          <p class="status-note" id="scan-state"></p>
+        </section>
+      </header>
 
       <div id="copilot-alert" class="copilot-alert hidden" role="alert">
         <div class="copilot-alert__body">
           <strong id="copilot-alert-title">Attention</strong>
           <p id="copilot-alert-msg"></p>
         </div>
-        <button type="button" id="copilot-alert-dismiss" class="copilot-alert__dismiss">
+        <button
+          type="button"
+          id="copilot-alert-dismiss"
+          class="copilot-alert__dismiss"
+          aria-label="Dismiss alert"
+        >
           Dismiss
         </button>
       </div>
 
-      <form id="login-form" class="form hidden">
+      <form id="login-form" class="panel panel--form hidden">
+        <h2 class="panel-title">Sign in</h2>
         <label>
           Email
           <input id="email" type="email" required autocomplete="username" />
@@ -56,7 +72,7 @@
           API Base URL
           <input id="api-base" type="url" placeholder="http://localhost:4000" />
         </label>
-        <button type="submit">Sign in</button>
+        <button type="submit" class="btn-primary">Sign in</button>
         <p class="hint">
           Already signed in on the Tsenta dashboard? Keep that tab open — your
           session syncs here automatically.
@@ -66,61 +82,93 @@
 
       <section id="authed" class="authed hidden">
         <form id="prefs-form" class="prefs">
-          <label>
-            Titles (comma-separated)
-            <input id="pref-titles" type="text" placeholder="Software Engineer" />
-          </label>
-          <label>
-            Keywords
-            <input id="pref-keywords" type="text" placeholder="React, Node" />
-          </label>
-          <label>
-            Locations
-            <input id="pref-locations" type="text" placeholder="Bengaluru, Remote" />
-          </label>
-          <div class="row">
+          <fieldset class="prefs-group">
+            <legend>Job search</legend>
             <label>
-              Exp min
-              <input id="pref-exp-min" type="number" min="0" max="50" value="0" />
+              Titles
+              <input
+                id="pref-titles"
+                type="text"
+                placeholder="Software Engineer, Backend Developer"
+              />
             </label>
             <label>
-              Exp max
-              <input id="pref-exp-max" type="number" min="0" max="50" value="30" />
+              Keywords
+              <input
+                id="pref-keywords"
+                type="text"
+                placeholder="react, node, python"
+              />
             </label>
-          </div>
-          <label>
-            Min salary (LPA)
-            <input id="pref-salary" type="number" min="0" max="500" step="0.5" />
-          </label>
-          <label>
-            Work mode
-            <select id="pref-work-mode">
-              <option value="any">Any</option>
-              <option value="office">Office</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="remote">Remote</option>
-            </select>
-          </label>
-          <label class="check">
-            <input id="pref-auto-scan" type="checkbox" checked />
-            Auto-scan
-          </label>
-          <label class="check">
-            <input id="pref-auto-apply" type="checkbox" />
-            Auto-apply Easy Apply
-          </label>
-          <label>
-            Daily apply limit
-            <input id="pref-daily-limit" type="number" min="1" max="100" value="10" />
-          </label>
-          <button type="submit">Save preferences</button>
+            <label>
+              Locations
+              <input
+                id="pref-locations"
+                type="text"
+                placeholder="Hyderabad, Bangalore, Remote"
+              />
+            </label>
+          </fieldset>
+
+          <fieldset class="prefs-group">
+            <legend>Filters</legend>
+            <div class="row">
+              <label>
+                Exp min
+                <input id="pref-exp-min" type="number" min="0" max="50" value="0" />
+              </label>
+              <label>
+                Exp max
+                <input id="pref-exp-max" type="number" min="0" max="50" value="30" />
+              </label>
+            </div>
+            <label>
+              Min salary (LPA)
+              <input id="pref-salary" type="number" min="0" max="500" step="0.5" />
+            </label>
+            <label>
+              Work mode
+              <select id="pref-work-mode">
+                <option value="any">Any</option>
+                <option value="office">Office</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="remote">Remote</option>
+              </select>
+            </label>
+          </fieldset>
+
+          <fieldset class="prefs-group">
+            <legend>Automation</legend>
+            <label class="check">
+              <input id="pref-auto-scan" type="checkbox" checked />
+              Auto-scan on Naukri
+            </label>
+            <label class="check">
+              <input id="pref-auto-apply" type="checkbox" />
+              Auto-apply Easy Apply jobs
+            </label>
+            <label>
+              Daily apply limit
+              <input id="pref-daily-limit" type="number" min="1" max="100" value="10" />
+            </label>
+          </fieldset>
+
+          <button type="submit" class="btn-primary">Save preferences</button>
           <p id="prefs-msg" class="hint"></p>
         </form>
 
-        <button id="scan-now" type="button">Scan now</button>
-        <button id="sync-now" type="button" class="secondary">Sync now</button>
-        <button id="logout" type="button" class="secondary">Sign out</button>
+        <div class="popup-actions">
+          <button id="scan-now" type="button" class="btn-primary">Scan now</button>
+          <button id="sync-now" type="button" class="btn-secondary">Sync</button>
+          <button id="logout" type="button" class="btn-ghost">Sign out</button>
+        </div>
       </section>
+
+      <footer class="popup-footer">
+        <a href="https://codexcareer.com/" target="_blank" rel="noreferrer">
+          powered by codexcareer
+        </a>
+      </footer>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

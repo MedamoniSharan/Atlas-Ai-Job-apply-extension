@@ -140,13 +140,19 @@ async function refreshUi() {
   apiBaseInput.value = status.auth.apiBaseUrl;
   const signedIn = Boolean(status.auth.accessToken);
   authStateEl.textContent = signedIn ? 'Signed in' : 'Not signed in';
+  authStateEl.classList.toggle('is-ok', signedIn);
+  authStateEl.classList.toggle('is-bad', !signedIn);
+
+  const apiOnline = status.health.apiReachable;
   healthStateEl.textContent = `API ${
-    status.health.apiReachable ? 'online' : 'offline'
+    apiOnline ? 'online' : 'offline'
   } · Queue ${status.health.queueDepth}${
     status.health.applyQueueDepth
       ? ` · Apply ${status.health.applyQueueDepth}`
       : ''
   }`;
+  healthStateEl.classList.toggle('is-ok', apiOnline);
+  healthStateEl.classList.toggle('is-bad', !apiOnline);
 
   renderAlert(status.copilot?.alert);
 
@@ -154,6 +160,8 @@ async function refreshUi() {
     scanStateEl.textContent = status.copilot.paused
       ? `Co-pilot paused · matched ${status.copilot.matched}, applied ${status.copilot.applied}`
       : `Co-pilot running · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
+  } else {
+    scanStateEl.textContent = '';
   }
 
   loginForm.classList.toggle('hidden', signedIn);
@@ -219,7 +227,8 @@ document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
     return;
   }
   prefsMsg.textContent = 'Saved. Opening Naukri Co-Pilot…';
-  scanStateEl.textContent = 'Open the bottom-left Atlas Co-Pilot and press Start.';
+  scanStateEl.textContent =
+    'Open the bottom-left Tsenta Co-Pilot on Naukri and press Start.';
   await chrome.tabs.create({ url: 'https://www.naukri.com', active: true });
 });
 

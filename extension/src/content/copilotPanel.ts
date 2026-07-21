@@ -59,16 +59,17 @@ export function mountCopilotPanel() {
         z-index: 2147483646;
         pointer-events: none;
         font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-        --atlas-bg: #0e1620;
-        --atlas-panel: #121c28;
-        --atlas-elevated: #182433;
-        --atlas-line: #243447;
-        --atlas-text: #e7eef6;
-        --atlas-muted: #8fa3b8;
-        --atlas-teal: #2bb0a6;
-        --atlas-teal-dim: rgba(43,176,166,.16);
-        --atlas-warn: #e3a85d;
-        --atlas-danger: #e35d6a;
+        --atlas-bg: #0a0a0a;
+        --atlas-panel: #141414;
+        --atlas-elevated: #1a1a1a;
+        --atlas-line: #2e2e2e;
+        --atlas-text: #fafafa;
+        --atlas-muted: #a3a3a3;
+        --atlas-accent: #ffffff;
+        --atlas-accent-ink: #0a0a0a;
+        --atlas-dim: rgba(255,255,255,.08);
+        --atlas-warn: #d4d4d4;
+        --atlas-danger: #737373;
       }
       #${ROOT_ID} * { box-sizing: border-box; font-family: inherit; }
       #${ROOT_ID} .atlas-dock {
@@ -83,15 +84,13 @@ export function mountCopilotPanel() {
         max-height: min(560px, calc(100vh - 32px));
         display: grid;
         grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
-        background:
-          radial-gradient(120% 80% at 0% 0%, rgba(43,176,166,.12), transparent 55%),
-          linear-gradient(180deg, #152233 0%, var(--atlas-panel) 42%, #0f1722 100%);
+        background: var(--atlas-panel);
         color: var(--atlas-text);
         border: 1px solid var(--atlas-line);
         border-radius: 16px;
         box-shadow:
-          0 22px 48px rgba(0,0,0,.42),
-          0 0 0 1px rgba(255,255,255,.03) inset;
+          0 22px 48px rgba(0,0,0,.55),
+          0 0 0 1px rgba(255,255,255,.04) inset;
         overflow: hidden;
         animation: atlas-panel-in .28s ease-out;
       }
@@ -116,7 +115,7 @@ export function mountCopilotPanel() {
         width: 22px;
         height: 22px;
         flex-shrink: 0;
-        color: var(--atlas-teal);
+        color: var(--atlas-text);
         transform-box: fill-box;
         transform-origin: center;
         transition: color .2s ease;
@@ -128,9 +127,17 @@ export function mountCopilotPanel() {
         color: var(--atlas-warn);
         animation: none;
       }
+      #${ROOT_ID}:not(.is-running) .atlas-brand:hover .atlas-cosmos-logo {
+        animation: atlas-logo-hover 1.4s ease-in-out forwards;
+      }
       @keyframes atlas-logo-spin {
         0%, 100% { transform: scale(1) rotate(0deg); }
         50% { transform: scale(1.08) rotate(180deg); }
+      }
+      @keyframes atlas-logo-hover {
+        0% { transform: scale(1) rotate(0deg); }
+        50% { transform: scale(1.35) rotate(180deg); }
+        100% { transform: scale(1) rotate(360deg); }
       }
       #${ROOT_ID} .atlas-brand-copy {
         display: grid;
@@ -169,7 +176,7 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} .btn-icon:hover {
         color: var(--atlas-text);
-        border-color: #3d536b !important;
+        border-color: #525252 !important;
         background: rgba(255,255,255,.06);
       }
       #${ROOT_ID} button {
@@ -188,12 +195,12 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} button:not(:disabled):hover { filter: brightness(1.06); }
       #${ROOT_ID} button:not(:disabled):active { transform: translateY(1px); }
-      #${ROOT_ID} .btn-start { background: var(--atlas-teal); color: #042421; }
-      #${ROOT_ID} .btn-pause { background: #2a3a4d; color: var(--atlas-text); }
+      #${ROOT_ID} .btn-start { background: var(--atlas-accent); color: var(--atlas-accent-ink); }
+      #${ROOT_ID} .btn-pause { background: var(--atlas-elevated); color: var(--atlas-text); border: 1px solid var(--atlas-line) !important; }
       #${ROOT_ID} .btn-stop {
         background: transparent;
-        color: var(--atlas-danger);
-        border: 1px solid #5a3040 !important;
+        color: var(--atlas-muted);
+        border: 1px solid var(--atlas-line) !important;
       }
       #${ROOT_ID} .atlas-stats {
         display: grid;
@@ -225,8 +232,8 @@ export function mountCopilotPanel() {
         text-transform: uppercase;
         color: var(--atlas-muted);
       }
-      #${ROOT_ID} .stat--applied .stat-n { color: #7ee0d7; }
-      #${ROOT_ID} .stat--skipped .stat-n { color: #f0d2a0; }
+      #${ROOT_ID} .stat--applied .stat-n { color: #e5e5e5; }
+      #${ROOT_ID} .stat--skipped .stat-n { color: #d4d4d4; }
       #${ROOT_ID} .atlas-meta {
         display: flex;
         justify-content: space-between;
@@ -244,7 +251,7 @@ export function mountCopilotPanel() {
         user-select: none;
       }
       #${ROOT_ID} .toggle input {
-        accent-color: var(--atlas-teal);
+        accent-color: var(--atlas-accent);
         width: 13px;
         height: 13px;
       }
@@ -253,11 +260,11 @@ export function mountCopilotPanel() {
         margin: 0 12px 10px;
         padding: 8px 10px;
         border-radius: 10px;
-        background: var(--atlas-teal-dim);
-        border: 1px solid rgba(43,176,166,.28);
+        background: var(--atlas-dim);
+        border: 1px solid var(--atlas-line);
         font-size: 12px;
         line-height: 1.35;
-        color: #b7f3ed;
+        color: var(--atlas-text);
       }
       #${ROOT_ID} .atlas-now.show { display: block; }
       #${ROOT_ID} .atlas-now strong {
@@ -265,7 +272,7 @@ export function mountCopilotPanel() {
         font-size: 10px;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-        color: #7ed9d0;
+        color: var(--atlas-muted);
         margin-bottom: 2px;
         font-weight: 700;
       }
@@ -293,7 +300,7 @@ export function mountCopilotPanel() {
         gap: 4px;
         max-height: 210px;
         scrollbar-width: thin;
-        scrollbar-color: #33485e transparent;
+        scrollbar-color: #525252 transparent;
       }
       #${ROOT_ID} .job-row {
         display: grid;
@@ -312,8 +319,8 @@ export function mountCopilotPanel() {
         background: rgba(255,255,255,.05);
       }
       #${ROOT_ID} .job-row.applying {
-        background: var(--atlas-teal-dim);
-        border-color: rgba(43,176,166,.35);
+        background: var(--atlas-dim);
+        border-color: var(--atlas-line);
       }
       #${ROOT_ID} .job-title {
         font-weight: 650;
@@ -337,14 +344,14 @@ export function mountCopilotPanel() {
         padding: 3px 7px;
         border-radius: 999px;
         white-space: nowrap;
-        background: #243446;
-        color: #a9bdd0;
+        background: var(--atlas-elevated);
+        color: var(--atlas-muted);
       }
-      #${ROOT_ID} .job-badge.pending { background: #243446; color: #a9bdd0; }
-      #${ROOT_ID} .job-badge.applied { background: rgba(43,176,166,.2); color: #9ef0e7; }
+      #${ROOT_ID} .job-badge.pending { background: var(--atlas-elevated); color: var(--atlas-muted); }
+      #${ROOT_ID} .job-badge.applied { background: rgba(255,255,255,.14); color: #f5f5f5; }
       #${ROOT_ID} .job-badge.skipped,
-      #${ROOT_ID} .job-badge.already_applied { background: rgba(227,168,93,.15); color: #f0d2a0; }
-      #${ROOT_ID} .job-badge.applying { background: rgba(43,176,166,.28); color: #9ef0e7; }
+      #${ROOT_ID} .job-badge.already_applied { background: rgba(255,255,255,.08); color: #d4d4d4; }
+      #${ROOT_ID} .job-badge.applying { background: rgba(255,255,255,.18); color: #fafafa; }
       #${ROOT_ID} .atlas-log-wrap {
         border-top: 1px solid var(--atlas-line);
         min-height: 0;
@@ -358,7 +365,7 @@ export function mountCopilotPanel() {
         gap: 3px;
         max-height: 120px;
         scrollbar-width: thin;
-        scrollbar-color: #33485e transparent;
+        scrollbar-color: #525252 transparent;
       }
       #${ROOT_ID} .log-row {
         display: grid;
@@ -368,13 +375,13 @@ export function mountCopilotPanel() {
         line-height: 1.35;
         padding: 5px 8px;
         border-radius: 8px;
-        color: #c5d3e0;
+        color: #d4d4d4;
       }
-      #${ROOT_ID} .log-row.success { color: #9ef0e7; }
-      #${ROOT_ID} .log-row.warn { color: #f0d2a0; }
-      #${ROOT_ID} .log-row.error { color: #f2a0a8; }
+      #${ROOT_ID} .log-row.success { color: #fafafa; font-weight: 600; }
+      #${ROOT_ID} .log-row.warn { color: #d4d4d4; }
+      #${ROOT_ID} .log-row.error { color: #a3a3a3; }
       #${ROOT_ID} .log-time {
-        color: #6f8499;
+        color: #737373;
         font-variant-numeric: tabular-nums;
         font-size: 10px;
         padding-top: 1px;
@@ -385,9 +392,9 @@ export function mountCopilotPanel() {
         padding: 9px 11px;
         font-size: 12px;
         line-height: 1.4;
-        background: rgba(227,168,93,.16);
-        color: #f0d2a0;
-        border: 1px solid rgba(227,168,93,.28);
+        background: var(--atlas-elevated);
+        color: var(--atlas-text);
+        border: 1px solid var(--atlas-line);
         border-radius: 10px;
       }
       #${ROOT_ID} .atlas-notice.show { display: block; }
@@ -463,14 +470,15 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} .atlas-modal-actions { display: grid; gap: 8px; }
       #${ROOT_ID} .btn-login {
-        background: var(--atlas-teal);
-        color: #042421;
+        background: var(--atlas-accent);
+        color: var(--atlas-accent-ink);
         width: 100%;
         padding: 10px 12px;
       }
       #${ROOT_ID} .btn-resume-login {
-        background: #2a3a4d;
+        background: var(--atlas-elevated);
         color: var(--atlas-text);
+        border: 1px solid var(--atlas-line) !important;
         width: 100%;
         padding: 10px 12px;
       }
@@ -494,11 +502,11 @@ export function mountCopilotPanel() {
         align-items: start;
         padding: 12px 12px 12px 14px;
         border-radius: 12px;
-        background: #102018;
-        color: #e8f7f2;
-        border: 1px solid rgba(43,176,166,.45);
+        background: var(--atlas-panel);
+        color: var(--atlas-text);
+        border: 1px solid var(--atlas-line);
         box-shadow:
-          0 16px 36px rgba(0,0,0,.4),
+          0 16px 36px rgba(0,0,0,.5),
           0 0 0 1px rgba(255,255,255,.04) inset;
         animation: atlas-toast-in .28s ease-out;
       }
@@ -518,8 +526,8 @@ export function mountCopilotPanel() {
         border-radius: 50%;
         display: grid;
         place-items: center;
-        background: rgba(43,176,166,.22);
-        color: #2bb0a6;
+        background: rgba(255,255,255,.1);
+        color: var(--atlas-text);
         font-size: 14px;
         font-weight: 800;
         line-height: 1;
@@ -532,13 +540,13 @@ export function mountCopilotPanel() {
         margin: 0;
         font-size: 13px;
         font-weight: 750;
-        color: #9ef0e7;
+        color: var(--atlas-text);
         line-height: 1.25;
       }
       #${ROOT_ID} .atlas-toast-msg {
         margin: 3px 0 0;
         font-size: 12px;
-        color: #b7c9d8;
+        color: var(--atlas-muted);
         line-height: 1.35;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -552,13 +560,13 @@ export function mountCopilotPanel() {
         padding: 0;
         border-radius: 7px;
         background: transparent;
-        color: #8fa3b8;
+        color: var(--atlas-muted);
         border: 0 !important;
         font-size: 14px;
         line-height: 1;
       }
       #${ROOT_ID} .atlas-toast-close:hover {
-        color: #e8eef5;
+        color: var(--atlas-text);
         background: rgba(255,255,255,.06);
       }
       #${ROOT_ID}.collapsed .atlas-toast-host { display: grid !important; }
