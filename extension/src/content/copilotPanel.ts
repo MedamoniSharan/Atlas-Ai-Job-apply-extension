@@ -424,7 +424,7 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID}.collapsed .atlas-head { padding: 8px 10px; }
       #${ROOT_ID}.collapsed .atlas-actions-run,
-      #${ROOT_ID}.collapsed .atlas-brand-sub,
+      #${ROOT_ID}.collapsed .atlas-brand-copy,
       #${ROOT_ID}.collapsed .atlas-stats,
       #${ROOT_ID}.collapsed .atlas-meta,
       #${ROOT_ID}.collapsed .atlas-now,
@@ -432,7 +432,10 @@ export function mountCopilotPanel() {
       #${ROOT_ID}.collapsed .atlas-log-wrap,
       #${ROOT_ID}.collapsed .atlas-notice,
       #${ROOT_ID}.collapsed .atlas-modal { display: none !important; }
-      #${ROOT_ID}.collapsed .atlas-brand-text { font-size: 12px; letter-spacing: 0.04em; }
+      #${ROOT_ID}.collapsed .atlas-head {
+        padding: 8px 12px;
+        gap: 8px;
+      }
       #${ROOT_ID} .atlas-modal {
         display: none;
         position: absolute;
