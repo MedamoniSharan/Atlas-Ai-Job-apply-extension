@@ -7,6 +7,7 @@ import {
   downloadPaymentInvoice,
   startPlanCheckout,
 } from '../lib/razorpayCheckout';
+import { CosmosLoader } from './CosmosLogo';
 
 type Feature = {
   label: string;
@@ -200,11 +201,15 @@ export function PricingPlans() {
                       disabled={busyPlan !== null}
                       onClick={() => void handleUpgrade(plan.paidPlan!)}
                     >
-                      <span>
-                        {busyPlan === plan.paidPlan
-                          ? 'Opening checkout…'
-                          : plan.cta}
-                      </span>
+                      {busyPlan === plan.paidPlan ? (
+                        <CosmosLoader
+                          label=""
+                          size={20}
+                          className="cosmos-loader--inline"
+                        />
+                      ) : (
+                        <span>{plan.cta}</span>
+                      )}
                     </button>
                   ) : (
                     <Link

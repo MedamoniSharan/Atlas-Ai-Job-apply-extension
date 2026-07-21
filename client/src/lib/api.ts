@@ -237,6 +237,10 @@ export async function fetchBillingMe() {
   return request<{
     plan: 'free' | 'pro' | 'max';
     planExpiresAt: string | null;
+    appliesUsed: number;
+    appliesLimit: number;
+    periodStart: string;
+    periodEnd: string;
     payments: Array<{
       id: string;
       plan: PaidPlan;

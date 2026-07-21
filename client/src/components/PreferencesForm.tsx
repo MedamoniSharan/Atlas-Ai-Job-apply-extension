@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import {
   DEFAULT_JOB_PREFERENCES,
   type JobPreferences,
@@ -7,26 +8,96 @@ import {
 import { fetchPreferences, savePreferences } from '../lib/api';
 import { CosmosLoader } from './CosmosLogo';
 
-function parseList(value: string): string[] {
-  return value
-    .split(/[,|\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 type PreferencesFormProps = {
   onSaved?: (prefs: JobPreferences) => void;
   submitLabel?: string;
 };
+
+type ChipFieldProps = {
+  label: string;
+  values: string[];
+  placeholder: string;
+  onChange: (next: string[]) => void;
+};
+
+function ChipField({ label, values, placeholder, onChange }: ChipFieldProps) {
+  const [draft, setDraft] = useState('');
+
+  function addChips(raw: string) {
+    const parts = raw
+      .split(/[,|\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    const seen = new Set(values.map((v) => v.toLowerCase()));
+    const next = [...values];
+    for (const part of parts) {
+      const key = part.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      next.push(part);
+    }
+    onChange(next);
+    setDraft('');
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addChips(draft);
+      return;
+    }
+    if (e.key === 'Backspace' && draft === '' && values.length > 0) {
+      onChange(values.slice(0, -1));
+    }
+  }
+
+  return (
+    <div className="chip-field">
+      <span className="chip-field__label">{label}</span>
+      <div className="chip-field__box">
+        {values.map((value) => (
+          <span className="pref-chip" key={value}>
+            {value}
+            <button
+              type="button"
+              className="pref-chip__remove"
+              aria-label={`Remove ${value}`}
+              onClick={() => onChange(values.filter((v) => v !== value))}
+            >
+              <X size={12} strokeWidth={2.4} aria-hidden />
+            </button>
+          </span>
+        ))}
+        <input
+          className="chip-field__input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={() => {
+            if (draft.trim()) addChips(draft);
+          }}
+          placeholder={values.length === 0 ? placeholder : 'Add another…'}
+        />
+        <button
+          type="button"
+          className="chip-field__add"
+          onClick={() => addChips(draft)}
+          disabled={!draft.trim()}
+        >
+          Add
+        </button>
+      </div>
+      <span className="chip-field__hint">Press Enter or Add to create a chip</span>
+    </div>
+  );
+}
 
 export function PreferencesForm({
   onSaved,
   submitLabel = 'Save preferences',
 }: PreferencesFormProps) {
   const [prefs, setPrefs] = useState<JobPreferences>(DEFAULT_JOB_PREFERENCES);
-  const [titlesText, setTitlesText] = useState('');
-  const [keywordsText, setKeywordsText] = useState('');
-  const [locationsText, setLocationsText] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -39,9 +110,6 @@ export function PreferencesForm({
       if (cancelled) return;
       if (res.success) {
         setPrefs(res.data);
-        setTitlesText(res.data.titles.join(', '));
-        setKeywordsText(res.data.keywords.join(', '));
-        setLocationsText(res.data.locations.join(', '));
       }
       setLoading(false);
     })();
@@ -54,32 +122,23 @@ export function PreferencesForm({
     e.preventDefault();
     setError('');
     setMessage('');
-    const next: JobPreferences = {
-      ...prefs,
-      titles: parseList(titlesText),
-      keywords: parseList(keywordsText),
-      locations: parseList(locationsText),
-    };
-    if (next.titles.length === 0 && next.keywords.length === 0) {
+    if (prefs.titles.length === 0 && prefs.keywords.length === 0) {
       setError('Add at least one job title or keyword.');
       return;
     }
-    if (next.experienceMin > next.experienceMax) {
+    if (prefs.experienceMin > prefs.experienceMax) {
       setError('Min experience cannot exceed max experience.');
       return;
     }
 
     setSaving(true);
-    const res = await savePreferences(next);
+    const res = await savePreferences(prefs);
     setSaving(false);
     if (!res.success) {
       setError(res.message);
       return;
     }
     setPrefs(res.data.preferences);
-    setTitlesText(res.data.preferences.titles.join(', '));
-    setKeywordsText(res.data.preferences.keywords.join(', '));
-    setLocationsText(res.data.preferences.locations.join(', '));
     setMessage('Preferences saved.');
     onSaved?.(res.data.preferences);
   }
@@ -95,33 +154,24 @@ export function PreferencesForm({
 
   return (
     <form className="prefs-form" onSubmit={onSubmit}>
-      <label>
-        Job titles
-        <textarea
-          value={titlesText}
-          onChange={(e) => setTitlesText(e.target.value)}
-          placeholder="Software Engineer, Backend Developer"
-          rows={2}
-        />
-      </label>
-      <label>
-        Keywords
-        <textarea
-          value={keywordsText}
-          onChange={(e) => setKeywordsText(e.target.value)}
-          placeholder="React, Node.js, TypeScript"
-          rows={2}
-        />
-      </label>
-      <label>
-        Locations
-        <textarea
-          value={locationsText}
-          onChange={(e) => setLocationsText(e.target.value)}
-          placeholder="Bengaluru, Remote, Hyderabad"
-          rows={2}
-        />
-      </label>
+      <ChipField
+        label="Job titles"
+        values={prefs.titles}
+        placeholder="Software Engineer"
+        onChange={(titles) => setPrefs((p) => ({ ...p, titles }))}
+      />
+      <ChipField
+        label="Keywords"
+        values={prefs.keywords}
+        placeholder="React, Node.js"
+        onChange={(keywords) => setPrefs((p) => ({ ...p, keywords }))}
+      />
+      <ChipField
+        label="Locations"
+        values={prefs.locations}
+        placeholder="Bengaluru, Remote"
+        onChange={(locations) => setPrefs((p) => ({ ...p, locations }))}
+      />
 
       <div className="prefs-row">
         <label>

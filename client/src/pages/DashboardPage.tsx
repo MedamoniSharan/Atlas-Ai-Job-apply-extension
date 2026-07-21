@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight } from 'lucide-react';
 import type { Application } from '@atlas/shared';
 import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
@@ -227,7 +228,8 @@ export function DashboardPage() {
         <div className="dash-callout dash-callout--stack">
           <ExtensionOnboarding compact userEmail={user?.email} />
           <Link className="dash-inline-link" to="/get-started">
-            View full setup guide →
+            View full setup guide
+            <ArrowRight size={14} strokeWidth={2.2} className="icon-motion" aria-hidden />
           </Link>
         </div>
       )}

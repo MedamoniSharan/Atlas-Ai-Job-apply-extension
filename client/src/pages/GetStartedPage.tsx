@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Check } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import { ExtensionOnboarding } from '../components/ExtensionOnboarding';
@@ -66,10 +67,16 @@ export function GetStartedPage() {
 
         <ol className="setup-steps">
           <li className={prefsDone ? 'done' : 'active'}>
-            Job preferences {prefsDone ? '✓' : ''}
+            Job preferences
+            {prefsDone ? (
+              <Check size={16} strokeWidth={2.4} className="icon-motion" aria-hidden />
+            ) : null}
           </li>
           <li className={!prefsDone ? '' : extensionDone ? 'done' : 'active'}>
-            Install extension {extensionDone ? '✓' : ''}
+            Install extension
+            {extensionDone ? (
+              <Check size={16} strokeWidth={2.4} className="icon-motion" aria-hidden />
+            ) : null}
           </li>
         </ol>
 

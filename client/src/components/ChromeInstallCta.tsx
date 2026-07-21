@@ -66,7 +66,7 @@ export function ChromeInstallCta() {
       <div className="chrome-cta__meta">
         <span>
           <Star size={14} fill="#f5b301" stroke="#f5b301" aria-hidden="true" />
-          Chrome Web Store 4.9★
+          Chrome Web Store 4.9
         </span>
         <span>
           <Users size={14} strokeWidth={2} aria-hidden="true" />

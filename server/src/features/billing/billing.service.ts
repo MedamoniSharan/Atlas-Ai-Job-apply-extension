@@ -3,12 +3,16 @@ import fs from 'fs';
 import Razorpay from 'razorpay';
 import {
   PLAN_PRICES_PAISE,
+  getEffectivePlan,
+  getIstMonthBounds,
+  getPlanAppliesLimit,
   type CreateBillingOrderInput,
   type PaidPlan,
   type VerifyBillingPaymentInput,
 } from '@atlas/shared';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
+import { ApplicationModel } from '../applications/application.model';
 import { UserModel } from '../users/user.model';
 import { PaymentModel } from './payment.model';
 import { generateInvoicePdf, invoiceFilePath } from './invoice.service';
@@ -201,9 +205,34 @@ export async function getBillingMe(userId: string) {
     .limit(20)
     .lean();
 
+  const { periodStart, periodEnd } = getIstMonthBounds();
+  const effectivePlan = getEffectivePlan(user.plan, user.planExpiresAt);
+  const appliesLimit = getPlanAppliesLimit(user.plan, user.planExpiresAt);
+
+  const appliesUsed = await ApplicationModel.countDocuments({
+    userId,
+    'metadata.skipped': { $ne: true },
+    $or: [{ status: 'applied' }, { 'metadata.source': 'auto_apply' }],
+    $and: [
+      {
+        $or: [
+          { appliedAt: { $gte: periodStart, $lt: periodEnd } },
+          {
+            appliedAt: { $exists: false },
+            createdAt: { $gte: periodStart, $lt: periodEnd },
+          },
+        ],
+      },
+    ],
+  });
+
   return {
-    plan: user.plan ?? 'free',
+    plan: effectivePlan,
     planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
+    appliesUsed,
+    appliesLimit,
+    periodStart: periodStart.toISOString(),
+    periodEnd: periodEnd.toISOString(),
     payments: payments.map((p) => ({
       id: p._id.toString(),
       plan: p.plan,

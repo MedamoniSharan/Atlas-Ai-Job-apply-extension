@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { CircleHelp } from 'lucide-react';
 import { login, register } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosMark } from '../components/CosmosLogo';
@@ -281,7 +282,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
                     setNotice('Use the password associated with your Cosmo account.')
                   }
                 >
-                  <span aria-hidden="true">?</span>
+                  <CircleHelp size={16} strokeWidth={2} className="icon-motion" aria-hidden />
                 </button>
               </div>
             ) : null}

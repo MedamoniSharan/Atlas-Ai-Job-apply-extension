@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { Check, Sparkles, X } from 'lucide-react';
 
 const FEATURES = [
   '4× Faster Fills',
@@ -25,18 +25,24 @@ export function HeroAutoApply() {
       <div className="hero-agent__inner">
         <div className="hero-agent__copy">
           <p className="hero-agent__badge">
-            <span className="hero-agent__badge-spark" aria-hidden="true">
-              ✦
-            </span>
+            <Sparkles
+              size={14}
+              strokeWidth={2}
+              className="hero-agent__badge-spark icon-motion icon-motion--spin-slow"
+              aria-hidden
+            />
             AI Powered
           </p>
           <h1 id="landing-hero-title">Auto-Apply Agent</h1>
           <ul className="hero-agent__features">
             {FEATURES.map((item) => (
               <li key={item}>
-                <span className="hero-agent__check" aria-hidden="true">
-                  ✓
-                </span>
+                <Check
+                  size={16}
+                  strokeWidth={2.4}
+                  className="hero-agent__check icon-motion"
+                  aria-hidden
+                />
                 {item}
               </li>
             ))}

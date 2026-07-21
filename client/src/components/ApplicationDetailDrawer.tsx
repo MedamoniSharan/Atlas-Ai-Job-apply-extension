@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { X } from 'lucide-react';
 import type { Application } from '@atlas/shared';
 import { sanitizeJobMetaFields } from '@atlas/shared';
 
@@ -122,7 +123,7 @@ export function ApplicationDetailDrawer({
             onClick={onClose}
             aria-label="Close"
           >
-            ×
+            <X size={18} strokeWidth={2} className="icon-motion" aria-hidden />
           </button>
         </header>
 

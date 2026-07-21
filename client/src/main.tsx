@@ -10,6 +10,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
 import './styles.css';
 
 const queryClient = new QueryClient();
@@ -46,15 +47,7 @@ createRoot(document.getElementById('root')!).render(
                 />
               }
             />
-            <Route
-              path="/profile"
-              element={
-                <ComingSoonPage
-                  title="Profile"
-                  blurb="Profile editing will live here. Manage account details under Settings today."
-                />
-              }
-            />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

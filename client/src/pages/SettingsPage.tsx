@@ -4,7 +4,6 @@ import { PreferencesForm } from '../components/PreferencesForm';
 import { ONBOARDING_QUERY_KEY } from '../lib/onboarding';
 
 export function SettingsPage() {
-  const accessToken = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
@@ -12,7 +11,6 @@ export function SettingsPage() {
     <div className="dash">
       <div className="panel settings-grid">
         <div>
-          <h2>Settings</h2>
           <p className="muted">
             Manage account details and job-search preferences used by the
             extension for scan and Easy Apply.
@@ -24,20 +22,6 @@ export function SettingsPage() {
           <p className="muted">
             {user?.name} · {user?.email}
           </p>
-        </div>
-
-        <div>
-          <strong>Access token</strong>
-          <p className="muted">
-            Prefer signing in from the extension popup. Tokens expire.
-          </p>
-          <code>{accessToken ?? '—'}</code>
-        </div>
-
-        <div>
-          <strong>API base URL</strong>
-          <p className="muted">Default for local development</p>
-          <code>http://localhost:4000</code>
         </div>
       </div>
 

@@ -7,15 +7,36 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import {
+  BarChart3,
+  Bell,
+  Briefcase,
+  CircleHelp,
+  Compass,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Rocket,
+  Search,
+  Settings,
+  User,
+} from 'lucide-react';
 import { useAuthStore } from './store/authStore';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
-import { ensureSession, fetchApplications } from './lib/api';
+import { ensureSession, fetchApplications, fetchBillingMe } from './lib/api';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
 
 export type ShellOutletContext = {
   search: string;
   setSearch: (value: string) => void;
 };
+
+const PLAN_LABEL = {
+  free: 'Basic',
+  pro: 'Premium',
+  max: 'UltraMag',
+} as const;
 
 function userInitials(name?: string | null): string {
   if (!name?.trim()) return '?';
@@ -72,6 +93,20 @@ export function AppLayout() {
     staleTime: 30_000,
   });
 
+  const { data: billing } = useQuery({
+    queryKey: ['billing', 'me'],
+    queryFn: async () => {
+      const res = await fetchBillingMe();
+      if (!res.success) throw new Error(res.message);
+      return res.data;
+    },
+    enabled: Boolean(accessToken),
+    staleTime: 60_000,
+  });
+
+  const planKey = billing?.plan ?? user?.plan ?? 'free';
+  const planLabel = PLAN_LABEL[planKey];
+
   const outletContext: ShellOutletContext = useMemo(
     () => ({ search, setSearch }),
     [search]
@@ -124,19 +159,19 @@ export function AppLayout() {
         <nav className="sidebar__nav">
           <NavLink to="/dashboard" end className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <DashIcon />
+              <LayoutDashboard size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Dashboard
           </NavLink>
           <NavLink to="/browse" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <BrowseIcon />
+              <Compass size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Browse jobs
           </NavLink>
           <NavLink to="/applications" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <AppsIcon />
+              <Briefcase size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Applications
             {typeof appCount === 'number' && appCount > 0 ? (
@@ -145,13 +180,13 @@ export function AppLayout() {
           </NavLink>
           <NavLink to="/inbox" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <InboxIcon />
+              <Inbox size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Inbox
           </NavLink>
           <NavLink to="/tracker" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <TrackerIcon />
+              <BarChart3 size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Tracker
           </NavLink>
@@ -160,20 +195,20 @@ export function AppLayout() {
         <nav className="sidebar__nav sidebar__nav--secondary">
           <NavLink to="/profile" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <ProfileIcon />
+              <User size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Profile
           </NavLink>
           <NavLink to="/settings" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <SettingsIcon />
+              <Settings size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Settings
           </NavLink>
           {needsSetup ? (
             <NavLink to="/get-started" className="sidebar__link">
               <span className="sidebar__icon" aria-hidden>
-                <StartIcon />
+                <Rocket size={18} strokeWidth={1.9} className="icon-motion" />
               </span>
               Get started
             </NavLink>
@@ -186,7 +221,7 @@ export function AppLayout() {
             href="mailto:support@cosmovai.com?subject=Cosmo%20feedback"
           >
             <span className="sidebar__help-icon" aria-hidden>
-              ?
+              <CircleHelp size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             <span>
               <strong>Help &amp; Support</strong>
@@ -200,7 +235,9 @@ export function AppLayout() {
             </div>
             <div className="sidebar__user-meta">
               <strong>{user?.name || 'Account'}</strong>
-              <span>Synced with Naukri</span>
+              <span className={`sidebar__plan sidebar__plan--${planKey}`}>
+                {planLabel}
+              </span>
             </div>
             <button
               type="button"
@@ -210,6 +247,7 @@ export function AppLayout() {
                 navigate('/', { replace: true });
               }}
             >
+              <LogOut size={14} strokeWidth={2} aria-hidden />
               Sign out
             </button>
           </div>
@@ -242,14 +280,14 @@ export function AppLayout() {
             aria-label="Open navigation"
             onClick={() => setSidebarOpen(true)}
           >
-            ☰
+            <Menu size={20} strokeWidth={1.9} className="icon-motion" aria-hidden />
           </button>
           <h1 className="shell__title">{title}</h1>
 
           {showHeaderSearch ? (
             <form className="shell__search" onSubmit={onSearchSubmit}>
               <span className="shell__search-icon" aria-hidden>
-                ⌕
+                <Search size={16} strokeWidth={2} className="icon-motion" />
               </span>
               <input
                 type="search"
@@ -270,7 +308,7 @@ export function AppLayout() {
               aria-label="Notifications"
               title="Notifications coming soon"
             >
-              ⌂
+              <Bell size={18} strokeWidth={1.8} className="icon-motion" aria-hidden />
             </button>
             <NavLink
               to="/get-started"
@@ -278,7 +316,7 @@ export function AppLayout() {
               aria-label="Help"
               title="Get started"
             >
-              ?
+              <CircleHelp size={18} strokeWidth={1.8} className="icon-motion" aria-hidden />
             </NavLink>
           </div>
         </header>
@@ -291,74 +329,5 @@ export function AppLayout() {
   );
 }
 
-function DashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="3" width="7" height="9" rx="1.5" />
-      <rect x="14" y="3" width="7" height="5" rx="1.5" />
-      <rect x="14" y="12" width="7" height="9" rx="1.5" />
-      <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
 
-function BrowseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
 
-function AppsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-    </svg>
-  );
-}
-
-function InboxIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 4h16v16H4z" />
-      <path d="m4 8 8 6 8-6" />
-    </svg>
-  );
-}
-
-function TrackerIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 19V5M4 19h16" />
-      <path d="M8 16v-5M12 16V8M16 16v-3" />
-    </svg>
-  );
-}
-
-function ProfileIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 20a8 8 0 0 1 16 0" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-    </svg>
-  );
-}
-
-function StartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M5 12h14M13 6l6 6-6 6" />
-    </svg>
-  );
-}
