@@ -92,13 +92,50 @@ export async function getCopilotState(): Promise<CopilotState> {
   };
 }
 
+function countsFromJobs(jobs: ScannedJobItem[]): Pick<
+  CopilotState,
+  'matched' | 'applied' | 'skipped'
+> {
+  let applied = 0;
+  let skipped = 0;
+  for (const job of jobs) {
+    if (job.status === 'applied') applied += 1;
+    else if (job.status === 'skipped' || job.status === 'already_applied') {
+      skipped += 1;
+    }
+  }
+  return { matched: jobs.length, applied, skipped };
+}
+
+/** Serialize storage writes so concurrent updates cannot clobber scannedJobs / counts. */
+let stateWriteChain: Promise<unknown> = Promise.resolve();
+
+async function commitCopilotState(
+  updater: (current: CopilotState) => Partial<CopilotState>
+): Promise<CopilotState> {
+  const run = async () => {
+    const current = await getCopilotState();
+    const partial = updater(current);
+    const next: CopilotState = { ...current, ...partial };
+    if (partial.scannedJobs) {
+      Object.assign(next, countsFromJobs(partial.scannedJobs));
+    }
+    await chrome.storage.local.set({ [STATE_KEY]: next });
+    return next;
+  };
+
+  const result = stateWriteChain.then(run, run);
+  stateWriteChain = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
+
 export async function setCopilotState(
   partial: Partial<CopilotState>
 ): Promise<CopilotState> {
-  const current = await getCopilotState();
-  const next = { ...current, ...partial };
-  await chrome.storage.local.set({ [STATE_KEY]: next });
-  return next;
+  return commitCopilotState(() => partial);
 }
 
 export function jobKey(job: {
@@ -112,30 +149,27 @@ export async function upsertScannedJobs(
   jobs: Omit<ScannedJobItem, 'status'>[],
   status: ScannedJobStatus = 'pending'
 ): Promise<ScannedJobItem[]> {
-  const state = await getCopilotState();
-  const byId = new Map(state.scannedJobs.map((j) => [j.id, j]));
-  for (const job of jobs) {
-    if (!byId.has(job.id)) {
-      byId.set(job.id, { ...job, status });
+  const next = await commitCopilotState((state) => {
+    const byId = new Map(state.scannedJobs.map((j) => [j.id, j]));
+    for (const job of jobs) {
+      if (!byId.has(job.id)) {
+        byId.set(job.id, { ...job, status });
+      }
     }
-  }
-  const scannedJobs = [...byId.values()].slice(0, MAX_SCANNED);
-  await setCopilotState({
-    scannedJobs,
-    matched: scannedJobs.length,
+    return { scannedJobs: [...byId.values()].slice(0, MAX_SCANNED) };
   });
-  return scannedJobs;
+  return next.scannedJobs;
 }
 
 export async function updateScannedJob(
   id: string,
   patch: Partial<Pick<ScannedJobItem, 'status' | 'skipReason' | 'title'>>
 ): Promise<void> {
-  const state = await getCopilotState();
-  const scannedJobs = state.scannedJobs.map((j) =>
-    j.id === id ? { ...j, ...patch } : j
-  );
-  await setCopilotState({ scannedJobs });
+  await commitCopilotState((state) => ({
+    scannedJobs: state.scannedJobs.map((j) =>
+      j.id === id ? { ...j, ...patch } : j
+    ),
+  }));
 }
 
 export async function getCopilotLogs(): Promise<CopilotLogEntry[]> {

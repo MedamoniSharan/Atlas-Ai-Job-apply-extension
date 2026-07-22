@@ -9,6 +9,7 @@ import { getCachedPreferences } from './storageManager';
 import { logger } from './logger';
 import {
   appendCopilotLog,
+  clearCopilotAlert,
   getCopilotState,
   jobKey,
   raiseCopilotToast,
@@ -93,6 +94,7 @@ async function waitWhilePausedForQuestions(
       }>(tabId, { type: 'CHECK_APPLY_STATUS' }, 2);
       if (status.applied) {
         await setCopilotState({ paused: false, needsLogin: false });
+        await clearCopilotAlert();
         await appendCopilotLog(
           'Apply success detected after your answers — continuing',
           'success'
@@ -101,6 +103,7 @@ async function waitWhilePausedForQuestions(
       }
       if (status.needsQuestions === false) {
         await setCopilotState({ paused: false, needsLogin: false });
+        await clearCopilotAlert();
         await appendCopilotLog(
           'Questions cleared — retrying apply',
           'success'
@@ -201,9 +204,11 @@ async function markApplied(
       metadata: { source: 'auto_apply', alreadyApplied: true },
     });
     await updateScannedJob(id, { status: 'already_applied' });
-    const st = await getCopilotState();
-    await setCopilotState({ skipped: st.skipped + 1 });
     await appendCopilotLog(`Already applied — skipped: ${base.title}`, 'info');
+    await raiseCopilotToast(
+      'Already applied — skipped',
+      base.company ? `${base.title} · ${base.company}` : base.title
+    );
     return;
   }
 
@@ -215,8 +220,6 @@ async function markApplied(
   });
   await noteLocalApply();
   await updateScannedJob(id, { status: 'applied' });
-  const st = await getCopilotState();
-  await setCopilotState({ applied: st.applied + 1 });
   await appendCopilotLog(`Applied: ${base.title}`, 'success');
   await raiseCopilotToast(
     'Job applied successfully',
@@ -243,9 +246,13 @@ async function markSkipped(
     },
   });
   await updateScannedJob(id, { status: 'skipped', skipReason: reason });
-  const st = await getCopilotState();
-  await setCopilotState({ skipped: st.skipped + 1 });
   await appendCopilotLog(`Skipped: ${base.title} — ${reason}`, 'warn');
+  await raiseCopilotToast(
+    'Job skipped',
+    base.company
+      ? `${base.title} · ${base.company}`
+      : `${base.title} — ${reason}`
+  );
 }
 
 async function markCompanySite(
@@ -267,6 +274,10 @@ async function markCompanySite(
   await appendCopilotLog(
     `Company site — saved for manual apply: ${base.title}`,
     'info'
+  );
+  await raiseCopilotToast(
+    'Saved for manual apply',
+    base.company ? `${base.title} · ${base.company}` : base.title
   );
 }
 
@@ -505,6 +516,7 @@ export async function pauseBot(): Promise<void> {
 
 export async function resumeBot(): Promise<void> {
   await setCopilotState({ paused: false, needsLogin: false });
+  await clearCopilotAlert();
   await appendCopilotLog('Bot resumed', 'success');
 }
 
@@ -634,8 +646,6 @@ export async function runBot(handlers: BotHandlers): Promise<{
             ],
             'already_applied'
           );
-          const st = await getCopilotState();
-          await setCopilotState({ skipped: st.skipped + 1 });
           await appendCopilotLog(
             `Already applied (Atlas) — skipped: ${job.title}`,
             'info'

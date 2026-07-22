@@ -9,6 +9,7 @@ const loginForm = document.getElementById('login-form')!;
 const authedSection = document.getElementById('authed')!;
 const formError = document.getElementById('form-error')!;
 const prefsMsg = document.getElementById('prefs-msg')!;
+const toastHost = document.getElementById('popup-toast-host')!;
 const emailInput = document.getElementById('email') as HTMLInputElement;
 const passwordInput = document.getElementById('password') as HTMLInputElement;
 const apiBaseInput = document.getElementById('api-base') as HTMLInputElement;
@@ -16,6 +17,42 @@ const alertEl = document.getElementById('copilot-alert')!;
 const alertTitleEl = document.getElementById('copilot-alert-title')!;
 const alertMsgEl = document.getElementById('copilot-alert-msg')!;
 const alertDismissBtn = document.getElementById('copilot-alert-dismiss')!;
+
+let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showToast(
+  title: string,
+  message: string,
+  variant: 'success' | 'error' = 'success'
+) {
+  toastHost.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = `popup-toast${variant === 'error' ? ' is-error' : ''}`;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `
+    <div class="popup-toast-icon" aria-hidden="true">${
+      variant === 'error' ? '!' : '✓'
+    }</div>
+    <div class="popup-toast-copy">
+      <p class="popup-toast-title"></p>
+      <p class="popup-toast-msg"></p>
+    </div>
+    <button type="button" class="popup-toast-close" aria-label="Dismiss">×</button>
+  `;
+  (el.querySelector('.popup-toast-title') as HTMLElement).textContent = title;
+  (el.querySelector('.popup-toast-msg') as HTMLElement).textContent = message;
+  const closeBtn = el.querySelector('.popup-toast-close') as HTMLButtonElement;
+  const dismiss = () => {
+    el.classList.add('is-out');
+    window.setTimeout(() => {
+      if (el.parentElement === toastHost) el.remove();
+    }, 220);
+  };
+  closeBtn.addEventListener('click', dismiss);
+  toastHost.appendChild(el);
+  if (toastHideTimer) clearTimeout(toastHideTimer);
+  toastHideTimer = setTimeout(dismiss, 2800);
+}
 
 function alertTitle(alert: CopilotAlert): string {
   switch (alert.kind) {
@@ -211,6 +248,7 @@ document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
   const preferences = readPrefsForm();
   if (!preferences.titles.length && !preferences.keywords.length) {
     prefsMsg.textContent = 'Add at least one title or keyword.';
+    showToast('Missing details', 'Add at least one title or keyword.', 'error');
     return;
   }
   const result = await send<{ success: boolean; message?: string }>({
@@ -219,21 +257,15 @@ document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
   });
   if (!result.success) {
     prefsMsg.textContent = result.message ?? 'Save failed';
+    showToast('Save failed', result.message ?? 'Could not save preferences.', 'error');
     return;
   }
-  prefsMsg.textContent = 'Saved. Opening Naukri Co-Pilot…';
-  scanStateEl.textContent =
-    'Open the bottom-left Cosmo Co-Pilot on Naukri and press Start.';
-  await chrome.tabs.create({ url: 'https://www.naukri.com', active: true });
+  prefsMsg.textContent = '';
+  showToast('Preferences saved', 'Your Cosmo settings are up to date.');
 });
 
 document.getElementById('logout')!.addEventListener('click', async () => {
   await send({ type: 'LOGOUT' });
-  await refreshUi();
-});
-
-document.getElementById('sync-now')!.addEventListener('click', async () => {
-  await send({ type: 'FLUSH_QUEUE' });
   await refreshUi();
 });
 

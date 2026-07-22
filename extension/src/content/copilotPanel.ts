@@ -28,7 +28,10 @@ function formatTime(iso: string): string {
   }
 }
 
-function statusLabel(status: ScannedJobItem['status']): string {
+function statusLabel(
+  status: ScannedJobItem['status'],
+  skipReason?: string
+): string {
   switch (status) {
     case 'pending':
       return 'Queued';
@@ -39,7 +42,7 @@ function statusLabel(status: ScannedJobItem['status']): string {
     case 'already_applied':
       return 'Already';
     case 'skipped':
-      return 'Skipped';
+      return /company site/i.test(skipReason || '') ? 'Manual' : 'Skipped';
     default:
       return status;
   }
@@ -59,17 +62,19 @@ export function mountCopilotPanel() {
         z-index: 2147483646;
         pointer-events: none;
         font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-        --atlas-bg: #0a0a0a;
-        --atlas-panel: #141414;
-        --atlas-elevated: #1a1a1a;
-        --atlas-line: #2e2e2e;
-        --atlas-text: #fafafa;
-        --atlas-muted: #a3a3a3;
-        --atlas-accent: #ffffff;
-        --atlas-accent-ink: #0a0a0a;
-        --atlas-dim: rgba(255,255,255,.08);
-        --atlas-warn: #d4d4d4;
-        --atlas-danger: #737373;
+        --atlas-bg: #f4f4f5;
+        --atlas-panel: #ffffff;
+        --atlas-elevated: #f4f4f5;
+        --atlas-line: #e4e4e7;
+        --atlas-text: #18181b;
+        --atlas-muted: #71717a;
+        --atlas-accent: #18181b;
+        --atlas-accent-ink: #ffffff;
+        --atlas-dim: rgba(24,24,27,.06);
+        --atlas-warn: #b45309;
+        --atlas-danger: #b91c1c;
+        --atlas-success: #15803d;
+        --atlas-skip: #a16207;
       }
       #${ROOT_ID} * { box-sizing: border-box; font-family: inherit; }
       #${ROOT_ID} .atlas-dock {
@@ -89,8 +94,8 @@ export function mountCopilotPanel() {
         border: 1px solid var(--atlas-line);
         border-radius: 16px;
         box-shadow:
-          0 22px 48px rgba(0,0,0,.55),
-          0 0 0 1px rgba(255,255,255,.04) inset;
+          0 18px 40px rgba(24,24,27,.14),
+          0 0 0 1px rgba(24,24,27,.04);
         overflow: hidden;
         animation: atlas-panel-in .28s ease-out;
       }
@@ -110,6 +115,21 @@ export function mountCopilotPanel() {
         align-items: center;
         gap: 9px;
         min-width: 0;
+        flex: 1 1 auto;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+      }
+      #${ROOT_ID} .atlas-brand:active {
+        cursor: grabbing;
+      }
+      #${ROOT_ID}.is-dragging .atlas-brand {
+        cursor: grabbing;
+      }
+      #${ROOT_ID}.is-dragging .atlas-panel {
+        box-shadow:
+          0 22px 48px rgba(24,24,27,.22),
+          0 0 0 1px rgba(24,24,27,.06);
       }
       #${ROOT_ID} .atlas-brand .atlas-cosmos-logo {
         width: 22px;
@@ -124,11 +144,11 @@ export function mountCopilotPanel() {
         animation: atlas-logo-spin 1.6s ease-in-out infinite;
       }
       #${ROOT_ID}.is-paused .atlas-brand .atlas-cosmos-logo {
-        color: var(--atlas-warn);
+        color: var(--atlas-text);
         animation: none;
       }
       #${ROOT_ID}:not(.is-running) .atlas-brand:hover .atlas-cosmos-logo {
-        animation: atlas-logo-hover 1.4s ease-in-out forwards;
+        animation: atlas-logo-hover 1.2s ease-in-out infinite;
       }
       @keyframes atlas-logo-spin {
         0%, 100% { transform: scale(1) rotate(0deg); }
@@ -136,19 +156,24 @@ export function mountCopilotPanel() {
       }
       @keyframes atlas-logo-hover {
         0% { transform: scale(1) rotate(0deg); }
-        50% { transform: scale(1.35) rotate(180deg); }
+        50% { transform: scale(1.2) rotate(180deg); }
         100% { transform: scale(1) rotate(360deg); }
       }
       #${ROOT_ID} .atlas-brand-copy {
         display: grid;
         gap: 1px;
         min-width: 0;
+        flex: 1 1 auto;
       }
       #${ROOT_ID} .atlas-brand-text {
         font-weight: 750;
-        font-size: 13px;
-        letter-spacing: 0.06em;
-        line-height: 1.1;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+        color: #18181b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       #${ROOT_ID} .atlas-brand-sub {
         font-size: 10px;
@@ -158,32 +183,24 @@ export function mountCopilotPanel() {
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      #${ROOT_ID} .atlas-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
-      #${ROOT_ID} .atlas-actions-run { display: flex; gap: 5px; align-items: center; }
-      #${ROOT_ID} .btn-icon {
-        width: 30px;
-        height: 30px;
-        padding: 0;
-        display: inline-grid;
-        place-items: center;
-        background: rgba(255,255,255,.03);
-        color: var(--atlas-muted);
-        border: 1px solid var(--atlas-line) !important;
-        border-radius: 9px;
-        font-size: 15px;
-        line-height: 1;
-        transition: color .15s ease, border-color .15s ease, background .15s ease;
+      #${ROOT_ID} .atlas-actions {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        flex-shrink: 0;
+        max-width: 58%;
       }
-      #${ROOT_ID} .btn-icon:hover {
-        color: var(--atlas-text);
-        border-color: #525252 !important;
-        background: rgba(255,255,255,.06);
+      #${ROOT_ID} .atlas-actions-run {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        min-width: 0;
       }
       #${ROOT_ID} button {
         border: 0;
         border-radius: 9px;
-        padding: 7px 11px;
-        font-size: 12px;
+        padding: 6px 9px;
+        font-size: 11px;
         font-weight: 650;
         cursor: pointer;
         transition: transform .12s ease, filter .12s ease, background .15s ease;
@@ -195,12 +212,111 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} button:not(:disabled):hover { filter: brightness(1.06); }
       #${ROOT_ID} button:not(:disabled):active { transform: translateY(1px); }
-      #${ROOT_ID} .btn-start { background: var(--atlas-accent); color: var(--atlas-accent-ink); }
-      #${ROOT_ID} .btn-pause { background: var(--atlas-elevated); color: var(--atlas-text); border: 1px solid var(--atlas-line) !important; }
+      #${ROOT_ID} .btn-start {
+        background: #16a34a;
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        min-width: 0;
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      #${ROOT_ID} .btn-start:disabled {
+        background: #86efac;
+        color: #14532d;
+        opacity: 1;
+      }
+      #${ROOT_ID} .btn-start.is-running {
+        background: #16a34a;
+        color: #ffffff;
+      }
+      #${ROOT_ID} .btn-start .run-anim {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      #${ROOT_ID} .btn-start .run-anim svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        animation: atlas-runner-cycle 0.45s ease-in-out infinite;
+      }
+      #${ROOT_ID} .btn-start .run-label {
+        display: inline-flex;
+        align-items: baseline;
+      }
+      #${ROOT_ID} .btn-start .run-dots {
+        display: inline-flex;
+        width: 1.1em;
+        letter-spacing: 0.02em;
+      }
+      #${ROOT_ID} .btn-start .run-dots i {
+        font-style: normal;
+        opacity: 0;
+        animation: atlas-run-dot 1.2s infinite;
+      }
+      #${ROOT_ID} .btn-start .run-dots i:nth-child(1) { animation-delay: 0s; }
+      #${ROOT_ID} .btn-start .run-dots i:nth-child(2) { animation-delay: 0.2s; }
+      #${ROOT_ID} .btn-start .run-dots i:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes atlas-runner-cycle {
+        0% { transform: translateX(0) translateY(0) rotate(-8deg); }
+        50% { transform: translateX(1.5px) translateY(-1.5px) rotate(8deg); }
+        100% { transform: translateX(0) translateY(0) rotate(-8deg); }
+      }
+      @keyframes atlas-run-dot {
+        0%, 20% { opacity: 0; }
+        40%, 100% { opacity: 1; }
+      }
+      #${ROOT_ID} .btn-pause {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fcd34d !important;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-grid;
+        place-items: center;
+        font-size: 13px;
+        line-height: 1;
+      }
       #${ROOT_ID} .btn-stop {
-        background: transparent;
-        color: var(--atlas-muted);
-        border: 1px solid var(--atlas-line) !important;
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5 !important;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-grid;
+        place-items: center;
+        font-size: 14px;
+        line-height: 1;
+      }
+      #${ROOT_ID} .btn-icon {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        display: inline-grid;
+        place-items: center;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe !important;
+        border-radius: 9px;
+        font-size: 15px;
+        line-height: 1;
+        transition: color .15s ease, border-color .15s ease, background .15s ease;
+      }
+      #${ROOT_ID} .btn-icon:hover {
+        color: #1e3a8a;
+        border-color: #93c5fd !important;
+        background: #dbeafe;
       }
       #${ROOT_ID} .atlas-stats {
         display: grid;
@@ -209,8 +325,8 @@ export function mountCopilotPanel() {
         padding: 0 12px 10px;
       }
       #${ROOT_ID} .stat {
-        background: rgba(255,255,255,.035);
-        border: 1px solid rgba(255,255,255,.05);
+        background: #f4f4f5;
+        border: 1px solid #e4e4e7;
         border-radius: 10px;
         padding: 8px 8px 7px;
         text-align: center;
@@ -232,8 +348,8 @@ export function mountCopilotPanel() {
         text-transform: uppercase;
         color: var(--atlas-muted);
       }
-      #${ROOT_ID} .stat--applied .stat-n { color: #e5e5e5; }
-      #${ROOT_ID} .stat--skipped .stat-n { color: #d4d4d4; }
+      #${ROOT_ID} .stat--applied .stat-n { color: var(--atlas-success); }
+      #${ROOT_ID} .stat--skipped .stat-n { color: var(--atlas-skip); }
       #${ROOT_ID} .atlas-meta {
         display: flex;
         justify-content: space-between;
@@ -300,7 +416,7 @@ export function mountCopilotPanel() {
         gap: 4px;
         max-height: 210px;
         scrollbar-width: thin;
-        scrollbar-color: #525252 transparent;
+        scrollbar-color: #d4d4d8 transparent;
       }
       #${ROOT_ID} .job-row {
         display: grid;
@@ -309,14 +425,15 @@ export function mountCopilotPanel() {
         align-items: center;
         padding: 8px 9px;
         border-radius: 10px;
-        background: rgba(255,255,255,.03);
-        border: 1px solid transparent;
+        background: #fafafa;
+        border: 1px solid #ececef;
         font-size: 12px;
         line-height: 1.3;
         transition: background .15s ease, border-color .15s ease;
       }
       #${ROOT_ID} .job-row:hover {
-        background: rgba(255,255,255,.05);
+        background: #f4f4f5;
+        border-color: #e4e4e7;
       }
       #${ROOT_ID} .job-row.applying {
         background: var(--atlas-dim);
@@ -347,11 +464,11 @@ export function mountCopilotPanel() {
         background: var(--atlas-elevated);
         color: var(--atlas-muted);
       }
-      #${ROOT_ID} .job-badge.pending { background: var(--atlas-elevated); color: var(--atlas-muted); }
-      #${ROOT_ID} .job-badge.applied { background: rgba(255,255,255,.14); color: #f5f5f5; }
+      #${ROOT_ID} .job-badge.pending { background: rgba(37,99,235,.12); color: #1d4ed8; }
+      #${ROOT_ID} .job-badge.applied { background: rgba(22,163,74,.14); color: var(--atlas-success); }
       #${ROOT_ID} .job-badge.skipped,
-      #${ROOT_ID} .job-badge.already_applied { background: rgba(255,255,255,.08); color: #d4d4d4; }
-      #${ROOT_ID} .job-badge.applying { background: rgba(255,255,255,.18); color: #fafafa; }
+      #${ROOT_ID} .job-badge.already_applied { background: rgba(202,138,4,.16); color: var(--atlas-skip); }
+      #${ROOT_ID} .job-badge.applying { background: rgba(37,99,235,.12); color: #1d4ed8; }
       #${ROOT_ID} .atlas-log-wrap {
         border-top: 1px solid var(--atlas-line);
         min-height: 0;
@@ -365,7 +482,7 @@ export function mountCopilotPanel() {
         gap: 3px;
         max-height: 120px;
         scrollbar-width: thin;
-        scrollbar-color: #525252 transparent;
+        scrollbar-color: #d4d4d8 transparent;
       }
       #${ROOT_ID} .log-row {
         display: grid;
@@ -375,13 +492,13 @@ export function mountCopilotPanel() {
         line-height: 1.35;
         padding: 5px 8px;
         border-radius: 8px;
-        color: #d4d4d4;
+        color: #18181b;
       }
-      #${ROOT_ID} .log-row.success { color: #fafafa; font-weight: 600; }
-      #${ROOT_ID} .log-row.warn { color: #d4d4d4; }
-      #${ROOT_ID} .log-row.error { color: #a3a3a3; }
+      #${ROOT_ID} .log-row.success { color: var(--atlas-success); font-weight: 600; }
+      #${ROOT_ID} .log-row.warn { color: var(--atlas-warn); }
+      #${ROOT_ID} .log-row.error { color: var(--atlas-danger); }
       #${ROOT_ID} .log-time {
-        color: #737373;
+        color: #18181b;
         font-variant-numeric: tabular-nums;
         font-size: 10px;
         padding-top: 1px;
@@ -421,8 +538,8 @@ export function mountCopilotPanel() {
         max-height: none;
         grid-template-rows: auto;
         animation: none;
+        border-radius: 18px;
       }
-      #${ROOT_ID}.collapsed .atlas-head { padding: 8px 10px; }
       #${ROOT_ID}.collapsed .atlas-actions-run,
       #${ROOT_ID}.collapsed .atlas-brand-copy,
       #${ROOT_ID}.collapsed .atlas-stats,
@@ -431,10 +548,35 @@ export function mountCopilotPanel() {
       #${ROOT_ID}.collapsed .atlas-section,
       #${ROOT_ID}.collapsed .atlas-log-wrap,
       #${ROOT_ID}.collapsed .atlas-notice,
-      #${ROOT_ID}.collapsed .atlas-modal { display: none !important; }
+      #${ROOT_ID}.collapsed .atlas-modal,
+      #${ROOT_ID}.collapsed #atlas-minimize { display: none !important; }
       #${ROOT_ID}.collapsed .atlas-head {
-        padding: 8px 12px;
-        gap: 8px;
+        padding: 14px 16px;
+        gap: 0;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+      }
+      #${ROOT_ID}.collapsed .atlas-head:active {
+        cursor: grabbing;
+      }
+      #${ROOT_ID}.collapsed .atlas-actions {
+        display: none !important;
+      }
+      #${ROOT_ID}.collapsed .atlas-brand {
+        pointer-events: none;
+      }
+      #${ROOT_ID}.collapsed .atlas-brand .atlas-cosmos-logo {
+        color: #18181b;
+        width: 36px;
+        height: 36px;
+        transition: transform 0.2s ease;
+      }
+      #${ROOT_ID}.collapsed .atlas-head:hover .atlas-cosmos-logo {
+        animation: atlas-logo-hover 1s ease-in-out infinite;
+      }
+      #${ROOT_ID}.collapsed.is-dragging .atlas-head {
+        cursor: grabbing;
       }
       #${ROOT_ID} .atlas-modal {
         display: none;
@@ -455,7 +597,7 @@ export function mountCopilotPanel() {
         border: 1px solid var(--atlas-line);
         border-radius: 14px;
         padding: 14px;
-        box-shadow: 0 16px 40px rgba(0,0,0,.45);
+        box-shadow: 0 16px 40px rgba(24,24,27,.16);
         display: grid;
         gap: 10px;
         pointer-events: auto;
@@ -509,8 +651,8 @@ export function mountCopilotPanel() {
         color: var(--atlas-text);
         border: 1px solid var(--atlas-line);
         box-shadow:
-          0 16px 36px rgba(0,0,0,.5),
-          0 0 0 1px rgba(255,255,255,.04) inset;
+          0 16px 36px rgba(24,24,27,.16),
+          0 0 0 1px rgba(24,24,27,.04);
         animation: atlas-toast-in .28s ease-out;
       }
       #${ROOT_ID} .atlas-toast.is-out {
@@ -529,8 +671,8 @@ export function mountCopilotPanel() {
         border-radius: 50%;
         display: grid;
         place-items: center;
-        background: rgba(255,255,255,.1);
-        color: var(--atlas-text);
+        background: rgba(22,163,74,.12);
+        color: var(--atlas-success);
         font-size: 14px;
         font-weight: 800;
         line-height: 1;
@@ -570,7 +712,7 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} .atlas-toast-close:hover {
         color: var(--atlas-text);
-        background: rgba(255,255,255,.06);
+        background: rgba(24,24,27,.06);
       }
       #${ROOT_ID}.collapsed .atlas-toast-host { display: grid !important; }
     </style>
@@ -588,8 +730,8 @@ export function mountCopilotPanel() {
         <div class="atlas-actions">
           <div class="atlas-actions-run">
             <button type="button" class="btn-start" id="atlas-start">Start</button>
-            <button type="button" class="btn-pause" id="atlas-pause">Pause</button>
-            <button type="button" class="btn-stop" id="atlas-stop">Stop</button>
+            <button type="button" class="btn-pause" id="atlas-pause" title="Pause" aria-label="Pause">⏸</button>
+            <button type="button" class="btn-stop" id="atlas-stop" title="Stop" aria-label="Stop">■</button>
           </div>
           <button
             type="button"
@@ -688,6 +830,123 @@ export function mountCopilotPanel() {
   const RESUME_AFTER_LOGIN_KEY = 'atlas_resume_after_login';
   const RETURN_URL_KEY = 'atlas_return_after_login';
   const COLLAPSED_KEY = 'atlas_copilot_collapsed';
+  const DOCK_POS_KEY = 'atlas_copilot_dock_pos';
+  const dockEl = root.querySelector('.atlas-dock') as HTMLElement;
+  const headEl = root.querySelector('.atlas-head') as HTMLElement;
+
+  function clampDockPosition(left: number, top: number) {
+    const width = dockEl.offsetWidth || 64;
+    const height = dockEl.offsetHeight || 64;
+    const maxLeft = Math.max(8, window.innerWidth - width - 8);
+    const maxTop = Math.max(8, window.innerHeight - height - 8);
+    return {
+      left: Math.min(Math.max(8, left), maxLeft),
+      top: Math.min(Math.max(8, top), maxTop),
+    };
+  }
+
+  function applyDockPosition(left: number, top: number) {
+    const next = clampDockPosition(left, top);
+    dockEl.style.left = `${next.left}px`;
+    dockEl.style.top = `${next.top}px`;
+    dockEl.style.right = 'auto';
+    dockEl.style.bottom = 'auto';
+    return next;
+  }
+
+  function saveDockPosition(left: number, top: number) {
+    try {
+      sessionStorage.setItem(
+        DOCK_POS_KEY,
+        JSON.stringify({ left, top })
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function restoreDockPosition() {
+    try {
+      const raw = sessionStorage.getItem(DOCK_POS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { left?: number; top?: number };
+      if (typeof parsed.left === 'number' && typeof parsed.top === 'number') {
+        applyDockPosition(parsed.left, parsed.top);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  restoreDockPosition();
+  window.addEventListener('resize', () => {
+    const left = parseFloat(dockEl.style.left || '');
+    const top = parseFloat(dockEl.style.top || '');
+    if (Number.isFinite(left) && Number.isFinite(top)) {
+      applyDockPosition(left, top);
+    }
+  });
+
+  let dragMoved = false;
+  let dragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let dragStartX = 0;
+  let dragStartY = 0;
+
+  function beginDockDrag(event: PointerEvent, captureEl: HTMLElement) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('button, input, a, label')) {
+      return;
+    }
+    dragging = true;
+    dragMoved = false;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    const rect = dockEl.getBoundingClientRect();
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    root.classList.add('is-dragging');
+    captureEl.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  headEl.addEventListener('pointerdown', (event) => {
+    // Collapsed: drag from anywhere on the head. Expanded: drag from brand only
+    // so Start / Pause / Stop / minimize stay clickable.
+    if (root.classList.contains('collapsed')) {
+      beginDockDrag(event, headEl);
+      return;
+    }
+    if (!(event.target as HTMLElement).closest('.atlas-brand')) return;
+    beginDockDrag(event, headEl);
+  });
+
+  headEl.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved = true;
+    const next = applyDockPosition(
+      event.clientX - dragOffsetX,
+      event.clientY - dragOffsetY
+    );
+    saveDockPosition(next.left, next.top);
+  });
+
+  function endDrag(event: PointerEvent) {
+    if (!dragging) return;
+    dragging = false;
+    root.classList.remove('is-dragging');
+    try {
+      headEl.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  headEl.addEventListener('pointerup', endDrag);
+  headEl.addEventListener('pointercancel', endDrag);
   let lastFlashedAlertAt = '';
   let lastToastId = '';
   let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -728,17 +987,29 @@ export function mountCopilotPanel() {
 
   function setCollapsed(collapsed: boolean) {
     root.classList.toggle('collapsed', collapsed);
-    minimizeBtn.textContent = collapsed ? '▢' : '−';
-    minimizeBtn.title = collapsed ? 'Expand' : 'Minimize';
-    minimizeBtn.setAttribute(
-      'aria-label',
-      collapsed ? 'Expand co-pilot' : 'Minimize co-pilot'
+    minimizeBtn.textContent = '−';
+    minimizeBtn.title = 'Minimize';
+    minimizeBtn.setAttribute('aria-label', 'Minimize co-pilot');
+    headEl.setAttribute(
+      'title',
+      collapsed
+        ? 'Drag to move · Click to open Cosmo Co-Pilot'
+        : 'Drag the Cosmo logo/title to move'
     );
     try {
       sessionStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
     } catch {
       /* ignore */
     }
+    // Keep the panel on-screen after size changes (collapsed ↔ expanded).
+    requestAnimationFrame(() => {
+      const left = parseFloat(dockEl.style.left || '');
+      const top = parseFloat(dockEl.style.top || '');
+      if (Number.isFinite(left) && Number.isFinite(top)) {
+        const next = applyDockPosition(left, top);
+        saveDockPosition(next.left, next.top);
+      }
+    });
   }
 
   try {
@@ -779,7 +1050,7 @@ export function mountCopilotPanel() {
           <div class="job-title">${escapeHtml(j.title)}</div>
           <div class="job-company">${escapeHtml(j.company)}</div>
         </div>
-        <span class="job-badge ${j.status}">${statusLabel(j.status)}</span>
+        <span class="job-badge ${j.status}">${statusLabel(j.status, j.skipReason)}</span>
       </div>`
       )
       .join('');
@@ -813,9 +1084,31 @@ export function mountCopilotPanel() {
     }
 
     bgToggle.checked = Boolean(state.runInBackground);
-    startBtn.textContent = state.running ? 'Running' : 'Start';
+    const isActivelyRunning = Boolean(state.running && !state.paused);
+    startBtn.classList.toggle('is-running', isActivelyRunning);
+    if (isActivelyRunning) {
+      startBtn.innerHTML = `
+        <span class="run-anim" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="14" cy="4" r="2.2"/>
+            <path d="M10.2 8.2c.7-.9 1.8-1.4 3-1.4h1.1l2.4 3.2c.3.4.2 1-.2 1.3l-2.1 1.5v2.8l3.4 4.2c.3.4.3 1-.2 1.3-.4.3-1 .3-1.3-.2L12.4 16l-2.2 1.7-1.6 4.1c-.2.5-.7.7-1.2.5-.5-.2-.7-.7-.5-1.2l1.8-4.5 2.1-1.6V12L8.8 10.4 6.9 13c-.3.5-.9.6-1.4.3-.5-.3-.6-.9-.3-1.4l2.4-3.5c.4-.6 1-.9 1.6-1.2z"/>
+          </svg>
+        </span>
+        <span class="run-label">Running<span class="run-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></span>
+      `;
+    } else {
+      startBtn.textContent = state.running ? 'Running' : 'Start';
+    }
     startBtn.disabled = state.running && !state.paused;
-    pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+    if (state.paused) {
+      pauseBtn.textContent = '▶';
+      pauseBtn.title = 'Resume';
+      pauseBtn.setAttribute('aria-label', 'Resume');
+    } else {
+      pauseBtn.textContent = '⏸';
+      pauseBtn.title = 'Pause';
+      pauseBtn.setAttribute('aria-label', 'Pause');
+    }
     pauseBtn.disabled = !state.running;
     stopBtn.disabled = !state.running;
 
@@ -828,15 +1121,15 @@ export function mountCopilotPanel() {
     const alert = state.alert;
     const waitingOnLogin =
       state.needsLogin ||
-      alert?.kind === 'login' ||
       (state.paused &&
-        /log into naukri|not logged into naukri|naukri login|login to continue/i.test(
-          state.lastMessage || logs[0]?.message || ''
-        ));
+        (alert?.kind === 'login' ||
+          /log into naukri|not logged into naukri|naukri login|login to continue/i.test(
+            state.lastMessage || logs[0]?.message || ''
+          )));
     const waitingOnQuestions =
-      alert?.kind === 'questions' ||
-      (state.paused &&
-        !waitingOnLogin &&
+      state.paused &&
+      !waitingOnLogin &&
+      (alert?.kind === 'questions' ||
         /question/i.test(state.lastMessage || logs[0]?.message || ''));
     const planLimit =
       alert?.kind === 'plan_limit' ||
@@ -846,7 +1139,14 @@ export function mountCopilotPanel() {
 
     showLoginModal(Boolean(waitingOnLogin));
 
-    if (alert?.message || waitingOnLogin || waitingOnQuestions || planLimit) {
+    const showNotice =
+      waitingOnLogin ||
+      waitingOnQuestions ||
+      planLimit ||
+      (Boolean(alert?.message) &&
+        (state.paused || alert?.kind === 'plan_limit' || alert?.level === 'error'));
+
+    if (showNotice) {
       noticeEl.classList.add('show', 'is-alert');
       noticeEl.textContent =
         alert?.message ||
@@ -956,7 +1256,17 @@ export function mountCopilotPanel() {
   });
 
   minimizeBtn.addEventListener('click', () => {
-    setCollapsed(!root.classList.contains('collapsed'));
+    setCollapsed(true);
+  });
+
+  root.querySelector('.atlas-head')?.addEventListener('click', (event) => {
+    if (!root.classList.contains('collapsed')) return;
+    if ((event.target as HTMLElement).closest('button')) return;
+    if (dragMoved) {
+      dragMoved = false;
+      return;
+    }
+    setCollapsed(false);
   });
 
   openLoginBtn.addEventListener('click', () => {
@@ -995,6 +1305,10 @@ export function mountCopilotPanel() {
     if (changes[LOG_KEY] || changes[STATE_KEY]) {
       void refresh();
     }
+  });
+
+  window.addEventListener('pageshow', () => {
+    void refresh();
   });
 
   chrome.runtime.onMessage.addListener((message) => {
