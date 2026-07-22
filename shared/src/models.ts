@@ -72,7 +72,6 @@ export const jobPreferencesSchema = z.object({
   workMode: workModeSchema.default('any'),
   autoScanEnabled: z.boolean().default(true),
   autoApplyEnabled: z.boolean().default(false),
-  dailyApplyLimit: z.number().int().min(1).max(100).default(10),
 });
 
 export type JobPreferences = z.infer<typeof jobPreferencesSchema>;
@@ -90,7 +89,6 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   workMode: 'any',
   autoScanEnabled: true,
   autoApplyEnabled: false,
-  dailyApplyLimit: 10,
 };
 
 export function preferencesAreComplete(prefs: JobPreferences | null | undefined): boolean {

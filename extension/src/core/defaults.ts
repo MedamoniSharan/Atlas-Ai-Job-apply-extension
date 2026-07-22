@@ -10,5 +10,4 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   workMode: 'any',
   autoScanEnabled: true,
   autoApplyEnabled: false,
-  dailyApplyLimit: 10,
 };

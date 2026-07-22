@@ -196,3 +196,16 @@ export async function healthCheck(): Promise<boolean> {
     return false;
   }
 }
+
+export async function fetchBillingMe(): Promise<
+  ApiResponse<{
+    plan: 'free' | 'pro' | 'max';
+    planExpiresAt: string | null;
+    appliesUsed: number;
+    appliesLimit: number;
+    periodStart: string;
+    periodEnd: string;
+  }>
+> {
+  return request('/api/v1/billing/me');
+}

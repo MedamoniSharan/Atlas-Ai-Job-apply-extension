@@ -61,11 +61,44 @@ async function sendExtensionConnected(): Promise<void> {
   });
 }
 
+/** Dashboard origins that host webBridge.js (auth sync). */
+const DASHBOARD_TAB_URLS = [
+  'http://localhost:5173/*',
+  'http://127.0.0.1:5173/*',
+];
+
+/**
+ * After install/update, content scripts are not injected into already-open tabs.
+ * Reload Cosmo tabs so webBridge can push the existing dashboard session.
+ */
+async function reloadOpenDashboardTabs(): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({ url: DASHBOARD_TAB_URLS });
+    await Promise.all(
+      tabs.map(async (tab) => {
+        if (tab.id == null) return;
+        try {
+          await chrome.tabs.reload(tab.id);
+        } catch (error) {
+          logger.warn('Failed to reload dashboard tab for auth sync', {
+            tabId: tab.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      })
+    );
+  } catch (error) {
+    logger.warn('Could not query dashboard tabs for auth sync', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   logger.info('Extension installed');
   chrome.alarms.create('sync-flush', { periodInMinutes: 1 });
   chrome.alarms.create('health-ping', { periodInMinutes: 5 });
-  void sendExtensionConnected();
+  void reloadOpenDashboardTabs().then(() => sendExtensionConnected());
 });
 
 chrome.runtime.onStartup.addListener(() => {

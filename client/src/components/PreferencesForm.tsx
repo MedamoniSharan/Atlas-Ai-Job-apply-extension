@@ -262,21 +262,6 @@ export function PreferencesForm({
           />
           Auto-apply Easy Apply jobs (requires Naukri login)
         </label>
-        <label>
-          Daily apply limit
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={prefs.dailyApplyLimit}
-            onChange={(e) =>
-              setPrefs((p) => ({
-                ...p,
-                dailyApplyLimit: Number(e.target.value),
-              }))
-            }
-          />
-        </label>
       </div>
 
       {error && <p className="error">{error}</p>}

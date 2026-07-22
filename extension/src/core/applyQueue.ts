@@ -1,10 +1,8 @@
 import type { JobPayload } from '@atlas/shared';
 import {
   ApplyQueueItem,
-  getApplyDayStats,
   getApplyQueue,
   getCachedPreferences,
-  setApplyDayStats,
   setApplyQueue,
 } from './storageManager';
 import { lookupAppliedJobs } from './apiClient';
@@ -16,6 +14,7 @@ import {
   setCopilotState,
 } from './copilotState';
 import { mergeJobFields } from './jobFields';
+import { getPlanApplyQuota, noteLocalApply } from './planApplyQuota';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,9 +67,15 @@ let processing = false;
 export async function enqueueApplyJobs(
   items: ApplyQueueItem[]
 ): Promise<number> {
-  const prefs = await getCachedPreferences();
-  const stats = await getApplyDayStats();
-  const remaining = Math.max(0, prefs.dailyApplyLimit - stats.count);
+  let remaining = 0;
+  try {
+    remaining = (await getPlanApplyQuota()).remaining;
+  } catch (error) {
+    logger.warn('Could not load plan apply quota', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return 0;
+  }
   if (remaining === 0) return 0;
 
   const queue = await getApplyQueue();
@@ -128,13 +133,27 @@ export async function processApplyQueue(
       return { processed: 0, message: 'Apply queue is empty.' };
     }
 
-    let stats = await getApplyDayStats();
     let processed = 0;
     let activeTabId = tabId;
 
     while (queue.length > 0) {
-      stats = await getApplyDayStats();
-      if (stats.count >= prefs.dailyApplyLimit) {
+      let quota;
+      try {
+        quota = await getPlanApplyQuota();
+      } catch (error) {
+        await appendCopilotLog(
+          `Could not verify plan apply limit: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          'warn'
+        );
+        break;
+      }
+      if (quota.remaining <= 0) {
+        await appendCopilotLog(
+          `Plan apply limit reached (${quota.used}/${quota.limit} this month). Upgrade in Atlas to continue.`,
+          'warn'
+        );
         break;
       }
 
@@ -248,11 +267,7 @@ export async function processApplyQueue(
               appliedAt: new Date().toISOString(),
               metadata: { source: 'auto_apply' },
             });
-            stats = {
-              date: stats.date,
-              count: stats.count + 1,
-            };
-            await setApplyDayStats(stats);
+            noteLocalApply();
             processed += 1;
             await raiseCopilotToast(
               'Job applied successfully',

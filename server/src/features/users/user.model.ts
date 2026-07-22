@@ -33,7 +33,6 @@ const preferencesSchema = new Schema(
     },
     autoScanEnabled: { type: Boolean, default: true },
     autoApplyEnabled: { type: Boolean, default: false },
-    dailyApplyLimit: { type: Number, default: 10 },
   },
   { _id: false }
 );

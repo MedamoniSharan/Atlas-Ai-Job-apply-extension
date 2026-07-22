@@ -1,7 +1,7 @@
 export type CopilotLogLevel = 'info' | 'success' | 'warn' | 'error';
 
 export type CopilotAlertKind =
-  | 'daily_limit'
+  | 'plan_limit'
   | 'login'
   | 'questions'
   | 'error'
@@ -171,7 +171,7 @@ export async function appendCopilotLog(
 
 function classifyAlert(message: string): CopilotAlertKind | null {
   const m = message.toLowerCase();
-  if (/daily apply limit/.test(m)) return 'daily_limit';
+  if (/plan apply limit|monthly apply limit/.test(m)) return 'plan_limit';
   if (/log into naukri|not logged into naukri|naukri login/.test(m)) {
     return 'login';
   }
@@ -194,7 +194,7 @@ async function syncActionBadge(alert: CopilotAlert | null | undefined) {
       return;
     }
     const text =
-      alert.kind === 'daily_limit'
+      alert.kind === 'plan_limit'
         ? 'MAX'
         : alert.kind === 'login'
           ? 'IN'

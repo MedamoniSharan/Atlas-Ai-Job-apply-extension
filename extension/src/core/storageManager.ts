@@ -35,11 +35,6 @@ export type ApplyQueueItem = {
   aboutCompany?: string;
 };
 
-export type ApplyDayStats = {
-  date: string;
-  count: number;
-};
-
 const KEYS = {
   accessToken: 'accessToken',
   refreshToken: 'refreshToken',
@@ -47,7 +42,6 @@ const KEYS = {
   queue: 'eventQueue',
   preferences: 'preferences',
   applyQueue: 'applyQueue',
-  applyDayStats: 'applyDayStats',
 } as const;
 
 export async function getAuthState(): Promise<AuthState> {
@@ -97,20 +91,6 @@ export async function getApplyQueue(): Promise<ApplyQueueItem[]> {
 
 export async function setApplyQueue(items: ApplyQueueItem[]): Promise<void> {
   await chrome.storage.local.set({ [KEYS.applyQueue]: items });
-}
-
-export async function getApplyDayStats(): Promise<ApplyDayStats> {
-  const today = new Date().toISOString().slice(0, 10);
-  const data = await chrome.storage.local.get(KEYS.applyDayStats);
-  const stats = data[KEYS.applyDayStats] as ApplyDayStats | undefined;
-  if (!stats || stats.date !== today) {
-    return { date: today, count: 0 };
-  }
-  return stats;
-}
-
-export async function setApplyDayStats(stats: ApplyDayStats): Promise<void> {
-  await chrome.storage.local.set({ [KEYS.applyDayStats]: stats });
 }
 
 export { KEYS, DEFAULT_API };

@@ -838,13 +838,15 @@ export function mountCopilotPanel() {
       (state.paused &&
         !waitingOnLogin &&
         /question/i.test(state.lastMessage || logs[0]?.message || ''));
-    const dailyLimit =
-      alert?.kind === 'daily_limit' ||
-      /daily apply limit/i.test(alert?.message || state.lastMessage || '');
+    const planLimit =
+      alert?.kind === 'plan_limit' ||
+      /plan apply limit|monthly apply limit/i.test(
+        alert?.message || state.lastMessage || ''
+      );
 
     showLoginModal(Boolean(waitingOnLogin));
 
-    if (alert?.message || waitingOnLogin || waitingOnQuestions || dailyLimit) {
+    if (alert?.message || waitingOnLogin || waitingOnQuestions || planLimit) {
       noticeEl.classList.add('show', 'is-alert');
       noticeEl.textContent =
         alert?.message ||

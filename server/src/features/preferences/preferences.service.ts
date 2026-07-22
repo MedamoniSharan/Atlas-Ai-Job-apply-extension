@@ -20,7 +20,6 @@ function normalizePreferences(
     workMode: raw?.workMode ?? 'any',
     autoScanEnabled: raw?.autoScanEnabled ?? true,
     autoApplyEnabled: raw?.autoApplyEnabled ?? false,
-    dailyApplyLimit: raw?.dailyApplyLimit ?? 10,
   };
 }
 

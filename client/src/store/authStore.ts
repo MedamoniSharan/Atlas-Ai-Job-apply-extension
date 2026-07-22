@@ -33,6 +33,16 @@ export const useAuthStore = create<AuthState>()(
         clearAuthFromExtension();
       },
     }),
-    { name: 'atlas-auth' }
+    {
+      name: 'atlas-auth',
+      onRehydrateStorage: () => (state) => {
+        if (state?.accessToken && state?.refreshToken) {
+          syncAuthToExtension({
+            accessToken: state.accessToken,
+            refreshToken: state.refreshToken,
+          });
+        }
+      },
+    }
   )
 );

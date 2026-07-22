@@ -19,8 +19,8 @@ const alertDismissBtn = document.getElementById('copilot-alert-dismiss')!;
 
 function alertTitle(alert: CopilotAlert): string {
   switch (alert.kind) {
-    case 'daily_limit':
-      return 'Daily apply limit reached';
+    case 'plan_limit':
+      return 'Plan apply limit reached';
     case 'login':
       return 'Naukri login needed';
     case 'questions':
@@ -82,8 +82,6 @@ function fillPrefsForm(prefs: JobPreferences) {
     prefs.autoScanEnabled;
   (document.getElementById('pref-auto-apply') as HTMLInputElement).checked =
     prefs.autoApplyEnabled;
-  (document.getElementById('pref-daily-limit') as HTMLInputElement).value =
-    String(prefs.dailyApplyLimit);
 }
 
 function readPrefsForm(): JobPreferences {
@@ -115,9 +113,6 @@ function readPrefsForm(): JobPreferences {
     autoApplyEnabled: (
       document.getElementById('pref-auto-apply') as HTMLInputElement
     ).checked,
-    dailyApplyLimit: Number(
-      (document.getElementById('pref-daily-limit') as HTMLInputElement).value
-    ),
   };
 }
 

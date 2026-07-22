@@ -17,6 +17,7 @@ import {
   upsertScannedJobs,
 } from './copilotState';
 import { mergeJobFields } from './jobFields';
+import { getPlanApplyQuota, noteLocalApply } from './planApplyQuota';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -212,7 +213,7 @@ async function markApplied(
     appliedAt: new Date().toISOString(),
     metadata: { source: 'auto_apply' },
   });
-  await incrementAppliedToday();
+  await noteLocalApply();
   await updateScannedJob(id, { status: 'applied' });
   const st = await getCopilotState();
   await setCopilotState({ applied: st.applied + 1 });
@@ -331,11 +332,11 @@ async function applyOneJob(
     return 'continue';
   }
 
-  const dayOk = await canApplyToday(prefs.dailyApplyLimit);
-  if (!dayOk) {
+  const quota = await getPlanApplyQuota();
+  if (quota.remaining <= 0) {
     await updateScannedJob(id, { status: 'pending' });
     await appendCopilotLog(
-      `Daily apply limit reached (${prefs.dailyApplyLimit}/day). Raise the limit in Atlas or try again tomorrow.`,
+      `Plan apply limit reached (${quota.used}/${quota.limit} this month). Upgrade in Atlas to continue.`,
       'warn'
     );
     await goBackToList(tabId, searchUrl, stealth);
@@ -711,18 +712,4 @@ export async function runBot(handlers: BotHandlers): Promise<{
   } finally {
     botRunning = false;
   }
-}
-
-async function canApplyToday(limit: number): Promise<boolean> {
-  const { getApplyDayStats } = await import('./storageManager');
-  const stats = await getApplyDayStats();
-  return stats.count < limit;
-}
-
-async function incrementAppliedToday(): Promise<void> {
-  const { getApplyDayStats, setApplyDayStats } = await import(
-    './storageManager'
-  );
-  const stats = await getApplyDayStats();
-  await setApplyDayStats({ date: stats.date, count: stats.count + 1 });
 }
