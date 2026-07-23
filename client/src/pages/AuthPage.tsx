@@ -80,7 +80,7 @@ function AuthPromoPanel() {
       <div className="auth-promo__content">
         <header className="auth-promo__brand-row">
           <Link to="/" className="auth-brand" aria-label="Cosmo home">
-            <CosmosMark logoSize={28} />
+            <CosmosMark logoSize={44} />
           </Link>
         </header>
 
@@ -176,7 +176,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
         <section className="auth-form-panel" aria-labelledby="auth-form-title">
           <div className="auth-form-panel__mobile-brand" aria-label="Cosmo home">
             <Link to="/" className="auth-brand">
-              <CosmosMark logoSize={24} />
+              <CosmosMark logoSize={36} />
             </Link>
           </div>
 

@@ -1620,10 +1620,14 @@ a.tracker-card__title:hover {
   color: var(--color-surface-raised);
 }
 
+.auth-brand .cosmos-mark {
+  gap: 12px;
+}
+
 .auth-brand .cosmos-mark__word {
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--color-surface-raised);
 }
 
@@ -2648,9 +2652,9 @@ a.tracker-card__title:hover {
 }
 
 .auth-brand .cosmos-mark__word {
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--color-surface-raised);
 }
 
@@ -4003,9 +4007,15 @@ a.tracker-card__title:hover {
   color: var(--ssb-face-fg);
 }
 
+.success-stories-button--plain {
+  width: auto;
+  align-self: center;
+}
+
 .success-stories-button--plain .success-stories-button__face {
+  width: auto;
   min-height: 40px;
-  padding: 8px 16px;
+  padding: 8px 18px;
   column-gap: 0;
   font-size: 13px;
   font-weight: 600;
@@ -4013,13 +4023,15 @@ a.tracker-card__title:hover {
 }
 
 .success-stories-button--plain:hover:not(:disabled) .success-stories-button__face {
-  padding: 8px 16px;
+  padding: 8px 18px;
   column-gap: 0;
 }
 
 .success-stories-button--plain .success-stories-button__busy {
+  width: auto;
+  min-width: 7.5rem;
   min-height: 40px;
-  padding: 8px 16px;
+  padding: 8px 18px;
 }
 
 .success-stories-button--plain:hover:not(:disabled) .success-stories-button__label {
