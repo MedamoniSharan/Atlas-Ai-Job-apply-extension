@@ -1,10 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Briefcase,
-  CalendarDays,
-  Target,
-} from 'lucide-react';
+import { Target } from 'lucide-react';
 import { fetchApplications, fetchBillingMe } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
@@ -14,8 +10,10 @@ import {
   CongratulationsBadgeCard,
   GrowthRadialCard,
   JobsExtensionStatsCard,
+  JobsStudyLottie,
   ProfileReportCard,
   SalesStatsCard,
+  SubscriptionCelebrate,
   type StatsRow,
 } from '../components/dashboard';
 import { useAuthStore } from '../store/authStore';
@@ -167,6 +165,41 @@ export function DashboardPage() {
     : planKey === 'free'
       ? 'No plan'
       : '—';
+
+  const daysLeft = (() => {
+    if (!subEnd || planKey === 'free') return null;
+    const end = new Date(subEnd);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    return Math.ceil((end.getTime() - startOfToday.getTime()) / 86_400_000);
+  })();
+
+  const daysLeftLabel =
+    daysLeft == null
+      ? null
+      : daysLeft < 0
+        ? 'Expired'
+        : daysLeft === 0
+          ? 'Ends today'
+          : daysLeft === 1
+            ? '1 day left'
+            : `${daysLeft} days left`;
+
+  const subscriptionMeta = (() => {
+    if (planKey === 'free') return 'Upgrade anytime';
+    const sub = billing?.subscription;
+    if (billing?.subscription?.cancelAtPeriodEnd) return 'Ends on this date';
+    // Only Razorpay recurring subscriptions auto-renew.
+    if (
+      sub?.source === 'razorpay' &&
+      sub.razorpaySubscriptionId &&
+      !sub.cancelAtPeriodEnd
+    ) {
+      return 'Renews automatically';
+    }
+    return subEnd ? 'Active until this date' : 'Active plan';
+  })();
 
   const matchRate =
     jobsCount > 0 ? Math.min(100, Math.round((matchedCount / jobsCount) * 100)) : 0;
@@ -330,16 +363,16 @@ export function DashboardPage() {
         </div>
 
         <aside className="dash-board__side" aria-label="Key metrics">
-          <article className="dash-stat-card">
-            <span className="dash-stat-card__icon" aria-hidden>
-              <Briefcase size={18} strokeWidth={2} />
-            </span>
-            <span className="dash-stat-card__label">Jobs</span>
-            <strong className="dash-stat-card__value">{jobsCount}</strong>
-            <em className="dash-stat-card__meta">{matchedCount} matched</em>
+          <article className="dash-stat-card dash-stat-card--jobs">
+            <div className="dash-stat-card__text">
+              <span className="dash-stat-card__label">Jobs</span>
+              <strong className="dash-stat-card__value">{jobsCount}</strong>
+              <em className="dash-stat-card__meta">{matchedCount} matched</em>
+            </div>
+            <JobsStudyLottie />
           </article>
 
-          <article className="dash-stat-card">
+          <article className="dash-stat-card dash-stat-card--applied">
             <span className="dash-stat-card__icon dash-stat-card__icon--naukri" aria-hidden>
               <img src="/naukri-logo.png" alt="" width={22} height={22} />
             </span>
@@ -348,7 +381,7 @@ export function DashboardPage() {
             <em className="dash-stat-card__meta">Auto + tracked</em>
           </article>
 
-          <article className="dash-stat-card">
+          <article className="dash-stat-card dash-stat-card--limit">
             <span className="dash-stat-card__icon" aria-hidden>
               <Target size={18} strokeWidth={2} />
             </span>
@@ -359,21 +392,19 @@ export function DashboardPage() {
             <em className="dash-stat-card__meta">{planLabel} plan</em>
           </article>
 
-          <article className="dash-stat-card">
-            <span className="dash-stat-card__icon" aria-hidden>
-              <CalendarDays size={18} strokeWidth={2} />
-            </span>
-            <span className="dash-stat-card__label">Subscription</span>
-            <strong className="dash-stat-card__value dash-stat-card__value--sm">
-              {subEndLabel}
-            </strong>
-            <em className="dash-stat-card__meta">
-              {billing?.subscription?.cancelAtPeriodEnd
-                ? 'Cancels at period end'
-                : planKey === 'free'
-                  ? 'Upgrade anytime'
-                  : 'Renews automatically'}
-            </em>
+          <article className="dash-stat-card dash-stat-card--subscription">
+            <div className="dash-stat-card__text">
+              <span className="dash-stat-card__label">Subscription</span>
+              <strong className="dash-stat-card__value dash-stat-card__value--sm">
+                {subEndLabel}
+              </strong>
+              <em className="dash-stat-card__meta">
+                {daysLeftLabel
+                  ? `${daysLeftLabel} · ${subscriptionMeta}`
+                  : subscriptionMeta}
+              </em>
+            </div>
+            <SubscriptionCelebrate />
           </article>
 
           <ProfileReportCard matchRate={matchRate} jobsCount={jobsCount} />

@@ -1130,6 +1130,218 @@ textarea {
   color: var(--color-text-secondary);
 }
 
+.dash-stat-card--subscription {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  grid-template-columns: none;
+  grid-template-areas: none;
+  padding: 14px 14px 14px 18px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 0;
+  background:
+    linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 48%, #151515 100%);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dash-stat-card--subscription::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 160' preserveAspectRatio='none'%3E%3Cpath fill='%231f1f1f' d='M0 96c48-28 96-28 144 0s96 28 144 0 96-28 144 0 48 28 48 28V160H0Z'/%3E%3Cpath fill='%232a2a2a' opacity='.85' d='M0 112c56-24 104-18 152 6s100 24 148 0 96-28 140-8c20 10 32 16 40 18V160H0Z'/%3E%3Cpath fill='%23333333' opacity='.55' d='M0 128c60-20 110-10 160 8s98 18 148-4 92-24 132-10c18 6 28 12 40 14V160H0Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: 140% 78%;
+  opacity: 0.95;
+}
+
+.dash-stat-card--subscription::after {
+  content: '';
+  position: absolute;
+  right: -20%;
+  top: -40%;
+  z-index: 0;
+  width: 70%;
+  height: 140%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0) 68%
+  );
+  pointer-events: none;
+}
+
+.dash-stat-card--subscription .dash-stat-card__text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dash-stat-card--subscription .dash-stat-card__label,
+.dash-stat-card--subscription .dash-stat-card__value,
+.dash-stat-card--subscription .dash-stat-card__meta {
+  grid-area: auto;
+}
+
+.dash-stat-card--subscription .dash-stat-card__label {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.dash-stat-card--subscription .dash-stat-card__value {
+  color: #ffffff;
+}
+
+.dash-stat-card--subscription .dash-stat-card__meta {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.dash-stat-card__lottie {
+  position: relative;
+  z-index: 1;
+  width: min(140px, 42%);
+  flex-shrink: 0;
+  margin-right: -6px;
+  pointer-events: none;
+}
+
+.dash-stat-card__lottie > div {
+  width: 100% !important;
+  height: auto !important;
+}
+
+.dash-stat-card--jobs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  grid-template-columns: none;
+  grid-template-areas: none;
+  padding: 16px 12px 16px 18px;
+  overflow: visible;
+  min-height: 0;
+  border-color: #d8ebe2;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(47, 107, 82, 0.2), transparent 42%),
+    radial-gradient(circle at 88% 80%, rgba(143, 191, 168, 0.35), transparent 46%),
+    linear-gradient(145deg, #f3faf6 0%, #e8f5ee 100%);
+  background-size: 160% 160%, 180% 180%, 100% 100%;
+  animation: dash-stat-glow-green 8s ease-in-out infinite;
+}
+
+.dash-stat-card--applied {
+  border-color: #d6e8f6;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(11, 126, 164, 0.22), transparent 42%),
+    radial-gradient(circle at 92% 78%, rgba(126, 200, 220, 0.38), transparent 48%),
+    linear-gradient(145deg, #f2f9fc 0%, #e4f2f8 100%);
+  background-size: 160% 160%, 180% 180%, 100% 100%;
+  animation: dash-stat-glow-blue 9s ease-in-out infinite;
+}
+
+.dash-stat-card--applied .dash-stat-card__icon--naukri {
+  background: #ffffff;
+  border-color: #cfe3f0;
+}
+
+.dash-stat-card--limit {
+  border-color: #f0e0c8;
+  background:
+    radial-gradient(circle at 16% 22%, rgba(224, 138, 43, 0.24), transparent 42%),
+    radial-gradient(circle at 90% 82%, rgba(255, 210, 150, 0.45), transparent 48%),
+    linear-gradient(145deg, #fffaf3 0%, #fff1df 100%);
+  background-size: 160% 160%, 180% 180%, 100% 100%;
+  animation: dash-stat-glow-amber 7.5s ease-in-out infinite;
+}
+
+.dash-stat-card--limit .dash-stat-card__icon {
+  background: rgba(224, 138, 43, 0.14);
+  color: #b86a12;
+}
+
+@keyframes dash-stat-glow-green {
+  0%,
+  100% {
+    background-position: 0% 40%, 100% 60%, 0 0;
+  }
+  50% {
+    background-position: 80% 20%, 20% 90%, 0 0;
+  }
+}
+
+@keyframes dash-stat-glow-blue {
+  0%,
+  100% {
+    background-position: 10% 30%, 90% 70%, 0 0;
+  }
+  50% {
+    background-position: 70% 10%, 30% 95%, 0 0;
+  }
+}
+
+@keyframes dash-stat-glow-amber {
+  0%,
+  100% {
+    background-position: 0% 50%, 100% 50%, 0 0;
+  }
+  50% {
+    background-position: 85% 15%, 15% 85%, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-stat-card--jobs,
+  .dash-stat-card--applied,
+  .dash-stat-card--limit {
+    animation: none;
+    background-size: 100% 100%;
+  }
+}
+
+.dash-stat-card--jobs .dash-stat-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.dash-stat-card--jobs .dash-stat-card__label,
+.dash-stat-card--jobs .dash-stat-card__value,
+.dash-stat-card--jobs .dash-stat-card__meta {
+  grid-area: auto;
+}
+
+.dash-stat-card__lottie--jobs {
+  width: 64px;
+  height: 64px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.dash-stat-card__lottie--jobs > div {
+  width: 64px !important;
+  height: 64px !important;
+  transform: scale(2.6);
+  transform-origin: center right;
+}
+
 /* Match / profile report */
 .dash-report {
   padding: 18px 18px 8px;
