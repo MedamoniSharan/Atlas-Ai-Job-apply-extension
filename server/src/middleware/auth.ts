@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import type { UserRole } from '@atlas/shared';
 import { env } from '../config/env';
 import { AppError } from './errorHandler';
 
 export interface AuthPayload {
   sub: string;
   email: string;
+  role: UserRole;
 }
 
 export interface AuthedRequest extends Request {
@@ -25,11 +27,25 @@ export function signRefreshToken(payload: AuthPayload): string {
 }
 
 export function verifyAccessToken(token: string): AuthPayload {
-  return jwt.verify(token, env.jwtAccessSecret) as AuthPayload;
+  const payload = jwt.verify(token, env.jwtAccessSecret) as AuthPayload & {
+    role?: UserRole;
+  };
+  return {
+    sub: payload.sub,
+    email: payload.email,
+    role: payload.role ?? 'user',
+  };
 }
 
 export function verifyRefreshToken(token: string): AuthPayload {
-  return jwt.verify(token, env.jwtRefreshSecret) as AuthPayload;
+  const payload = jwt.verify(token, env.jwtRefreshSecret) as AuthPayload & {
+    role?: UserRole;
+  };
+  return {
+    sub: payload.sub,
+    email: payload.email,
+    role: payload.role ?? 'user',
+  };
 }
 
 export function requireAuth(
@@ -49,4 +65,18 @@ export function requireAuth(
   } catch {
     next(new AppError('Invalid or expired token', 401, 'TOKEN_INVALID'));
   }
+}
+
+export function requireAdmin(
+  req: AuthedRequest,
+  _res: Response,
+  next: NextFunction
+) {
+  if (!req.user) {
+    return next(new AppError('Unauthorized', 401, 'UNAUTHORIZED'));
+  }
+  if (req.user.role !== 'admin') {
+    return next(new AppError('Forbidden', 403, 'FORBIDDEN'));
+  }
+  next();
 }

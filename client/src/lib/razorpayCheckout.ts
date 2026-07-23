@@ -1,26 +1,25 @@
 import type { PaidPlan } from '@atlas/shared';
 import {
-  createBillingOrder,
+  cancelSubscription,
+  createSubscription,
   downloadInvoice,
   fetchMe,
   previewInvoice,
-  verifyBillingPayment,
+  verifySubscription,
 } from './api';
 import { useAuthStore } from '../store/authStore';
 
 type RazorpaySuccessResponse = {
-  razorpay_order_id: string;
   razorpay_payment_id: string;
+  razorpay_subscription_id: string;
   razorpay_signature: string;
 };
 
 type RazorpayOptions = {
   key: string;
-  amount: number;
-  currency: string;
   name: string;
   description: string;
-  order_id: string;
+  subscription_id: string;
   prefill?: { name?: string; email?: string };
   theme?: { color?: string };
   handler: (response: RazorpaySuccessResponse) => void;
@@ -84,15 +83,15 @@ export async function startPlanCheckout(
     throw new Error('Razorpay Checkout failed to load');
   }
 
-  const orderRes = await createBillingOrder(plan);
-  if (!orderRes.success) {
-    throw new Error(orderRes.message || 'Could not create order');
+  const subRes = await createSubscription(plan);
+  if (!subRes.success) {
+    throw new Error(subRes.message || 'Could not create subscription');
   }
 
-  const order = orderRes.data;
+  const sub = subRes.data;
   const user = useAuthStore.getState().user;
   const key =
-    order.keyId ||
+    sub.keyId ||
     (import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined) ||
     '';
 
@@ -105,27 +104,30 @@ export async function startPlanCheckout(
 
     const rzp = new window.Razorpay!({
       key,
-      amount: order.amount,
-      currency: order.currency,
       name: 'Cosmo',
-      description: plan === 'pro' ? 'Pro plan — 1 month' : 'Max plan — 1 month',
-      order_id: order.orderId,
+      description:
+        plan === 'pro'
+          ? 'Premium — monthly subscription'
+          : 'UltraMag — monthly subscription',
+      subscription_id: sub.subscriptionId,
       prefill: {
         name: user?.name,
         email: user?.email,
       },
-      theme: { color: '#0f172a' },
+      theme: { color: '#15362b' },
       handler: (response) => {
         void (async () => {
           try {
-            const verifyRes = await verifyBillingPayment({
-              razorpay_order_id: response.razorpay_order_id,
+            const verifyRes = await verifySubscription({
               razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
               razorpay_signature: response.razorpay_signature,
               plan,
             });
             if (!verifyRes.success) {
-              throw new Error(verifyRes.message || 'Payment verification failed');
+              throw new Error(
+                verifyRes.message || 'Subscription verification failed'
+              );
             }
 
             const me = await fetchMe();
@@ -141,7 +143,13 @@ export async function startPlanCheckout(
             }
 
             settled = true;
-            resolve(verifyRes.data);
+            resolve({
+              paymentId: verifyRes.data.paymentId,
+              plan: verifyRes.data.plan,
+              planExpiresAt: verifyRes.data.planExpiresAt,
+              invoiceUrl: verifyRes.data.invoiceUrl,
+              invoiceNumber: verifyRes.data.invoiceNumber,
+            });
           } catch (error) {
             settled = true;
             reject(error instanceof Error ? error : new Error(String(error)));
@@ -166,6 +174,14 @@ export async function startPlanCheckout(
 
     rzp.open();
   });
+}
+
+export async function cancelPlanSubscription(immediate = false) {
+  const res = await cancelSubscription(immediate);
+  if (!res.success) {
+    throw new Error(res.message || 'Could not cancel subscription');
+  }
+  return res.data;
 }
 
 export async function downloadPaymentInvoice(paymentId: string): Promise<void> {

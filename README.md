@@ -41,6 +41,28 @@ Or run `bash scripts/bootstrap.sh`.
 4. The content script emits `JobDetected` / `ApplicationRecorded`.
 5. Events persist in `chrome.storage`, sync idempotently via `POST /api/v1/events/sync`, and appear on **Applications** (Socket.IO live updates).
 
+## Billing (Razorpay Subscriptions)
+
+Paid plans (`pro` / `max`) use **Razorpay Subscriptions** (monthly auto-renew).
+
+1. Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` in `.env`.
+2. In the Razorpay Dashboard → Webhooks, point to:
+   `https://<your-api-host>/api/v1/billing/webhooks/razorpay`
+3. Subscribe to at least: `subscription.authenticated`, `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`, `payment.failed`.
+4. Razorpay Plan IDs are created automatically on first subscribe / when an admin changes plan price.
+5. Users subscribe from **Profile** or pricing UI; cancel schedules end-of-period cancellation.
+
+Legacy one-time order endpoints (`/billing/create-order`, `/billing/verify`) remain for reconcile/compat but checkout uses `/billing/subscribe`.
+
+## Admin dashboard
+
+1. Add your email to `ADMIN_EMAILS` in `.env`, **or** run:
+   `npx tsx scripts/promote-admin.ts --email=you@example.com`
+2. Sign in, then open `/admin` (also linked in the app sidebar for admins).
+3. Admins can view revenue charts, manage users/plans/subscriptions/payments, and read the audit log.
+
+Admin API base: `/api/v1/admin/*` (requires JWT with `role: admin`).
+
 ## API shape
 
 ```json
@@ -58,6 +80,14 @@ Or run `bash scripts/bootstrap.sh`.
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
 - `GET /api/v1/auth/me`
+
+### Billing
+
+- `POST /api/v1/billing/subscribe`
+- `POST /api/v1/billing/verify-subscription`
+- `POST /api/v1/billing/cancel`
+- `GET /api/v1/billing/me`
+- `POST /api/v1/billing/webhooks/razorpay`
 
 ### Events & applications
 
@@ -79,4 +109,5 @@ See [docs/design.md](docs/design.md).
 ## MVP scope notes
 
 - Naukri adapter is implemented; other platforms are stubs.
-- Google OAuth, billing, and cloud resume storage are deferred.
+- Google OAuth and cloud resume storage are deferred.
+- Admin panel and Razorpay recurring subscriptions are implemented.

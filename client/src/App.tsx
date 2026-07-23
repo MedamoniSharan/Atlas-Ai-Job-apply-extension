@@ -19,6 +19,7 @@ import {
   Rocket,
   Search,
   Settings,
+  Shield,
   User,
 } from 'lucide-react';
 import { useAuthStore } from './store/authStore';
@@ -197,6 +198,14 @@ export function AppLayout() {
             </span>
             Settings
           </NavLink>
+          {user?.role === 'admin' ? (
+            <NavLink to="/admin" className="sidebar__link">
+              <span className="sidebar__icon" aria-hidden>
+                <Shield size={18} strokeWidth={1.9} className="icon-motion" />
+              </span>
+              Admin
+            </NavLink>
+          ) : null}
           {needsSetup ? (
             <NavLink to="/get-started" className="sidebar__link">
               <span className="sidebar__icon" aria-hidden>

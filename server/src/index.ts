@@ -7,6 +7,8 @@ import { initSocket } from './realtime/socket';
 
 async function main() {
   await connectMongo();
+  const { seedPlanConfigs } = await import('./features/billing/planConfig.service');
+  await seedPlanConfigs();
 
   const app = createApp();
   const server = http.createServer(app);

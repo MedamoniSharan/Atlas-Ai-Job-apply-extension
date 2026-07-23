@@ -124,7 +124,7 @@ export function PricingPlans() {
       const result = await startPlanCheckout(plan);
       setLastPaymentId(result.paymentId);
       setStatus(
-        `Payment successful — ${plan === 'pro' ? 'Pro' : 'Max'} is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
+        `Subscription started — ${plan === 'pro' ? 'Premium' : 'UltraMag'} renews monthly. Current period until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
       );
     } catch (error) {
       const message =

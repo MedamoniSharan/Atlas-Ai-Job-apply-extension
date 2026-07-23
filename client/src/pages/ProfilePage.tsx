@@ -8,6 +8,7 @@ import {
   downloadPaymentInvoice,
   previewPaymentInvoice,
   startPlanCheckout,
+  cancelPlanSubscription,
 } from '../lib/razorpayCheckout';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader } from '../components/CosmosLogo';
@@ -41,6 +42,7 @@ export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [busyPlan, setBusyPlan] = useState<PaidPlan | null>(null);
+  const [busyCancel, setBusyCancel] = useState(false);
   const [busyInvoiceId, setBusyInvoiceId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<'preview' | 'download' | null>(
     null
@@ -74,7 +76,7 @@ export function ProfilePage() {
       const result = await startPlanCheckout(plan);
       setLastPaymentId(result.paymentId);
       setStatus(
-        `${plan === 'pro' ? 'Premium' : 'UltraMag'} is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
+        `${plan === 'pro' ? 'Premium' : 'UltraMag'} subscription is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
       );
       await queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
     } catch (error) {
@@ -83,6 +85,30 @@ export function ProfilePage() {
       if (message !== 'Payment cancelled') setStatus(message);
     } finally {
       setBusyPlan(null);
+    }
+  }
+
+  async function onCancelSubscription() {
+    setBusyCancel(true);
+    setStatus(null);
+    try {
+      const result = await cancelPlanSubscription(false);
+      setStatus(
+        result.cancelAtPeriodEnd
+          ? `Cancellation scheduled. Access continues until ${
+              result.planExpiresAt
+                ? new Date(result.planExpiresAt).toLocaleDateString('en-IN')
+                : 'period end'
+            }.`
+          : 'Subscription cancelled.'
+      );
+      await queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not cancel subscription'
+      );
+    } finally {
+      setBusyCancel(false);
     }
   }
 
@@ -181,12 +207,33 @@ export function ProfilePage() {
           <p className="muted">
             You’re on <strong>{planLabel}</strong>
             {data.planExpiresAt && plan !== 'free'
-              ? ` · renews/expires ${new Date(data.planExpiresAt).toLocaleDateString('en-IN')}`
+              ? ` · current period ends ${new Date(data.planExpiresAt).toLocaleDateString('en-IN')}`
+              : null}
+            {data.subscription?.cancelAtPeriodEnd
+              ? ' · cancels at period end'
               : null}
             . Usage: {data.appliesHourUsed ?? 0}/{data.appliesHourLimit ?? 0} this hour ·{' '}
             {data.appliesDayUsed ?? 0}/{data.appliesDayLimit ?? 0} today ·{' '}
             {data.appliesUsed} / {data.appliesLimit} this month.
           </p>
+          {data.subscription &&
+          ['active', 'authenticated', 'pending', 'halted'].includes(
+            data.subscription.status
+          ) &&
+          !data.subscription.cancelAtPeriodEnd ? (
+            <button
+              type="button"
+              className="dash-btn dash-btn--ghost"
+              disabled={busyCancel}
+              onClick={() => void onCancelSubscription()}
+            >
+              {busyCancel ? (
+                <CosmosLoader label="" size={18} className="cosmos-loader--inline" />
+              ) : (
+                'Cancel auto-renew'
+              )}
+            </button>
+          ) : null}
         </div>
 
         {status ? (

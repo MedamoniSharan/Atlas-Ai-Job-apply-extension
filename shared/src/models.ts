@@ -20,10 +20,20 @@ export const planTierSchema = z.enum(['free', 'pro', 'max']);
 
 export type PlanTier = z.infer<typeof planTierSchema>;
 
+export const userRoleSchema = z.enum(['user', 'admin']);
+
+export type UserRole = z.infer<typeof userRoleSchema>;
+
+export const userStatusSchema = z.enum(['active', 'suspended']);
+
+export type UserStatus = z.infer<typeof userStatusSchema>;
+
 export const userSchema = z.object({
   id: z.string(),
   email: z.string().email(),
   name: z.string(),
+  role: userRoleSchema.optional(),
+  status: userStatusSchema.optional(),
   plan: planTierSchema.optional(),
   planExpiresAt: z.string().datetime().optional(),
   createdAt: z.string().datetime().optional(),
@@ -53,10 +63,50 @@ export type VerifyBillingPaymentInput = z.infer<
   typeof verifyBillingPaymentSchema
 >;
 
+export const createSubscriptionSchema = z.object({
+  plan: paidPlanSchema,
+});
+
+export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
+
+export const verifySubscriptionSchema = z.object({
+  razorpay_payment_id: z.string().min(1),
+  razorpay_subscription_id: z.string().min(1),
+  razorpay_signature: z.string().min(1),
+  plan: paidPlanSchema,
+});
+
+export type VerifySubscriptionInput = z.infer<typeof verifySubscriptionSchema>;
+
+export const cancelSubscriptionSchema = z.object({
+  immediate: z.boolean().optional().default(false),
+});
+
+export type CancelSubscriptionInput = z.infer<typeof cancelSubscriptionSchema>;
+
+export const subscriptionStatusSchema = z.enum([
+  'created',
+  'authenticated',
+  'active',
+  'pending',
+  'halted',
+  'cancelled',
+  'completed',
+  'expired',
+]);
+
+export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
+
 export const PLAN_PRICES_PAISE = {
   pro: 9900,
   max: 29900,
 } as const satisfies Record<PaidPlan, number>;
+
+export const PLAN_DISPLAY_NAMES = {
+  free: 'Basic',
+  pro: 'Premium',
+  max: 'UltraMag',
+} as const satisfies Record<PlanTier, string>;
 
 export const workModeSchema = z.enum(['any', 'office', 'hybrid', 'remote']);
 

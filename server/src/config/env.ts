@@ -21,4 +21,9 @@ export const env = {
   ).split(','),
   razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? '',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
+  adminEmails: (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
 };

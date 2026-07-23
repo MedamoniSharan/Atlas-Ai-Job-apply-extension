@@ -233,6 +233,50 @@ export async function verifyBillingPayment(payload: {
   });
 }
 
+export async function createSubscription(plan: PaidPlan) {
+  return request<{
+    subscriptionId: string;
+    localSubscriptionId: string;
+    keyId: string;
+    plan: PaidPlan;
+    amountPaise: number;
+  }>('/api/v1/billing/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export async function verifySubscription(payload: {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+  plan: PaidPlan;
+}) {
+  return request<{
+    paymentId: string;
+    subscriptionId: string;
+    plan: PaidPlan;
+    planExpiresAt: string;
+    invoiceUrl: string;
+    invoiceNumber: string;
+  }>('/api/v1/billing/verify-subscription', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function cancelSubscription(immediate = false) {
+  return request<{
+    subscriptionId: string;
+    cancelAtPeriodEnd: boolean;
+    status: string;
+    planExpiresAt: string | null;
+  }>('/api/v1/billing/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ immediate }),
+  });
+}
+
 export async function fetchBillingMe() {
   return request<{
     plan: 'free' | 'pro' | 'max';
@@ -245,6 +289,16 @@ export async function fetchBillingMe() {
     appliesDayLimit: number;
     periodStart: string;
     periodEnd: string;
+    subscription: {
+      id: string;
+      tier: PaidPlan;
+      status: string;
+      source: string;
+      cancelAtPeriodEnd: boolean;
+      currentPeriodStart: string | null;
+      currentPeriodEnd: string | null;
+      razorpaySubscriptionId?: string;
+    } | null;
     payments: Array<{
       id: string;
       plan: PaidPlan;
@@ -255,6 +309,250 @@ export async function fetchBillingMe() {
       paidAt?: string;
     }>;
   }>('/api/v1/billing/me');
+}
+
+// ─── Admin API ───────────────────────────────────────────────
+
+export async function fetchAdminMetrics(days = 30) {
+  return request<{
+    kpis: {
+      totalUsers: number;
+      newUsers7: number;
+      newUsers30: number;
+      activePaid: number;
+      mrrPaise: number;
+      revenueMtdPaise: number;
+      revenueYtdPaise: number;
+      failedPayments: number;
+      churnCancels: number;
+    };
+    series: {
+      revenueDaily: Array<{ date: string; amountPaise: number; count: number }>;
+      signupsDaily: Array<{ date: string; count: number }>;
+      planMix: Array<{ tier: string; count: number }>;
+      paymentOutcomes: Array<{ status: string; count: number }>;
+      subsByTier: Array<{ tier: string; count: number }>;
+    };
+    lists: {
+      recentPayments: Array<{
+        id: string;
+        plan: string;
+        amountPaise: number;
+        paidAt?: string;
+        userName?: string;
+        userEmail?: string;
+      }>;
+      expiringSoon: Array<{
+        id: string;
+        tier: string;
+        currentPeriodEnd: string | null;
+        userName?: string;
+        userEmail?: string;
+      }>;
+      haltedSubs: Array<{
+        id: string;
+        tier: string;
+        updatedAt?: string;
+        userName?: string;
+        userEmail?: string;
+      }>;
+    };
+  }>(`/api/v1/admin/metrics?days=${days}`);
+}
+
+export async function fetchAdminUsers(params: {
+  q?: string;
+  plan?: string;
+  role?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.q) search.set('q', params.q);
+  if (params.plan) search.set('plan', params.plan);
+  if (params.role) search.set('role', params.role);
+  if (params.status) search.set('status', params.status);
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? 20));
+  return request<{
+    items: Array<{
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+      status: string;
+      plan: string;
+      planExpiresAt: string | null;
+      extensionConnectedAt: string | null;
+      createdAt?: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(`/api/v1/admin/users?${search}`);
+}
+
+export async function fetchAdminUser(id: string) {
+  return request<Record<string, unknown>>(`/api/v1/admin/users/${id}`);
+}
+
+export async function patchAdminUser(
+  id: string,
+  body: { name?: string; role?: string; status?: string }
+) {
+  return request(`/api/v1/admin/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function setAdminUserPlan(
+  id: string,
+  body: { action: 'grant' | 'extend' | 'revoke'; plan?: PaidPlan; days?: number }
+) {
+  return request(`/api/v1/admin/users/${id}/plan`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchAdminSubscriptions(params: {
+  status?: string;
+  tier?: string;
+  page?: number;
+  limit?: number;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.status) search.set('status', params.status);
+  if (params.tier) search.set('tier', params.tier);
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? 20));
+  return request<{
+    items: Array<{
+      id: string;
+      userId: string;
+      userName?: string;
+      userEmail?: string;
+      tier: string;
+      status: string;
+      source: string;
+      cancelAtPeriodEnd: boolean;
+      currentPeriodStart: string | null;
+      currentPeriodEnd: string | null;
+      razorpaySubscriptionId?: string;
+      createdAt?: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(`/api/v1/admin/subscriptions?${search}`);
+}
+
+export async function cancelAdminSubscription(id: string, immediate = false) {
+  return request(
+    `/api/v1/admin/subscriptions/${id}/cancel?immediate=${immediate ? '1' : '0'}`,
+    { method: 'POST', body: '{}' }
+  );
+}
+
+export async function extendAdminSubscription(id: string, days: number) {
+  return request(`/api/v1/admin/subscriptions/${id}/extend`, {
+    method: 'POST',
+    body: JSON.stringify({ days }),
+  });
+}
+
+export async function fetchAdminPayments(params: {
+  status?: string;
+  plan?: string;
+  page?: number;
+  limit?: number;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.status) search.set('status', params.status);
+  if (params.plan) search.set('plan', params.plan);
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? 20));
+  return request<{
+    items: Array<{
+      id: string;
+      userId: string;
+      userName?: string;
+      userEmail?: string;
+      plan: string;
+      amountPaise: number;
+      currency: string;
+      status: string;
+      type: string;
+      invoiceNumber?: string;
+      razorpayPaymentId?: string;
+      createdAt?: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(`/api/v1/admin/payments?${search}`);
+}
+
+export async function reconcileAdminPayment(id: string) {
+  return request(`/api/v1/admin/payments/${id}/reconcile`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function fetchAdminPlans() {
+  return request<
+    Array<{
+      tier: string;
+      name: string;
+      description: string;
+      amountPaise: number;
+      limits: {
+        monthlyApplies: number;
+        monthlyScans: number;
+        appliesPerHour: number;
+        appliesPerDay: number;
+      };
+      razorpayPlanId: string | null;
+      active: boolean;
+    }>
+  >('/api/v1/admin/plans');
+}
+
+export async function updateAdminPlan(
+  tier: string,
+  body: Record<string, unknown>
+) {
+  return request(`/api/v1/admin/plans/${tier}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchAdminAudit(page = 1, limit = 40) {
+  return request<{
+    items: Array<{
+      id: string;
+      action: string;
+      targetType: string;
+      targetId?: string;
+      before?: Record<string, unknown>;
+      after?: Record<string, unknown>;
+      ip?: string;
+      adminName?: string;
+      adminEmail?: string;
+      createdAt?: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(`/api/v1/admin/audit?page=${page}&limit=${limit}`);
 }
 
 export async function fetchInvoiceBlob(

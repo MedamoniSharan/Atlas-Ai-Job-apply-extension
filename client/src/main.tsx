@@ -3,6 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from './App';
+import { AdminLayout } from './admin/AdminLayout';
+import { AdminOverviewPage } from './admin/AdminOverviewPage';
+import { AdminUsersPage } from './admin/AdminUsersPage';
+import { AdminSubscriptionsPage } from './admin/AdminSubscriptionsPage';
+import { AdminPaymentsPage } from './admin/AdminPaymentsPage';
+import { AdminPlansPage } from './admin/AdminPlansPage';
+import { AdminAuditPage } from './admin/AdminAuditPage';
 import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -12,6 +19,7 @@ import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import './styles.css';
+import './admin/admin.css';
 
 const queryClient = new QueryClient();
 
@@ -39,6 +47,14 @@ createRoot(document.getElementById('root')!).render(
               }
             />
             <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+            <Route path="payments" element={<AdminPaymentsPage />} />
+            <Route path="plans" element={<AdminPlansPage />} />
+            <Route path="audit" element={<AdminAuditPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
