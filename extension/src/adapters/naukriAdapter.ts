@@ -55,9 +55,9 @@ export const naukriSelectors: SelectorRegistry = {
     'a[href*="/mnj/"]',
     'a[href*="logout"]',
   ],
+  // Visible Login/Register controls only — never #login_Layer alone
+  // (Naukri often keeps that node in the DOM, hidden, after login).
   loggedOut: [
-    '#login_Layer',
-    '#register_Layer',
     'a.nI-gNb-lg-rg__login',
     'a.nI-gNb-lg-rg__register',
   ],
@@ -93,6 +93,34 @@ export type SearchResultJob = {
   /** True when Naukri only offers apply on the employer site (not Easy Apply). */
   companySiteApply?: boolean;
 };
+
+/** Positive signals → loggedIn; visible Login/Register → loggedOut; else uncertain. */
+export type LoginStatus = 'loggedIn' | 'loggedOut' | 'uncertain';
+
+/** Soft session cookie names — hint only; never sufficient alone for loggedIn. */
+const SESSION_COOKIE_NAME_HINTS = [
+  /^_t_ds$/i,
+  /^naukri/i,
+  /^ak_bmsc$/i,
+  /^BM_/i,
+  /session/i,
+  /^_clsk$/i,
+  /^UNID$/i,
+];
+
+/**
+ * Soft probe: presence of Naukri-ish session cookies. Does not prove login;
+ * used only as corroborating context alongside DOM status.
+ */
+export function hasNaukriSessionCookieHint(
+  cookieString: string = typeof document !== 'undefined' ? document.cookie : ''
+): boolean {
+  if (!cookieString.trim()) return false;
+  return cookieString.split(';').some((part) => {
+    const name = part.split('=')[0]?.trim() ?? '';
+    return name.length > 0 && SESSION_COOKIE_NAME_HINTS.some((re) => re.test(name));
+  });
+}
 
 export function jobIdFromUrl(url: string): string | undefined {
   const match = url.match(/(\d{8,})(?:\?|#|$)/);
@@ -188,6 +216,20 @@ function hasVisibleLoggedOutSignal(doc: Document): boolean {
     if (el && isElementVisible(el)) return true;
   }
   return false;
+}
+
+/**
+ * Ternary login detection. Prefers positive account signals only.
+ * Does not treat #login_Layer presence as logged out.
+ */
+function resolveLoginStatus(doc: Document): LoginStatus {
+  if (hasLoggedInSignal(doc)) return 'loggedIn';
+  if (hasVisibleLoggedOutSignal(doc)) return 'loggedOut';
+  return 'uncertain';
+}
+
+export function getLoginStatus(doc: Document = document): LoginStatus {
+  return resolveLoginStatus(doc);
 }
 
 function absoluteUrl(src?: string | null): string | undefined {
@@ -584,14 +626,12 @@ export class NaukriAdapter implements PlatformAdapter {
     }
   }
 
+  getLoginStatus(doc: Document = document): LoginStatus {
+    return resolveLoginStatus(doc);
+  }
+
   isLoggedIn(doc: Document = document): boolean {
-    // Prefer positive account signals. Naukri often keeps #login_Layer in the
-    // DOM (hidden) even after login, which used to cause false "logged out".
-    if (hasLoggedInSignal(doc)) return true;
-
-    if (hasVisibleLoggedOutSignal(doc)) return false;
-
-    return false;
+    return resolveLoginStatus(doc) === 'loggedIn';
   }
 
   readJob(doc: Document = document): Partial<JobPayload> | null {
@@ -939,11 +979,106 @@ export class NaukriAdapter implements PlatformAdapter {
   }
 
   hasBlockingApplyFlow(doc: Document = document): string | null {
+    const block = this.detectNaukriBlockPage(doc);
+    if (block) return block;
     const text = (doc.body?.innerText || '').toLowerCase();
     if (text.includes('login to apply') || text.includes('register to apply')) {
       return 'Naukri login required';
     }
     return this.detectNeedsUserQuestions(doc);
+  }
+
+  detectNaukriBlockPage(doc: Document = document): string | null {
+    const title = (doc.title || '').toLowerCase();
+    const text = (doc.body?.innerText || '').slice(0, 8000).toLowerCase();
+
+    const blockPatterns = [
+      /captcha/,
+      /verify you are human/,
+      /unusual activity/,
+      /access denied/,
+      /security check/,
+      /challenge-page/,
+      /robot check/,
+      /temporarily blocked/,
+      /suspicious activity/,
+    ];
+    if (blockPatterns.some((p) => p.test(title) || p.test(text))) {
+      return 'Naukri verification or block page detected';
+    }
+
+    const challengeSelectors = [
+      'iframe[src*="captcha"]',
+      'iframe[src*="challenge"]',
+      '[class*="captcha"]',
+      '[id*="captcha"]',
+      '#challenge-form',
+      '.cf-browser-verification',
+      '[data-testid*="captcha"]',
+    ].join(', ');
+    const challenge = doc.querySelector(challengeSelectors);
+    if (challenge) {
+      const el = challenge as HTMLElement;
+      if (el.offsetParent !== null || el.getClientRects().length > 0) {
+        return 'Naukri verification or block page detected';
+      }
+    }
+
+    return null;
+  }
+
+  clickNextSearchPage(doc: Document = document): {
+    ok: boolean;
+    reason?: string;
+  } {
+    const nodes = Array.from(
+      doc.querySelectorAll<HTMLElement>(
+        'a, button, [role="button"], [class*="pagination"] a, [class*="Pagination"] a'
+      )
+    );
+    const next = nodes.find((el) => {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+      const title = (el.getAttribute('title') || '').toLowerCase();
+      if (/^next$/i.test(text) || /^›$|^>$/.test(text)) return true;
+      if (aria.includes('next') || title.includes('next')) return true;
+      if (/^next\b/i.test(text) && text.length < 12) return true;
+      return false;
+    });
+    if (!next) {
+      return { ok: false, reason: 'Next page control not found' };
+    }
+    const disabled =
+      next.getAttribute('disabled') != null ||
+      next.getAttribute('aria-disabled') === 'true' ||
+      /disabled|inactive/i.test(next.className);
+    if (disabled) {
+      return { ok: false, reason: 'Already on the last page' };
+    }
+    next.click();
+    return { ok: true };
+  }
+
+  /** Bump Naukri search URL to the next results page when Next click fails. */
+  nextSearchPageUrl(currentUrl: string): string | null {
+    try {
+      const u = new URL(currentUrl);
+      const pageQ = u.searchParams.get('page');
+      if (pageQ && /^\d+$/.test(pageQ)) {
+        u.searchParams.set('page', String(Number(pageQ) + 1));
+        return u.toString();
+      }
+      const m = u.pathname.match(/^(.*?)(?:-(\d+))?$/);
+      if (m) {
+        const base = m[1]!;
+        const n = m[2] ? Number(m[2]) : 1;
+        u.pathname = `${base}-${n + 1}`;
+        return u.toString();
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import {
   naukriSelectors,
   buildNaukriSearchUrl,
   matchesPreferences,
+  hasNaukriSessionCookieHint,
 } from './naukriAdapter';
 import { backoffMs } from '../core/queueManager';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
@@ -109,12 +110,27 @@ describe('NaukriAdapter', () => {
     `;
     document.cookie = 'naukri=1';
     expect(adapter.isLoggedIn(document)).toBe(false);
+    expect(adapter.getLoginStatus(document)).toBe('loggedOut');
+  });
+
+  it('treats #login_Layer alone (without Login control class) as uncertain', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `<a id="login_Layer" href="/login" style="display:none">Login</a>`;
+    expect(adapter.getLoginStatus(document)).toBe('uncertain');
+    expect(adapter.isLoggedIn(document)).toBe(false);
+  });
+
+  it('treats empty header with no signals as uncertain', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `<header class="nI-gNb-header"><div></div></header>`;
+    expect(adapter.getLoginStatus(document)).toBe('uncertain');
   });
 
   it('treats profile drawer as logged in', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `<div class="nI-gNb-drawer__icon"></div>`;
     expect(adapter.isLoggedIn(document)).toBe(true);
+    expect(adapter.getLoginStatus(document)).toBe('loggedIn');
   });
 
   it('treats hidden Login button + profile drawer as logged in', () => {
@@ -135,6 +151,14 @@ describe('NaukriAdapter', () => {
       <a href="https://www.naukri.com/mnjuser/homepage">My Naukri</a>
     `;
     expect(adapter.isLoggedIn(document)).toBe(true);
+  });
+
+  it('detects soft session cookie hint without flipping login status', () => {
+    document.cookie = 'naukri_session=abc; other=1';
+    expect(hasNaukriSessionCookieHint(document.cookie)).toBe(true);
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `<div></div>`;
+    expect(adapter.getLoginStatus(document)).toBe('uncertain');
   });
   it('scrapes rich Naukri JD detail fields', () => {
     const adapter = new NaukriAdapter();

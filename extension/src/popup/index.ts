@@ -1,4 +1,5 @@
 import type { JobPreferences, WorkMode } from '@atlas/shared';
+import { CONSENT_VERSION } from '@atlas/shared';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
 
@@ -58,6 +59,10 @@ function alertTitle(alert: CopilotAlert): string {
   switch (alert.kind) {
     case 'plan_limit':
       return 'Plan apply limit reached';
+    case 'rate_limit':
+      return 'Safety limit reached';
+    case 'blocked':
+      return 'Naukri verification';
     case 'login':
       return 'Naukri login needed';
     case 'questions':
@@ -189,9 +194,29 @@ async function refreshUi() {
   renderAlert(status.copilot?.alert);
 
   if (status.copilot?.running) {
-    scanStateEl.textContent = status.copilot.paused
-      ? `Co-pilot paused · matched ${status.copilot.matched}, applied ${status.copilot.applied}`
-      : `Co-pilot running · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
+    const onBreak =
+      status.copilot.sessionBreakUntil &&
+      Date.parse(status.copilot.sessionBreakUntil) > Date.now();
+    if (onBreak) {
+      const ms = status.copilot.sessionBreakRemainingMs ?? 0;
+      const sec = Math.max(0, Math.ceil(ms / 1000));
+      const min = Math.floor(sec / 60);
+      const rem = sec % 60;
+      scanStateEl.textContent = `Co-pilot break — resumes in ${min}:${String(rem).padStart(2, '0')}`;
+    } else if (
+      status.copilot.paceLabel &&
+      (status.copilot.paceRemainingMs ?? 0) > 0
+    ) {
+      const sec = Math.max(
+        0,
+        Math.ceil((status.copilot.paceRemainingMs ?? 0) / 1000)
+      );
+      scanStateEl.textContent = `${status.copilot.paceLabel} — ${sec}s`;
+    } else {
+      scanStateEl.textContent = status.copilot.paused
+        ? `Co-pilot paused · matched ${status.copilot.matched}, applied ${status.copilot.applied}`
+        : `Co-pilot running · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
+    }
   } else {
     scanStateEl.textContent = '';
   }
@@ -274,7 +299,11 @@ document.getElementById('scan-now')!.addEventListener('click', async () => {
   const result = await send<{
     ok: boolean;
     message?: string;
-  }>({ type: 'COPILOT_START' });
+  }>({
+    type: 'COPILOT_START',
+    consentAccepted: true,
+    consentVersion: CONSENT_VERSION,
+  });
   scanStateEl.textContent = result.ok
     ? 'Co-pilot started — watch the panel on Naukri.'
     : result.message ?? 'Could not start';

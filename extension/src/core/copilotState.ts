@@ -2,8 +2,10 @@ export type CopilotLogLevel = 'info' | 'success' | 'warn' | 'error';
 
 export type CopilotAlertKind =
   | 'plan_limit'
+  | 'rate_limit'
   | 'login'
   | 'questions'
+  | 'blocked'
   | 'error'
   | 'generic';
 
@@ -45,15 +47,36 @@ export type ScannedJobItem = {
   skipReason?: string;
 };
 
+export type SessionCompletePrompt = {
+  applied: number;
+  matched: number;
+  skipped: number;
+  at: string;
+};
+
+export type LoginPauseReason = 'loggedOut' | 'uncertain';
+
 export type CopilotState = {
   running: boolean;
   paused: boolean;
   runInBackground: boolean;
   needsLogin: boolean;
+  /** Why we paused for login — drives confirm vs log-in copy. */
+  loginPauseReason?: LoginPauseReason | null;
   keyword: string;
   matched: number;
   applied: number;
   skipped: number;
+  appliesThisSession: number;
+  stealthAppliesThisSession: number;
+  stealthStartedAt?: string | null;
+  sessionBreakUntil?: string | null;
+  sessionBreakRemainingMs?: number | null;
+  /** Human-pace wait shown to the user (e.g. "Reading JD"). */
+  paceLabel?: string | null;
+  paceRemainingMs?: number | null;
+  /** Shown when a browse session finishes — next page vs close. */
+  sessionComplete?: SessionCompletePrompt | null;
   currentTitle?: string;
   lastMessage?: string;
   alert?: CopilotAlert | null;
@@ -73,10 +96,19 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   paused: false,
   runInBackground: false,
   needsLogin: false,
+  loginPauseReason: null,
   keyword: '',
   matched: 0,
   applied: 0,
   skipped: 0,
+  appliesThisSession: 0,
+  stealthAppliesThisSession: 0,
+  stealthStartedAt: null,
+  sessionBreakUntil: null,
+  sessionBreakRemainingMs: null,
+  paceLabel: null,
+  paceRemainingMs: null,
+  sessionComplete: null,
   alert: null,
   toast: null,
   scannedJobs: [],
@@ -205,14 +237,19 @@ export async function appendCopilotLog(
 
 function classifyAlert(message: string): CopilotAlertKind | null {
   const m = message.toLowerCase();
+  if (/hourly safety limit|hourly apply limit/.test(m)) return 'rate_limit';
+  if (/daily safety limit|daily apply limit/.test(m)) return 'rate_limit';
   if (/plan apply limit|monthly apply limit/.test(m)) return 'plan_limit';
-  if (/log into naukri|not logged into naukri|naukri login/.test(m)) {
+  if (/naukri asked for verification|blocked|captcha|unusual activity/.test(m)) {
+    return 'blocked';
+  }
+  if (/log into naukri|not logged into naukri|naukri login|confirm you.?re logged/i.test(m)) {
     return 'login';
   }
   if (/asking questions|waiting on naukri questions|questions still open/.test(m)) {
     return 'questions';
   }
-  if (/bot error|still not logged|stopping bot/.test(m)) return 'error';
+  if (/co-pilot error|still not logged|stopping co-pilot/.test(m)) return 'error';
   if (levelLooksImportant(m)) return 'generic';
   return null;
 }
@@ -230,11 +267,15 @@ async function syncActionBadge(alert: CopilotAlert | null | undefined) {
     const text =
       alert.kind === 'plan_limit'
         ? 'MAX'
-        : alert.kind === 'login'
-          ? 'IN'
-          : alert.level === 'error'
-            ? '!'
-            : '⚠';
+        : alert.kind === 'rate_limit'
+          ? 'CAP'
+          : alert.kind === 'blocked'
+            ? 'BLK'
+            : alert.kind === 'login'
+              ? 'IN'
+              : alert.level === 'error'
+                ? '!'
+                : '⚠';
     await chrome.action.setBadgeText({ text });
     await chrome.action.setBadgeBackgroundColor({
       color: alert.level === 'error' ? '#b42318' : '#b45309',

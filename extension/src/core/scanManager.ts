@@ -97,13 +97,20 @@ export async function runScan(options: {
   await waitForTabComplete(tab.id);
   await wait(2500);
 
-  const login = await sendToTab<{ loggedIn: boolean }>(tab.id, {
+  const login = await sendToTab<{
+    loggedIn: boolean;
+    status?: 'loggedIn' | 'loggedOut' | 'uncertain';
+  }>(tab.id, {
     type: 'CHECK_LOGIN',
   });
   if (!login.loggedIn) {
+    const hint =
+      login.status === 'uncertain'
+        ? 'Confirm you’re logged into Naukri in this browser, then Scan again.'
+        : 'Log into Naukri in this browser, then Scan again.';
     return {
       ok: false,
-      message: 'Log into Naukri in this browser, then Scan again.',
+      message: hint,
       matched: 0,
       queuedForApply: 0,
       loggedIn: false,

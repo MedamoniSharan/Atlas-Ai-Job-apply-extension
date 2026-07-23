@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import { Check, Sparkles, X } from 'lucide-react';
 
 const FEATURES = [
-  '4× Faster Fills',
-  '1,000+ Apps / Night',
-  'Browser Agent, No Manual Forms',
-  'Works on Greenhouse, Workday, Ashby & more',
+  'Guided Easy Apply on Naukri',
+  'Human-paced co-pilot sessions',
+  'You stay in control',
+  'Scan, review, and apply with consent',
 ] as const;
 
 const PROMO_ART = '/A6sNEgPCIIfX9ATPDrQVd1r4PU.avif';
@@ -33,7 +33,7 @@ export function HeroAutoApply() {
             />
             AI Powered
           </p>
-          <h1 id="landing-hero-title">Auto-Apply Agent</h1>
+          <h1 id="landing-hero-title">Naukri Co-Pilot</h1>
           <ul className="hero-agent__features">
             {FEATURES.map((item) => (
               <li key={item}>
@@ -54,11 +54,11 @@ export function HeroAutoApply() {
             <div className="hero-agent__panel-top">
               <div className="hero-agent__brand-row">
                 <WorkdayMark />
-                <span>Workday</span>
+                <span>Naukri</span>
               </div>
               <div className="hero-agent__status">
                 <span className="hero-agent__spinner" />
-                Auto-Applying...
+                Co-pilot assisting…
                 <X size={14} strokeWidth={2.4} aria-hidden="true" />
               </div>
             </div>
@@ -66,12 +66,12 @@ export function HeroAutoApply() {
             <Link
               className="hero-agent__promo"
               to="/register"
-              aria-label="Start applying with AutoApply Agent"
+              aria-label="Start applying with Cosmo Co-Pilot"
             >
               <img
                 className="hero-agent__promo-img"
                 src={PROMO_ART}
-                alt="AutoApply Agent — applies to jobs while you relax. Start Applying."
+                alt="Cosmo Co-Pilot — guided Easy Apply on Naukri. You stay in control."
                 width={720}
                 height={280}
                 decoding="async"
@@ -100,7 +100,7 @@ export function HeroAutoApply() {
           <img
             className="hero-agent__toast-img"
             src={TOAST_ART}
-            alt="You've already saved 20 minutes!"
+            alt="Guided applies with safer pacing"
             width={360}
             height={80}
             decoding="async"

@@ -6,6 +6,8 @@ import {
   getEffectivePlan,
   getIstMonthBounds,
   getPlanAppliesLimit,
+  getPlanAppliesPerDay,
+  getPlanAppliesPerHour,
   type CreateBillingOrderInput,
   type PaidPlan,
   type VerifyBillingPaymentInput,
@@ -13,6 +15,12 @@ import {
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { ApplicationModel } from '../applications/application.model';
+import {
+  appliedCountFilter,
+  dayRange,
+  hourRange,
+  monthRange,
+} from '../applications/applyCount';
 import { UserModel } from '../users/user.model';
 import { PaymentModel } from './payment.model';
 import { generateInvoicePdf, invoiceFilePath } from './invoice.service';
@@ -208,29 +216,28 @@ export async function getBillingMe(userId: string) {
   const { periodStart, periodEnd } = getIstMonthBounds();
   const effectivePlan = getEffectivePlan(user.plan, user.planExpiresAt);
   const appliesLimit = getPlanAppliesLimit(user.plan, user.planExpiresAt);
+  const appliesHourLimit = getPlanAppliesPerHour(user.plan, user.planExpiresAt);
+  const appliesDayLimit = getPlanAppliesPerDay(user.plan, user.planExpiresAt);
 
-  const appliesUsed = await ApplicationModel.countDocuments({
-    userId,
-    'metadata.skipped': { $ne: true },
-    $or: [{ status: 'applied' }, { 'metadata.source': 'auto_apply' }],
-    $and: [
-      {
-        $or: [
-          { appliedAt: { $gte: periodStart, $lt: periodEnd } },
-          {
-            appliedAt: { $exists: false },
-            createdAt: { $gte: periodStart, $lt: periodEnd },
-          },
-        ],
-      },
-    ],
-  });
+  const month = monthRange();
+  const hour = hourRange();
+  const day = dayRange();
+
+  const [appliesUsed, appliesHourUsed, appliesDayUsed] = await Promise.all([
+    ApplicationModel.countDocuments(appliedCountFilter(userId, month)),
+    ApplicationModel.countDocuments(appliedCountFilter(userId, hour)),
+    ApplicationModel.countDocuments(appliedCountFilter(userId, day)),
+  ]);
 
   return {
     plan: effectivePlan,
     planExpiresAt: user.planExpiresAt?.toISOString() ?? null,
     appliesUsed,
     appliesLimit,
+    appliesHourUsed,
+    appliesHourLimit,
+    appliesDayUsed,
+    appliesDayLimit,
     periodStart: periodStart.toISOString(),
     periodEnd: periodEnd.toISOString(),
     payments: payments.map((p) => ({

@@ -23,12 +23,12 @@ const PLAN_FEATURES: Record<PlanTier, string[]> = {
   pro: [
     '300 automated applies / month',
     '1500 multi-board scans / month',
-    'Priority bot processing',
+    'Human-paced co-pilot',
   ],
   max: [
     '1000 automated applies / month',
     '5000 multi-board scans / month',
-    'Priority bot processing',
+    'Human-paced co-pilot',
     'Highest monthly volume',
   ],
 };
@@ -183,7 +183,9 @@ export function ProfilePage() {
             {data.planExpiresAt && plan !== 'free'
               ? ` · renews/expires ${new Date(data.planExpiresAt).toLocaleDateString('en-IN')}`
               : null}
-            . Usage this month: {data.appliesUsed} / {data.appliesLimit} applies.
+            . Usage: {data.appliesHourUsed ?? 0}/{data.appliesHourLimit ?? 0} this hour ·{' '}
+            {data.appliesDayUsed ?? 0}/{data.appliesDayLimit ?? 0} today ·{' '}
+            {data.appliesUsed} / {data.appliesLimit} this month.
           </p>
         </div>
 

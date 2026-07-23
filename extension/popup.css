@@ -394,6 +394,10 @@ button:disabled {
 }
 
 .popup-footer a {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 500;
@@ -401,6 +405,12 @@ button:disabled {
   text-decoration: none;
   text-transform: lowercase;
   transition: color 150ms ease;
+}
+
+.popup-footer img {
+  display: block;
+  width: 132px;
+  height: auto;
 }
 
 .popup-footer a:hover {

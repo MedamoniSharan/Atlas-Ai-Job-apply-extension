@@ -203,6 +203,10 @@ export async function fetchBillingMe(): Promise<
     planExpiresAt: string | null;
     appliesUsed: number;
     appliesLimit: number;
+    appliesHourUsed: number;
+    appliesHourLimit: number;
+    appliesDayUsed: number;
+    appliesDayLimit: number;
     periodStart: string;
     periodEnd: string;
   }>

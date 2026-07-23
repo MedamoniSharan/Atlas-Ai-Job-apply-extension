@@ -2,34 +2,28 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useInView } from 'motion/react';
 import { CosmosIconMark, CosmovaiWordmark } from './CosmosLogo';
-import { Highlighter } from './ui/highlighter';
 
 const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'];
 const moreLinks = ['Careers', 'Terms', 'Privacy'];
 
 function PoweredByCodex() {
   return (
-    <p className="footer-powered">
-      <span className="footer-powered__prefix">powered by</span>{' '}
-      <a
-        className="footer-powered__link"
-        href="https://codexcareer.com"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Highlighter
-          action="highlight"
-          color="#FFB347"
-          strokeWidth={1.8}
-          animationDuration={700}
-          iterations={2}
-          padding={3}
-          isView
-        >
-          <span className="footer-powered__brand">codexcareer</span>
-        </Highlighter>
-      </a>
-    </p>
+    <a
+      className="footer-powered"
+      href="https://codexcareer.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="powered by codexcareer"
+    >
+      <img
+        className="footer-powered__logo"
+        src="/codexcareer-logo.png"
+        alt="codexcareer"
+        width={168}
+        height={55}
+      />
+      <span className="footer-powered__caption">powered by codexcareer</span>
+    </a>
   );
 }
 

@@ -36,8 +36,9 @@ const plans: Plan[] = [
     priceNote: '/ forever',
     cta: 'Get started',
     features: [
-      { label: '50 Automated Applies' },
-      { label: '500 Multi-board Scans' },
+      { label: '50 assisted applies / month' },
+      { label: 'Safety: 6/hour · 15/day' },
+      { label: '500 multi-board scans' },
     ],
   },
   {
@@ -52,11 +53,10 @@ const plans: Plan[] = [
     badge: 'Most popular',
     paidPlan: 'pro',
     features: [
-      { label: '300 Automated Applies' },
-      { label: '1500 Multi-board Scans' },
-      { label: 'Priority Bot Processing Queue' },
-      { label: 'Advanced ATS Keyword Injection' },
-      { label: 'Dedicated IP Routing' },
+      { label: '300 assisted applies / month' },
+      { label: 'Safety: 12/hour · 40/day' },
+      { label: '1500 multi-board scans' },
+      { label: 'Human-paced co-pilot sessions' },
     ],
   },
   {
@@ -69,11 +69,10 @@ const plans: Plan[] = [
     cta: 'Upgrade to Max',
     paidPlan: 'max',
     features: [
-      { label: '1000 Automated Applies' },
-      { label: '5000 Multi-board Scans' },
-      { label: 'Priority Bot Processing Queue' },
-      { label: 'Advanced ATS Keyword Injection' },
-      { label: 'Dedicated IP Routing' },
+      { label: '1000 assisted applies / month' },
+      { label: 'Safety: 18/hour · 60/day' },
+      { label: '5000 multi-board scans' },
+      { label: 'Human-paced co-pilot sessions' },
     ],
   },
 ];

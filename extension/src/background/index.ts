@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { EventEnvelope, EventType, JobPayload, JobPreferences } from '@atlas/shared';
+import { CONSENT_VERSION } from '@atlas/shared';
 import { enqueue } from '../core/queueManager';
 import { flushQueue } from '../core/syncManager';
 import { reportHealth } from '../core/healthMonitor';
@@ -26,14 +27,93 @@ import {
   clearCopilotAlert,
   clearCopilotLogs,
   getCopilotState,
+  raiseCopilotAlert,
   setCopilotState,
 } from '../core/copilotState';
+import { getApplyQuotaSnapshot } from '../core/planApplyQuota';
+import {
+  isBlocked,
+  isStealthCooldownActive,
+} from '../core/safetyStorage';
 import {
   pauseBot,
   resumeBot,
   runBot,
   stopBot,
+  continueNextPage,
+  closeSessionComplete,
 } from '../core/botRunner';
+
+/** Tracks an opened Naukri login tab so we can re-verify when it closes. */
+let pendingNaukriLogin: {
+  loginTabId: number;
+  naukriTabId: number;
+} | null = null;
+
+function waitMs(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function reverifyAfterLoginTabClosed(naukriTabId: number): Promise<void> {
+  // Let Naukri session cookies settle, then re-check the apply tab.
+  await waitMs(1500);
+  let login: {
+    loggedIn?: boolean;
+    status?: 'loggedIn' | 'loggedOut' | 'uncertain';
+  } = {};
+  try {
+    login = await chrome.tabs.sendMessage(naukriTabId, { type: 'CHECK_LOGIN' });
+  } catch {
+    try {
+      await chrome.tabs.reload(naukriTabId);
+      await waitMs(2500);
+      login = await chrome.tabs.sendMessage(naukriTabId, { type: 'CHECK_LOGIN' });
+    } catch {
+      login = {};
+    }
+  }
+
+  if (login.loggedIn) {
+    await setCopilotState({
+      needsLogin: false,
+      loginPauseReason: null,
+      paused: false,
+    });
+    await clearCopilotAlert();
+    try {
+      await chrome.tabs.sendMessage(naukriTabId, {
+        type: 'LOGIN_REVERIFIED',
+        loggedIn: true,
+      });
+    } catch {
+      /* content may be reloading */
+    }
+    return;
+  }
+
+  const reason: 'loggedOut' | 'uncertain' =
+    login.status === 'loggedOut' ? 'loggedOut' : 'uncertain';
+  await setCopilotState({
+    paused: true,
+    needsLogin: true,
+    loginPauseReason: reason,
+  });
+  try {
+    await chrome.tabs.sendMessage(naukriTabId, {
+      type: 'SHOW_LOGIN_PROMPT',
+      reason,
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (!pendingNaukriLogin || pendingNaukriLogin.loginTabId !== tabId) return;
+  const naukriTabId = pendingNaukriLogin.naukriTabId;
+  pendingNaukriLogin = null;
+  void reverifyAfterLoginTabClosed(naukriTabId);
+});
 
 async function persistAndSync(
   type: EventType,
@@ -114,7 +194,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       switch (message?.type) {
@@ -245,25 +325,36 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             },
           });
           if (result.queuedForApply > 0) {
-            void processApplyQueue(
-              {
-                persistJobDetected: async (payload) => {
-                  await persistAndSync(
-                    'JobDetected',
-                    payload as unknown as Record<string, unknown>
-                  );
-                },
-                persistApplicationRecorded: async (payload) => {
-                  await persistAndSync(
-                    'ApplicationRecorded',
-                    payload as unknown as Record<string, unknown>
-                  );
-                },
-              },
-              result.tabId
+            await raiseCopilotAlert(
+              `${result.queuedForApply} job(s) ready — open co-pilot and press Start to apply with consent.`,
+              'info',
+              'generic'
             );
           }
           sendResponse(result);
+          break;
+        }
+        case 'GET_APPLY_QUOTA': {
+          try {
+            const quota = await getApplyQuotaSnapshot(Boolean(message.force));
+            sendResponse({ ok: true, quota });
+          } catch (error) {
+            sendResponse({
+              ok: false,
+              message:
+                error instanceof Error ? error.message : 'Could not load quota',
+            });
+          }
+          break;
+        }
+        case 'GET_SAFETY_STATUS': {
+          const state = await getCopilotState();
+          sendResponse({
+            ok: true,
+            blocked: await isBlocked(),
+            stealthCooldown: await isStealthCooldownActive(),
+            runInBackground: state.runInBackground,
+          });
           break;
         }
         case 'START_APPLY_QUEUE': {
@@ -290,6 +381,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             sendResponse({
               ok: false,
               message: 'Sign in to Atlas from the extension popup first.',
+            });
+            break;
+          }
+          if (
+            !message.consentAccepted ||
+            message.consentVersion !== CONSENT_VERSION
+          ) {
+            sendResponse({
+              ok: false,
+              message: 'Consent required before starting co-pilot.',
+            });
+            break;
+          }
+          if (await isBlocked()) {
+            sendResponse({
+              ok: false,
+              message:
+                'Naukri verification cooldown active — wait before starting again.',
             });
             break;
           }
@@ -332,9 +441,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ ok: true });
           break;
         }
+        case 'COPILOT_NEXT_PAGE': {
+          const result = await continueNextPage();
+          sendResponse(result);
+          break;
+        }
+        case 'COPILOT_SESSION_CLOSE': {
+          await closeSessionComplete();
+          sendResponse({ ok: true });
+          break;
+        }
         case 'COPILOT_SET_BACKGROUND': {
+          if (Boolean(message.runInBackground)) {
+            if (await isStealthCooldownActive()) {
+              sendResponse({
+                ok: false,
+                message:
+                  'Stealth cooldown active — use foreground mode for safer pacing.',
+              });
+              break;
+            }
+          }
           await setCopilotState({
             runInBackground: Boolean(message.runInBackground),
+            stealthStartedAt: Boolean(message.runInBackground)
+              ? new Date().toISOString()
+              : null,
+            stealthAppliesThisSession: 0,
           });
           sendResponse({ ok: true });
           break;
@@ -344,8 +477,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             typeof message.loginUrl === 'string' && message.loginUrl
               ? message.loginUrl
               : 'https://www.naukri.com/nlogin/login';
-          await chrome.tabs.create({ url: loginUrl, active: true });
-          sendResponse({ ok: true });
+          const naukriTabId =
+            typeof message.naukriTabId === 'number'
+              ? message.naukriTabId
+              : sender.tab?.id;
+          const created = await chrome.tabs.create({
+            url: loginUrl,
+            active: true,
+          });
+          if (created.id != null && naukriTabId != null) {
+            pendingNaukriLogin = {
+              loginTabId: created.id,
+              naukriTabId,
+            };
+          }
+          sendResponse({ ok: true, loginTabId: created.id });
           break;
         }
         default:

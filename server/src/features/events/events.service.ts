@@ -1,16 +1,25 @@
 import {
-  Application,
-  EventEnvelope,
+  getEffectivePlan,
+  getPlanAppliesLimit,
+  getPlanAppliesPerDay,
+  getPlanAppliesPerHour,
   jobPayloadSchema,
-  SyncEventsRequest,
+  type EventEnvelope,
 } from '@atlas/shared';
 import { ActivityModel } from './activity.model';
 import { ApplicationModel, IApplication } from '../applications/application.model';
 import { UserModel } from '../users/user.model';
 import { getIo } from '../../realtime/socket';
 import { logger } from '../../config/logger';
+import { AppError } from '../../middleware/errorHandler';
+import {
+  appliedCountFilter,
+  dayRange,
+  hourRange,
+  monthRange,
+} from '../applications/applyCount';
 
-function toApplication(doc: IApplication): Application {
+function toApplication(doc: IApplication) {
   return {
     id: doc._id.toString(),
     eventId: doc.eventId,
@@ -41,16 +50,66 @@ function toApplication(doc: IApplication): Application {
     aboutCompany: doc.aboutCompany,
     status: doc.status,
     appliedAt: doc.appliedAt?.toISOString(),
-    metadata: doc.metadata as Application['metadata'],
+    metadata: doc.metadata,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
 }
 
+function countsAsApply(event: EventEnvelope, status: string): boolean {
+  if (event.type !== 'ApplicationRecorded') return false;
+  const parsed = jobPayloadSchema.safeParse(event.payload);
+  if (!parsed.success) return false;
+  if (parsed.data.metadata?.skipped) return false;
+  return status === 'applied' || parsed.data.metadata?.source === 'auto_apply';
+}
+
+async function assertApplyCaps(userId: string): Promise<void> {
+  const user = await UserModel.findById(userId).lean();
+  if (!user) return;
+
+  const hour = hourRange();
+  const day = dayRange();
+  const month = monthRange();
+
+  const [hourUsed, dayUsed, monthUsed] = await Promise.all([
+    ApplicationModel.countDocuments(appliedCountFilter(userId, hour)),
+    ApplicationModel.countDocuments(appliedCountFilter(userId, day)),
+    ApplicationModel.countDocuments(appliedCountFilter(userId, month)),
+  ]);
+
+  const plan = getEffectivePlan(user.plan, user.planExpiresAt);
+  const hourLimit = getPlanAppliesPerHour(user.plan, user.planExpiresAt);
+  const dayLimit = getPlanAppliesPerDay(user.plan, user.planExpiresAt);
+  const monthLimit = getPlanAppliesLimit(user.plan, user.planExpiresAt);
+
+  if (hourUsed >= hourLimit) {
+    throw new AppError(
+      `Hourly safety limit reached (${hourLimit}/hour on ${plan})`,
+      429,
+      'APPLY_HOUR_CAP'
+    );
+  }
+  if (dayUsed >= dayLimit) {
+    throw new AppError(
+      `Daily safety limit reached (${dayLimit}/day on ${plan})`,
+      429,
+      'APPLY_DAY_CAP'
+    );
+  }
+  if (monthUsed >= monthLimit) {
+    throw new AppError(
+      `Monthly apply limit reached (${monthLimit}/month on ${plan})`,
+      429,
+      'APPLY_PLAN_CAP'
+    );
+  }
+}
+
 async function upsertApplicationFromEvent(
   userId: string,
   event: EventEnvelope
-): Promise<Application | null> {
+) {
   if (
     event.type !== 'ApplicationRecorded' &&
     event.type !== 'JobDetected'
@@ -74,6 +133,10 @@ async function upsertApplicationFromEvent(
         ? 'applied'
         : job.status
       : job.status;
+
+  if (countsAsApply(event, status)) {
+    await assertApplyCaps(userId);
+  }
 
   const filter =
     job.externalJobId && job.externalJobId.length > 0
@@ -149,9 +212,9 @@ async function handleExtensionConnected(
 
 export async function syncEvents(
   userId: string,
-  body: SyncEventsRequest
-): Promise<{ processed: number; applications: Application[] }> {
-  const applications: Application[] = [];
+  body: { events: EventEnvelope[] }
+): Promise<{ processed: number; applications: ReturnType<typeof toApplication>[] }> {
+  const applications: ReturnType<typeof toApplication>[] = [];
 
   for (const event of body.events) {
     await ActivityModel.findOneAndUpdate(

@@ -16,6 +16,12 @@ fs.copyFileSync(path.join(root, 'manifest.json'), path.join(dist, 'manifest.json
 fs.copyFileSync(path.join(root, 'popup.html'), path.join(dist, 'popup.html'));
 fs.copyFileSync(path.join(root, 'popup.css'), path.join(dist, 'popup.css'));
 
+const assetsSrc = path.join(root, 'assets');
+const assetsDist = path.join(dist, 'assets');
+if (fs.existsSync(assetsSrc)) {
+  fs.cpSync(assetsSrc, assetsDist, { recursive: true });
+}
+
 async function writeIcons(outDir) {
   const svgPath = path.join(root, 'icons', 'icon.svg');
   const svg = fs.readFileSync(svgPath);

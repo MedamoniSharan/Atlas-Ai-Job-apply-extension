@@ -13,7 +13,6 @@ import {
   Briefcase,
   CircleHelp,
   Compass,
-  Inbox,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -49,7 +48,6 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/settings')) return 'Settings';
   if (pathname.startsWith('/get-started')) return 'Get started';
   if (pathname.startsWith('/browse')) return 'Browse jobs';
-  if (pathname.startsWith('/inbox')) return 'Inbox';
   if (pathname.startsWith('/tracker')) return 'Tracker';
   if (pathname.startsWith('/profile')) return 'Profile';
   if (pathname.startsWith('/applications')) return 'Applications';
@@ -177,12 +175,6 @@ export function AppLayout() {
             {typeof appCount === 'number' && appCount > 0 ? (
               <span className="sidebar__badge">{appCount}</span>
             ) : null}
-          </NavLink>
-          <NavLink to="/inbox" className="sidebar__link">
-            <span className="sidebar__icon" aria-hidden>
-              <Inbox size={18} strokeWidth={1.9} className="icon-motion" />
-            </span>
-            Inbox
           </NavLink>
           <NavLink to="/tracker" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>

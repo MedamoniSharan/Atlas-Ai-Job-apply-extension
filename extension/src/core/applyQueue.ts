@@ -1,5 +1,17 @@
 import type { JobPayload } from '@atlas/shared';
 import {
+  handleBlockedPage,
+  paceModeFromStealth,
+  pacedWait,
+  wait,
+} from './humanPace';
+import {
+  getApplyQuotaBlock,
+  getApplyQuotaSnapshot,
+  noteLocalApply,
+  quotaBlockMessage,
+} from './planApplyQuota';
+import {
   ApplyQueueItem,
   getApplyQueue,
   getCachedPreferences,
@@ -10,19 +22,11 @@ import { logger } from './logger';
 import {
   appendCopilotLog,
   getCopilotState,
+  raiseCopilotAlert,
   raiseCopilotToast,
   setCopilotState,
 } from './copilotState';
 import { mergeJobFields } from './jobFields';
-import { getPlanApplyQuota, noteLocalApply } from './planApplyQuota';
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function randomDelay() {
-  return 3000 + Math.floor(Math.random() * 5000);
-}
 
 function normalizeUrl(url: string): string {
   try {
@@ -69,7 +73,7 @@ export async function enqueueApplyJobs(
 ): Promise<number> {
   let remaining = 0;
   try {
-    remaining = (await getPlanApplyQuota()).remaining;
+    remaining = (await getApplyQuotaSnapshot()).monthRemaining;
   } catch (error) {
     logger.warn('Could not load plan apply quota', {
       error: error instanceof Error ? error.message : String(error),
@@ -139,21 +143,25 @@ export async function processApplyQueue(
     while (queue.length > 0) {
       let quota;
       try {
-        quota = await getPlanApplyQuota();
+        quota = await getApplyQuotaSnapshot();
       } catch (error) {
         await appendCopilotLog(
-          `Could not verify plan apply limit: ${
+          `Could not verify apply limits: ${
             error instanceof Error ? error.message : String(error)
           }`,
           'warn'
         );
         break;
       }
-      if (quota.remaining <= 0) {
-        await appendCopilotLog(
-          `Plan apply limit reached (${quota.used}/${quota.limit} this month). Upgrade in Atlas to continue.`,
-          'warn'
+      const blockReason = getApplyQuotaBlock(quota);
+      if (blockReason) {
+        const msg = quotaBlockMessage(quota, blockReason);
+        await raiseCopilotAlert(
+          msg,
+          'warn',
+          blockReason === 'month' ? 'plan_limit' : 'rate_limit'
         );
+        await appendCopilotLog(msg, 'warn');
         break;
       }
 
@@ -194,22 +202,55 @@ export async function processApplyQueue(
         if (activeTabId == null) continue;
 
         await waitForTabComplete(activeTabId);
-        await wait(2000);
+        const mode = paceModeFromStealth(false);
+        await pacedWait(mode, 'nav', { jobTitle: item.title });
+        await pacedWait(mode, 'dwell', { jobTitle: item.title });
+
+        const block = await sendToTab<{ blocked?: boolean; reason?: string }>(
+          activeTabId,
+          { type: 'CHECK_BLOCK_PAGE' },
+          3
+        );
+        if (block.blocked) {
+          await handleBlockedPage(block.reason || 'verification page');
+          await setApplyQueue([item, ...queue]);
+          return {
+            processed,
+            message: 'Stopped — Naukri verification page detected.',
+          };
+        }
 
         let loggedIn = false;
         for (let attempt = 0; attempt < 5; attempt++) {
-          const login = await sendToTab<{ loggedIn: boolean }>(activeTabId, {
+          const login = await sendToTab<{
+            loggedIn: boolean;
+            status?: 'loggedIn' | 'loggedOut' | 'uncertain';
+          }>(activeTabId, {
             type: 'CHECK_LOGIN',
           });
           if (login.loggedIn) {
             loggedIn = true;
+            await setCopilotState({ needsLogin: false, loginPauseReason: null });
             break;
           }
-          await setCopilotState({ paused: true, running: true });
+          const reason: 'loggedOut' | 'uncertain' =
+            login.status === 'loggedOut' ? 'loggedOut' : 'uncertain';
+          await setCopilotState({
+            paused: true,
+            running: true,
+            needsLogin: true,
+            loginPauseReason: reason,
+          });
           await appendCopilotLog(
-            'Paused — you are not logged into Naukri. Log in, then press Resume.',
+            reason === 'uncertain'
+              ? 'Paused — confirm you’re logged into Naukri, then press Resume.'
+              : 'Paused — you are not logged into Naukri. Log in, then press Resume.',
             'warn'
           );
+          await sendToTab(activeTabId, {
+            type: 'SHOW_LOGIN_PROMPT',
+            reason,
+          }).catch(() => undefined);
           const start = Date.now();
           while (Date.now() - start < 120_000) {
             const st = await getCopilotState();
@@ -230,7 +271,7 @@ export async function processApplyQueue(
           await setApplyQueue([item, ...queue]);
           return {
             processed,
-            message: 'Log into Naukri, then retry apply.',
+            message: 'Confirm you’re logged into Naukri, then retry apply.',
           };
         }
 
@@ -238,9 +279,19 @@ export async function processApplyQueue(
           ok: boolean;
           skipped?: boolean;
           alreadyApplied?: boolean;
+          blocked?: boolean;
           reason?: string;
           job?: Partial<JobPayload>;
         }>(activeTabId, { type: 'RUN_EASY_APPLY' });
+
+        if (result.blocked) {
+          await handleBlockedPage(result.reason || 'verification page');
+          await setApplyQueue([item, ...queue]);
+          return {
+            processed,
+            message: 'Stopped — Naukri verification page detected.',
+          };
+        }
 
         const base = mergeJobFields(result.job, item, {
           url: item.url,
@@ -301,7 +352,9 @@ export async function processApplyQueue(
         );
       }
 
-      await wait(randomDelay());
+      await pacedWait(paceModeFromStealth(false), 'betweenJobs', {
+        jobTitle: item.title,
+      });
       queue = await getApplyQueue();
     }
 

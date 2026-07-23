@@ -2,6 +2,7 @@ import type { JobPayload } from '@atlas/shared';
 import {
   NaukriAdapter,
   SearchResultJob,
+  hasNaukriSessionCookieHint,
 } from '../adapters/naukriAdapter';
 import { resolveAdapter } from '../adapters';
 import { logger } from '../core/logger';
@@ -114,9 +115,28 @@ async function runEasyApply(): Promise<{
   skipped?: boolean;
   alreadyApplied?: boolean;
   needsUserInput?: boolean;
+  blocked?: boolean;
   reason?: string;
   job?: Partial<JobPayload>;
 }> {
+  const blockReason = naukri.detectNaukriBlockPage(document);
+  if (blockReason) {
+    return { ok: false, blocked: true, reason: blockReason };
+  }
+
+  const loginStatus = naukri.getLoginStatus(document);
+  if (loginStatus !== 'loggedIn') {
+    return {
+      ok: false,
+      skipped: true,
+      reason:
+        loginStatus === 'uncertain'
+          ? 'Confirm you’re logged into Naukri'
+          : 'Naukri login required',
+      job: naukri.readJob(document) ?? undefined,
+    };
+  }
+
   const job = naukri.readJob(document) ?? undefined;
 
   // Success page / already applied must win over leftover questionnaire DOM.
@@ -249,11 +269,37 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case 'CHECK_LOGIN': {
         // Header auth controls can render slightly after document_idle.
         await new Promise((r) => setTimeout(r, 300));
-        sendResponse({ loggedIn: naukri.isLoggedIn(document) });
+        const status = naukri.getLoginStatus(document);
+        const cookieHint = hasNaukriSessionCookieHint(document.cookie);
+        sendResponse({
+          status,
+          loggedIn: status === 'loggedIn',
+          cookieHint,
+        });
         break;
       }
       case 'SHOW_LOGIN_PROMPT': {
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, reason: message?.reason ?? null });
+        break;
+      }
+      case 'CLICK_NEXT_PAGE': {
+        const clicked = naukri.clickNextSearchPage(document);
+        if (clicked.ok) {
+          sendResponse(clicked);
+          break;
+        }
+        const nextUrl = naukri.nextSearchPageUrl(window.location.href);
+        if (nextUrl) {
+          window.location.href = nextUrl;
+          sendResponse({ ok: true, via: 'url' });
+          break;
+        }
+        sendResponse(clicked);
+        break;
+      }
+      case 'CHECK_BLOCK_PAGE': {
+        const reason = naukri.detectNaukriBlockPage(document);
+        sendResponse({ blocked: Boolean(reason), reason: reason ?? undefined });
         break;
       }
       case 'CHECK_APPLY_STATUS': {

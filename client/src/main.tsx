@@ -38,15 +38,6 @@ createRoot(document.getElementById('root')!).render(
                 />
               }
             />
-            <Route
-              path="/inbox"
-              element={
-                <ComingSoonPage
-                  title="Inbox"
-                  blurb="Recruiter messages and replies will land here. Not available in this MVP."
-                />
-              }
-            />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
