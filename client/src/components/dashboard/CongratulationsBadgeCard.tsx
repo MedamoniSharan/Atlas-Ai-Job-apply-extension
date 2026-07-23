@@ -39,10 +39,20 @@ export function CongratulationsBadgeCard({
           Congratulations {name}!{' '}
           <span aria-hidden="true">🎉</span>
         </h2>
-        <p>
-          You have {matchedCount} matched jobs and {appliedCount} applications
-          tracked.
-          <br />
+        <p className="dash-congrats__summary">
+          <span className="dash-congrats__metric">
+            <span className="dash-congrats__stat">{matchedCount}</span>
+            <span className="dash-congrats__metric-label">matched jobs</span>
+          </span>
+          <span className="dash-congrats__sep" aria-hidden>
+            ·
+          </span>
+          <span className="dash-congrats__metric">
+            <span className="dash-congrats__stat">{appliedCount}</span>
+            <span className="dash-congrats__metric-label">applications tracked</span>
+          </span>
+        </p>
+        <p className="dash-congrats__hint">
           Keep the co-pilot running to grow your pipeline.
         </p>
         <Link

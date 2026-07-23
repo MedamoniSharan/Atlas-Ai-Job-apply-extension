@@ -1,13 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  Briefcase,
-  CheckCircle2,
-  Globe2,
-  Puzzle,
-  SkipForward,
-  Sparkles,
-} from 'lucide-react';
-import { BrowserStoreMark } from '../BrowserStoreButtons';
+import { FlatStatusIcon, type StatusIconKey } from './FlatStatusIcon';
 
 type TabKey = 'jobs' | 'extension';
 
@@ -17,39 +9,13 @@ export type StatsRow = {
   count: number;
   pct: number;
   barClass: string;
-  icon:
-    | 'applied'
-    | 'matched'
-    | 'company'
-    | 'skipped'
-    | 'auto'
-    | 'chrome'
-    | 'edge'
-    | 'firefox'
-    | 'connect';
+  icon: StatusIconKey;
 };
 
 function formatCount(n: number): string {
   if (n >= 1000)
     return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 2)}k`.replace(/\.00k$/, 'k');
   return String(n);
-}
-
-function RowIcon({ icon }: { icon: StatsRow['icon'] }) {
-  if (icon === 'chrome' || icon === 'edge' || icon === 'firefox') {
-    return <BrowserStoreMark storeKey={icon} size={22} />;
-  }
-
-  const map = {
-    applied: CheckCircle2,
-    matched: Sparkles,
-    company: Globe2,
-    skipped: SkipForward,
-    auto: Puzzle,
-    connect: Briefcase,
-  } as const;
-  const Icon = map[icon] ?? Briefcase;
-  return <Icon size={16} strokeWidth={2.2} aria-hidden />;
 }
 
 export function JobsExtensionStatsCard({
@@ -123,7 +89,7 @@ export function JobsExtensionStatsCard({
                       <span
                         className={`dash-breakdown__icon dash-breakdown__icon--${row.icon}`}
                       >
-                        <RowIcon icon={row.icon} />
+                        <FlatStatusIcon icon={row.icon} />
                       </span>
                       {row.label}
                     </span>

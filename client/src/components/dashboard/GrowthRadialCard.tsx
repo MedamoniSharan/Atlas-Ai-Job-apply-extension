@@ -90,10 +90,10 @@ export function GrowthRadialCard({
             </desc>
             <path className="dash-growth__track" d="M 38 130 A 72 72 0 1 1 182 130" />
             <path className="dash-growth__progress" d={progressPath} />
-            <text x="110" y="93" className="dash-growth__value">
+            <text x="110" y="108" className="dash-growth__value">
               {usagePct}%
             </text>
-            <text x="110" y="116" className="dash-growth__label">
+            <text x="110" y="130" className="dash-growth__label">
               Usage
             </text>
           </svg>
