@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreVertical, Sparkles } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 
 const periods = ['Last 28 Days', 'Last Month', 'Last Year'] as const;
 
@@ -15,12 +15,6 @@ function ApplyRing({ value }: { value: number }) {
       }}
     >
       <div className="dash-sales__ring-inner">
-        <Sparkles
-          aria-hidden
-          size={38}
-          strokeWidth={1.8}
-          className="dash-sales__sparkle"
-        />
         <strong>{value}%</strong>
         <span>Applied</span>
       </div>
