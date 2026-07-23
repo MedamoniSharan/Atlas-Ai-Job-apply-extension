@@ -1236,15 +1236,6 @@ textarea {
 }
 
 .dash-stat-card--applied {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  grid-template-columns: none;
-  grid-template-areas: none;
-  padding: 16px 12px 16px 18px;
-  overflow: visible;
-  min-height: 0;
   border-color: #d6e8f6;
   background:
     radial-gradient(circle at 18% 18%, rgba(11, 126, 164, 0.22), transparent 42%),
@@ -1252,6 +1243,11 @@ textarea {
     linear-gradient(145deg, #f2f9fc 0%, #e4f2f8 100%);
   background-size: 160% 160%, 180% 180%, 100% 100%;
   animation: dash-stat-glow-blue 9s ease-in-out infinite;
+}
+
+.dash-stat-card--applied .dash-stat-card__icon--naukri {
+  background: #ffffff;
+  border-color: #cfe3f0;
 }
 
 .dash-stat-card--limit {
@@ -1308,8 +1304,7 @@ textarea {
   }
 }
 
-.dash-stat-card--jobs .dash-stat-card__text,
-.dash-stat-card--applied .dash-stat-card__text {
+.dash-stat-card--jobs .dash-stat-card__text {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1321,15 +1316,11 @@ textarea {
 
 .dash-stat-card--jobs .dash-stat-card__label,
 .dash-stat-card--jobs .dash-stat-card__value,
-.dash-stat-card--jobs .dash-stat-card__meta,
-.dash-stat-card--applied .dash-stat-card__label,
-.dash-stat-card--applied .dash-stat-card__value,
-.dash-stat-card--applied .dash-stat-card__meta {
+.dash-stat-card--jobs .dash-stat-card__meta {
   grid-area: auto;
 }
 
-.dash-stat-card__lottie--jobs,
-.dash-stat-card__lottie--applied {
+.dash-stat-card__lottie--jobs {
   width: 64px;
   height: 64px;
   margin-right: 4px;
@@ -1339,8 +1330,7 @@ textarea {
   overflow: visible;
 }
 
-.dash-stat-card__lottie--jobs > div,
-.dash-stat-card__lottie--applied > div {
+.dash-stat-card__lottie--jobs > div {
   width: 64px !important;
   height: 64px !important;
   transform: scale(2.6);
@@ -7055,62 +7045,26 @@ a.tracker-card__title:hover {
   padding: 12px 16px;
 }
 
-.get-extension__stores,
-.get-extension__guide {
+.get-extension__status {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.get-extension__status h2 {
+  margin: 0;
+}
+
+.get-extension__status .muted {
+  margin: 0;
+}
+
+.get-extension__stores {
   margin-top: 1.25rem;
 }
 
-.get-extension__stores h3,
-.get-extension__guide h3 {
+.get-extension__stores h3 {
   margin: 0 0 0.75rem;
   font-size: 1rem;
-}
-
-.get-extension__guide-head {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.35rem;
-}
-
-.get-extension__guide-head h3 {
-  margin: 0;
-}
-
-.get-extension__steps {
-  list-style: none;
-  margin: 1rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.85rem;
-}
-
-.get-extension__step {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.get-extension__step-num {
-  flex-shrink: 0;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--color-surface-raised);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.get-extension__step strong {
-  display: block;
-  margin-bottom: 0.15rem;
-}
-
-.get-extension__step .muted {
-  margin: 0;
 }
 
 .get-extension__actions {

@@ -6,7 +6,6 @@ import { useApplicationSocket } from '../lib/socket';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import {
   ActivityTimeline,
-  AppliedRecruitmentLottie,
   appsToTimeline,
   CongratulationsBadgeCard,
   GrowthRadialCard,
@@ -374,12 +373,12 @@ export function DashboardPage() {
           </article>
 
           <article className="dash-stat-card dash-stat-card--applied">
-            <div className="dash-stat-card__text">
-              <span className="dash-stat-card__label">Applied</span>
-              <strong className="dash-stat-card__value">{appliedCount}</strong>
-              <em className="dash-stat-card__meta">Auto + tracked</em>
-            </div>
-            <AppliedRecruitmentLottie />
+            <span className="dash-stat-card__icon dash-stat-card__icon--naukri" aria-hidden>
+              <img src="/naukri-logo.png" alt="" width={22} height={22} />
+            </span>
+            <span className="dash-stat-card__label">Applied</span>
+            <strong className="dash-stat-card__value">{appliedCount}</strong>
+            <em className="dash-stat-card__meta">Auto + tracked</em>
           </article>
 
           <article className="dash-stat-card dash-stat-card--limit">
