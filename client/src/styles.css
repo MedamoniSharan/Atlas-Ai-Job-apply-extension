@@ -7045,19 +7045,8 @@ a.tracker-card__title:hover {
   min-width: 0;
 }
 
-.browser-store-button__eyebrow {
-  display: block;
-  white-space: nowrap;
-  color: #59636f;
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: 0.01em;
-}
-
 .browser-store-button__name {
   display: block;
-  margin-top: 4px;
   white-space: nowrap;
   color: #151a21;
   font-size: 15px;
@@ -7079,24 +7068,6 @@ a.tracker-card__title:hover {
   background: #ffffff;
   border-color: #d7dce2;
   box-shadow: 0 1px 2px rgba(18, 29, 43, 0.06);
-}
-
-.browser-store-button.is-disabled {
-  opacity: 1;
-  color: inherit;
-}
-
-.browser-store-button.is-disabled .browser-store-button__eyebrow,
-.browser-store-button.is-disabled .browser-store-button__cta {
-  color: #8a929c;
-}
-
-.browser-store-button.is-disabled .browser-store-button__name {
-  color: #3a424c;
-}
-
-.browser-store-button.is-disabled .browser-store-mark {
-  opacity: 0.78;
 }
 
 .browser-store-button__cta {

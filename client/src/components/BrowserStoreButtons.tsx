@@ -92,22 +92,18 @@ export function BrowserStoreButtons({
             target={href ? '_blank' : undefined}
             rel={href ? 'noreferrer noopener' : undefined}
             aria-label={store.title}
-            aria-disabled={!href}
-            className={`browser-store-button${isFeatured ? ' is-featured' : ''}${!href ? ' is-disabled' : ''}`}
+            className={`browser-store-button${isFeatured ? ' is-featured' : ''}`}
             onClick={(event) => {
               if (href) return;
               event.preventDefault();
               window.alert(
-                `${store.storeName} listing is coming soon. For Chrome, use Add to Chrome when the store link is available.`
+                `${store.storeName} listing will open here once the store link is available.`
               );
             }}
           >
             <StoreMark storeKey={store.key} />
             <span className="browser-store-button__text">
               <span className="sr-only">{store.label}</span>
-              <span className="browser-store-button__eyebrow">
-                {href ? 'Available in the' : 'Coming soon on'}
-              </span>
               <span className="browser-store-button__name">{store.storeName}</span>
               <span className="browser-store-button__cta">{store.cta}</span>
             </span>
