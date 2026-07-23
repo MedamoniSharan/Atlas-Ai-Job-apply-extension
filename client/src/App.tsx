@@ -46,6 +46,37 @@ function userInitials(name?: string | null): string {
   return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
 }
 
+function ShellClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const dateLabel = now.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const timeLabel = now.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  return (
+    <time
+      className="shell__clock"
+      dateTime={now.toISOString()}
+      title={`${dateLabel} · ${timeLabel}`}
+    >
+      <span className="shell__clock-date">{dateLabel}</span>
+      <span className="shell__clock-time">{timeLabel}</span>
+    </time>
+  );
+}
+
 function pageTitle(pathname: string): string {
   if (pathname.startsWith('/settings')) return 'Settings';
   if (pathname.startsWith('/get-extension') || pathname.startsWith('/get-started')) {
@@ -300,6 +331,8 @@ export function AppLayout() {
           ) : (
             <div className="shell__search-spacer" />
           )}
+
+          <ShellClock />
 
           <div className="shell__actions">
             <button

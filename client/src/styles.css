@@ -454,10 +454,35 @@ textarea {
   flex: 1;
 }
 
+.shell__clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 2px;
+  line-height: 1.15;
+  text-align: right;
+  color: var(--color-text-on-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell__clock-date {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.shell__clock-time {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 .shell__actions {
   display: flex;
   gap: var(--space-2);
-  margin-left: auto;
 }
 
 .shell__icon-btn {
@@ -763,6 +788,8 @@ textarea {
   min-height: 150px;
   display: flex;
   justify-content: center;
+  outline: none;
+  cursor: default;
 }
 
 .dash-growth__chart {
@@ -792,6 +819,7 @@ textarea {
 .dash-growth__progress {
   stroke: var(--color-surface-raised);
   stroke-dasharray: 5 5;
+  stroke-linecap: butt;
 }
 
 .dash-growth__value {
@@ -973,14 +1001,35 @@ textarea {
   place-items: center;
   border-radius: 50%;
   position: relative;
+  outline: none;
+  cursor: default;
+}
+
+.dash-sales__ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: translateZ(0);
+}
+
+.dash-sales__ring-track,
+.dash-sales__ring-progress {
+  stroke-width: 10;
+}
+
+.dash-sales__ring-track {
+  stroke: #e9edf0;
+}
+
+.dash-sales__ring-progress {
+  stroke: #2f6b52;
+  stroke-linecap: butt;
+  will-change: stroke-dashoffset;
 }
 
 .dash-sales__ring::before {
-  content: '';
-  position: absolute;
-  inset: 14px;
-  border-radius: inherit;
-  background: #fff;
+  content: none;
 }
 
 .dash-sales__ring-inner {
@@ -4087,6 +4136,15 @@ a.tracker-card__title:hover {
     margin: 0;
   }
 
+  .shell__clock {
+    order: 3;
+    margin-left: 0;
+  }
+
+  .shell__actions {
+    margin-left: auto;
+  }
+
   .shell__header {
     flex-wrap: wrap;
   }
@@ -7018,11 +7076,26 @@ a.tracker-card__title:hover {
 }
 
 .browser-store-button.is-featured {
-  border-color: var(--color-surface-raised);
-  box-shadow: 0 0 0 1px var(--color-surface-raised);
+  background: #ffffff;
+  border-color: #d7dce2;
+  box-shadow: 0 1px 2px rgba(18, 29, 43, 0.06);
 }
 
 .browser-store-button.is-disabled {
+  opacity: 1;
+  color: inherit;
+}
+
+.browser-store-button.is-disabled .browser-store-button__eyebrow,
+.browser-store-button.is-disabled .browser-store-button__cta {
+  color: #8a929c;
+}
+
+.browser-store-button.is-disabled .browser-store-button__name {
+  color: #3a424c;
+}
+
+.browser-store-button.is-disabled .browser-store-mark {
   opacity: 0.78;
 }
 

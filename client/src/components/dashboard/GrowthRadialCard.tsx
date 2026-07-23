@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, Gauge, Target } from 'lucide-react';
+import { useHoverProgress } from '../../hooks/useHoverProgress';
 
 const PERIODS = ['This month', 'Last month', 'This year'] as const;
+const ARC_LENGTH = 100;
 
 export interface GrowthRadialCardProps {
   usagePct: number;
@@ -22,19 +24,41 @@ export function GrowthRadialCard({
 }: GrowthRadialCardProps) {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>(PERIODS[0]);
   const [isOpen, setIsOpen] = useState(false);
+  const maskId = useId();
+  const { percent, durationMs, hovered, setReplay, bind } = useHoverProgress(usagePct);
+  const revealRef = useRef<SVGPathElement>(null);
+  const target = Math.max(0, Math.min(100, usagePct));
+  const targetOffset = ARC_LENGTH - target;
 
-  const progressPath = useMemo(() => {
-    // Semi-circle arc: map 0–100% onto an open path approximating the demo chart.
-    const clamped = Math.max(0, Math.min(100, usagePct));
-    if (clamped <= 0) return 'M 38 130';
-    if (clamped >= 100) return 'M 38 130 A 72 72 0 1 1 182 130';
-    // Approximate endpoint along the arc for mid values (visual only).
-    const angle = Math.PI * (1 - clamped / 100);
-    const x = 110 + 72 * Math.cos(angle);
-    const y = 130 - 72 * Math.sin(angle);
-    const large = clamped > 50 ? 1 : 0;
-    return `M 38 130 A 72 72 0 ${large} 1 ${x.toFixed(1)} ${y.toFixed(1)}`;
-  }, [usagePct]);
+  useEffect(() => {
+    setReplay(() => {
+      const el = revealRef.current;
+      if (!el) return;
+
+      if (
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        el.style.transition = 'none';
+        el.style.strokeDashoffset = String(targetOffset);
+        return;
+      }
+
+      el.style.transition = 'none';
+      el.style.strokeDashoffset = String(ARC_LENGTH);
+      void el.getBoundingClientRect();
+      el.style.transition = `stroke-dashoffset ${durationMs}ms cubic-bezier(0.45, 0, 0.2, 1)`;
+      el.style.strokeDashoffset = String(targetOffset);
+    });
+    return () => setReplay(null);
+  }, [durationMs, setReplay, targetOffset]);
+
+  useEffect(() => {
+    const el = revealRef.current;
+    if (!el || hovered) return;
+    el.style.transition = 'none';
+    el.style.strokeDashoffset = String(targetOffset);
+  }, [hovered, targetOffset]);
 
   return (
     <article className="dash-widget dash-growth" aria-labelledby="growth-card-title">
@@ -77,7 +101,12 @@ export function GrowthRadialCard({
         </div>
       </header>
 
-      <section className="dash-growth__radial" aria-label="Usage chart">
+      <section
+        className="dash-growth__radial"
+        aria-label="Usage chart"
+        tabIndex={0}
+        {...bind}
+      >
         <div className="dash-growth__chart">
           <svg
             viewBox="0 0 220 170"
@@ -88,10 +117,40 @@ export function GrowthRadialCard({
             <desc id="growth-chart-description">
               A radial progress chart showing {usagePct} percent of monthly applies used.
             </desc>
-            <path className="dash-growth__track" d="M 38 130 A 72 72 0 1 1 182 130" />
-            <path className="dash-growth__progress" d={progressPath} />
+            <defs>
+              <mask
+                id={maskId}
+                maskUnits="userSpaceOnUse"
+                x="0"
+                y="0"
+                width="220"
+                height="170"
+              >
+                <path
+                  ref={revealRef}
+                  d="M 38 130 A 72 72 0 1 1 182 130"
+                  pathLength={ARC_LENGTH}
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="22"
+                  strokeLinecap="butt"
+                  strokeDasharray={ARC_LENGTH}
+                  strokeDashoffset={targetOffset}
+                />
+              </mask>
+            </defs>
+            <path
+              className="dash-growth__track"
+              d="M 38 130 A 72 72 0 1 1 182 130"
+              pathLength={ARC_LENGTH}
+            />
+            <path
+              className="dash-growth__progress"
+              d="M 38 130 A 72 72 0 1 1 182 130"
+              mask={`url(#${maskId})`}
+            />
             <text x="110" y="108" className="dash-growth__value">
-              {usagePct}%
+              {percent}%
             </text>
             <text x="110" y="130" className="dash-growth__label">
               Usage
