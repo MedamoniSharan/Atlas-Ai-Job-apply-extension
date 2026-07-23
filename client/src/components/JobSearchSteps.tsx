@@ -1,5 +1,4 @@
-import { useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 
 const steps = [
@@ -23,14 +22,6 @@ const steps = [
 ] as const;
 
 export function JobSearchSteps() {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState('');
-
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) setFileName(file.name);
-  }
-
   return (
     <section className="job-steps-shell" aria-labelledby="job-steps-title">
       <h2 id="job-steps-title" className="job-steps-title">
@@ -52,33 +43,16 @@ export function JobSearchSteps() {
         ))}
       </div>
       <div className="job-steps-action">
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf,.doc,.docx"
-          hidden
-          onChange={handleFileChange}
-        />
-        <button
-          className="job-steps-button"
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          aria-label="Get started by uploading your resume"
-        >
-          <span>{fileName ? 'Resume selected' : 'Get Started'}</span>
+        <Link className="job-steps-button" to="/login" aria-label="Get started — sign in">
+          <span>Get Started</span>
           <ArrowUpRight
             size={16}
             strokeWidth={2.2}
             className="job-steps-arrow icon-motion"
             aria-hidden
           />
-        </button>
+        </Link>
       </div>
-      {fileName ? (
-        <p className="job-steps-status" role="status">
-          Selected: {fileName}
-        </p>
-      ) : null}
     </section>
   );
 }

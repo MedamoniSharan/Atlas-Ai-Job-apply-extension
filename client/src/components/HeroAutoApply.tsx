@@ -2,20 +2,44 @@ import { Link } from 'react-router-dom';
 import { Check, Sparkles, X } from 'lucide-react';
 
 const FEATURES = [
-  'Guided Easy Apply on Naukri',
-  'Human-paced co-pilot sessions',
-  'You stay in control',
-  'Scan, review, and apply with consent',
+  '4× Faster Fills',
+  '1,000+ Apps / Night',
+  'Browser Agent, No Manual Forms',
+  'Works on Greenhouse, Workday, Ashby & more',
 ] as const;
 
-const PROMO_ART = '/A6sNEgPCIIfX9ATPDrQVd1r4PU.avif';
-const TOAST_ART = '/XAkCgccIBX2KJG3BPQ1pP7Vfeu8.avif';
+const PROMO_ART = '/hero-promo-card.png?v=10';
+const NAUKRI_LOGO = '/naukri-logo.png';
 
-function WorkdayMark() {
+function NaukriMark({ size = 28 }: { size?: number }) {
   return (
-    <span className="hero-agent__wd" aria-hidden="true">
-      <span>w</span>
-    </span>
+    <img
+      className="hero-agent__naukri"
+      src={NAUKRI_LOGO}
+      alt=""
+      width={size}
+      height={size}
+      decoding="async"
+      aria-hidden="true"
+    />
+  );
+}
+
+function MicrosoftMark() {
+  return (
+    <svg
+      className="hero-agent__microsoft"
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 23 23"
+      role="img"
+    >
+      <path fill="#F25022" d="M1 1h10v10H1z" />
+      <path fill="#7FBA00" d="M12 1h10v10H12z" />
+      <path fill="#00A4EF" d="M1 12h10v10H1z" />
+      <path fill="#FFB900" d="M12 12h10v10H12z" />
+    </svg>
   );
 }
 
@@ -33,7 +57,10 @@ export function HeroAutoApply() {
             />
             AI Powered
           </p>
-          <h1 id="landing-hero-title">Naukri Co-Pilot</h1>
+          <h1 id="landing-hero-title" className="hero-agent__title">
+            <NaukriMark size={36} />
+            <span>Naukri Auto Apply</span>
+          </h1>
           <ul className="hero-agent__features">
             {FEATURES.map((item) => (
               <li key={item}>
@@ -53,27 +80,27 @@ export function HeroAutoApply() {
           <div className="hero-agent__panel">
             <div className="hero-agent__panel-top">
               <div className="hero-agent__brand-row">
-                <WorkdayMark />
-                <span>Naukri</span>
+                <MicrosoftMark />
+                <span>Microsoft</span>
               </div>
               <div className="hero-agent__status">
                 <span className="hero-agent__spinner" />
-                Co-pilot assisting…
+                Auto-Applying…
                 <X size={14} strokeWidth={2.4} aria-hidden="true" />
               </div>
             </div>
 
             <Link
               className="hero-agent__promo"
-              to="/register"
-              aria-label="Start applying with Cosmo Co-Pilot"
+              to="/login"
+              aria-label="Start applying — sign in"
             >
               <img
                 className="hero-agent__promo-img"
                 src={PROMO_ART}
-                alt="Cosmo Co-Pilot — guided Easy Apply on Naukri. You stay in control."
-                width={720}
-                height={280}
+                alt="AutoApply Agent — applies to jobs while you relax"
+                width={700}
+                height={178}
                 decoding="async"
               />
             </Link>
@@ -97,14 +124,14 @@ export function HeroAutoApply() {
             </div>
           </div>
 
-          <img
-            className="hero-agent__toast-img"
-            src={TOAST_ART}
-            alt="Guided applies with safer pacing"
-            width={360}
-            height={80}
-            decoding="async"
-          />
+          <div className="hero-agent__toast" role="status">
+            <span className="hero-agent__toast-icon" aria-hidden="true">
+              <Check size={14} strokeWidth={2.6} />
+            </span>
+            <p>
+              You’ve already saved <strong>20 minutes!</strong>
+            </p>
+          </div>
         </div>
       </div>
     </section>

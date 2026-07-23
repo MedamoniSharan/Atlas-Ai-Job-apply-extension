@@ -3085,16 +3085,16 @@ a.tracker-card__title:hover {
 /* Auto-Apply Agent hero */
 .hero-agent {
   width: 100%;
-  padding: 28px 24px 64px;
+  padding: 12px 24px 36px;
   background: transparent;
 }
 
 .hero-agent__inner {
-  width: min(1120px, 100%);
+  width: min(1040px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: 18px;
   align-items: center;
 }
 
@@ -3106,8 +3106,8 @@ a.tracker-card__title:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 18px;
-  padding: 7px 12px;
+  margin: 0 0 12px;
+  padding: 6px 11px;
   border-radius: 999px;
   border: 1px solid #e5e7eb;
   background: #ffffff;
@@ -3126,13 +3126,34 @@ a.tracker-card__title:hover {
   color: #7c3aed;
 }
 
-.hero-agent__copy h1 {
-  margin: 0 0 28px;
-  font-size: clamp(40px, 5vw, 56px);
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+.hero-agent__copy h1,
+.hero-agent__title {
+  margin: 0 0 16px;
+  font-size: clamp(30px, 3.8vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
   font-weight: 750;
   color: #0f172a;
+}
+
+.hero-agent__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  max-width: 100%;
+}
+
+.hero-agent__title span {
+  min-width: 0;
+  white-space: normal;
+}
+
+.hero-agent__naukri {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .hero-agent__features {
@@ -3140,14 +3161,14 @@ a.tracker-card__title:hover {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 .hero-agent__features li {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 17px;
+  gap: 10px;
+  font-size: 16px;
   font-weight: 600;
   color: #111827;
   letter-spacing: -0.01em;
@@ -3156,8 +3177,8 @@ a.tracker-card__title:hover {
 .hero-agent__check {
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
   border-radius: 999px;
   background: #4f46e5;
@@ -3175,62 +3196,54 @@ a.tracker-card__title:hover {
 .hero-agent__panel {
   position: relative;
   background: #ffffff;
-  border-radius: 24px;
+  border-radius: 20px;
   border: 1px solid #eef0f3;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
-    0 18px 40px rgba(15, 23, 42, 0.08);
-  padding: 22px 22px 28px;
-  overflow: hidden;
-  min-height: 420px;
+    0 14px 32px rgba(15, 23, 42, 0.08);
+  padding: 14px 14px 12px;
+  overflow: visible;
 }
 
 .hero-agent__panel-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .hero-agent__brand-row {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
-  color: #111827;
+  color: #3c4043;
 }
 
-.hero-agent__wd {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: #0875e1;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: lowercase;
+.hero-agent__google,
+.hero-agent__microsoft {
+  display: block;
+  flex-shrink: 0;
 }
 
 .hero-agent__status {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 6px 12px;
+  gap: 7px;
+  min-height: 30px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: #6d28d9;
   color: #ffffff;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 .hero-agent__spinner {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: #ffffff;
@@ -3245,62 +3258,65 @@ a.tracker-card__title:hover {
 
 .hero-agent__promo {
   display: block;
-  margin-bottom: 22px;
-  border-radius: 18px;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
   overflow: hidden;
+  background: transparent;
+  box-shadow: none;
   text-decoration: none;
-  background: linear-gradient(105deg, #ffffff 0%, #f3e8ff 72%, #fce7f3 100%);
-  border: 1px solid #f3e8ff;
-  box-shadow: 0 8px 24px rgba(109, 40, 217, 0.08);
-  transition: transform var(--motion-fast), box-shadow var(--motion-fast);
+  line-height: 0;
+  font-size: 0;
 }
 
 .hero-agent__promo:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(109, 40, 217, 0.14);
+  opacity: 0.97;
 }
 
 .hero-agent__promo:focus-visible {
-  outline: 2px solid #7c3aed;
+  outline: 2px solid #111827;
   outline-offset: 3px;
-}
-
-.hero-agent__promo:active {
-  transform: translateY(0);
 }
 
 .hero-agent__promo-img {
   display: block;
   width: 100%;
   height: auto;
-  object-fit: cover;
-  object-position: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  vertical-align: top;
 }
 
 .hero-agent__table {
   display: grid;
-  gap: 10px;
-  padding: 4px 4px 0;
+  gap: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .hero-agent__table-head,
 .hero-agent__table-row {
   display: grid;
   grid-template-columns: 1.4fr 1fr 0.7fr;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .hero-agent__table-head {
   color: #93c5fd;
   font-weight: 600;
+  padding-bottom: 6px;
 }
 
 .hero-agent__table-row {
   color: #111827;
   font-weight: 500;
-  padding: 8px 0;
+  padding: 6px 0;
   border-top: 1px solid #f1f5f9;
 }
 
@@ -3309,15 +3325,44 @@ a.tracker-card__title:hover {
   font-weight: 700;
 }
 
-.hero-agent__toast-img {
+.hero-agent__toast {
   position: absolute;
   right: 10px;
-  bottom: -6px;
-  width: min(280px, 78%);
-  height: auto;
-  filter: drop-shadow(0 10px 28px rgba(15, 23, 42, 0.12));
+  bottom: -14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1.5px solid #86efac;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
   animation: landing-rise 900ms ease-out 200ms both;
-  pointer-events: none;
+}
+
+.hero-agent__toast-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #22c55e;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.hero-agent__toast p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #111827;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.hero-agent__toast strong {
+  font-weight: 750;
 }
 
 @keyframes hero-spin {
@@ -3327,25 +3372,53 @@ a.tracker-card__title:hover {
 }
 
 @media (max-width: 900px) {
+  .hero-agent {
+    padding: 8px 16px 36px;
+  }
+
   .hero-agent__inner {
     grid-template-columns: 1fr;
-    gap: 36px;
+    gap: 20px;
+  }
+
+  .hero-agent__copy h1,
+  .hero-agent__title {
+    margin-bottom: 12px;
+    font-size: clamp(28px, 7vw, 36px);
+  }
+
+  .hero-agent__title {
+    gap: 10px;
+  }
+
+  .hero-agent__title .hero-agent__naukri {
+    width: 32px;
+    height: 32px;
+  }
+
+  .hero-agent__features {
+    gap: 8px;
   }
 
   .hero-agent__features li {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .hero-agent__promo {
-    margin-bottom: 18px;
+    margin-bottom: 12px;
   }
 
-  .hero-agent__toast-img {
+  .hero-agent__toast {
     position: relative;
     right: auto;
     bottom: auto;
-    margin-top: 14px;
-    width: min(320px, 100%);
+    margin-top: 12px;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .hero-agent__toast p {
+    white-space: normal;
   }
 }
 
@@ -3745,6 +3818,7 @@ a.tracker-card__title:hover {
   font-weight: 700;
   line-height: 20px;
   text-align: center;
+  text-decoration: none;
   transition: background-color 160ms ease, border-color 160ms ease,
     transform 160ms ease;
 }
