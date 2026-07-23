@@ -8,6 +8,7 @@ import {
   previewPaymentInvoice,
   startPlanCheckout,
 } from '../lib/razorpayCheckout';
+import { BrowserStoreButtons } from './BrowserStoreButtons';
 import { CosmosLoader } from './CosmosLogo';
 import { SuccessStoriesButton } from './SuccessStoriesButton';
 
@@ -257,13 +258,9 @@ export function PricingPlans() {
           ))}
         </div>
 
-        <div className="pricing-compatible" aria-label="Compatible platforms">
-          <p>Compatible with</p>
-          <div className="pricing-compatible__logos">
-            <span className="pricing-compatible__chip">Naukri</span>
-            <span className="pricing-compatible__chip">Chrome</span>
-            <span className="pricing-compatible__chip">LinkedIn</span>
-          </div>
+        <div className="pricing-compatible" aria-label="Available on">
+          <p>Available on</p>
+          <BrowserStoreButtons />
         </div>
 
         <section className="team-plan" aria-labelledby="team-heading">

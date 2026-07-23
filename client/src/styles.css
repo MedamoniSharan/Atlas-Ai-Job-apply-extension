@@ -4004,13 +4004,22 @@ a.tracker-card__title:hover {
 }
 
 .success-stories-button--plain .success-stories-button__face {
-  padding: 12px 22px;
+  min-height: 40px;
+  padding: 8px 16px;
   column-gap: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
 }
 
 .success-stories-button--plain:hover:not(:disabled) .success-stories-button__face {
-  padding: 12px 22px;
+  padding: 8px 16px;
   column-gap: 0;
+}
+
+.success-stories-button--plain .success-stories-button__busy {
+  min-height: 40px;
+  padding: 8px 16px;
 }
 
 .success-stories-button--plain:hover:not(:disabled) .success-stories-button__label {
@@ -5272,31 +5281,88 @@ a.tracker-card__title:hover {
   padding: 8px 0 4px;
 }
 
-.pricing-compatible p {
+.pricing-compatible > p {
   margin: 0;
   color: var(--pricing-muted);
   font-size: 13px;
   font-weight: 500;
 }
 
-.pricing-compatible__logos {
+.browser-store-buttons {
   display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.pricing-compatible__chip {
-  display: inline-flex;
+.browser-store-button {
+  display: flex;
+  height: 52px;
+  width: 220px;
   align-items: center;
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--pricing-line);
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #d7dce2;
   background: #ffffff;
-  color: var(--pricing-ink);
-  font-size: 13px;
+  text-decoration: none;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(18, 29, 43, 0.06);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.browser-store-button:hover {
+  transform: translateY(-2px);
+  border-color: #b8c0ca;
+  box-shadow: 0 6px 16px rgba(18, 29, 43, 0.1);
+}
+
+.browser-store-button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 4px #1a73e8;
+}
+
+.browser-store-button__text {
+  min-width: 0;
+}
+
+.browser-store-button__eyebrow {
+  display: block;
+  white-space: nowrap;
+  color: #59636f;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.browser-store-button__name {
+  display: block;
+  margin-top: 4px;
+  white-space: nowrap;
+  color: #151a21;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.browser-store-button svg {
+  flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+  .browser-store-buttons {
+    flex-direction: row;
+  }
 }
 
 .team-plan {
