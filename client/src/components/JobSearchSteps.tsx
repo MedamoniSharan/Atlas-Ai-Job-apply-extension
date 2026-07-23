@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
+import { SuccessStoriesButton } from './SuccessStoriesButton';
 
 const steps = [
   {
@@ -43,15 +42,7 @@ export function JobSearchSteps() {
         ))}
       </div>
       <div className="job-steps-action">
-        <Link className="job-steps-button" to="/login" aria-label="Get started — sign in">
-          <span>Get Started</span>
-          <ArrowUpRight
-            size={16}
-            strokeWidth={2.2}
-            className="job-steps-arrow icon-motion"
-            aria-hidden
-          />
-        </Link>
+        <SuccessStoriesButton label="Get Started" to="/login" />
       </div>
     </section>
   );

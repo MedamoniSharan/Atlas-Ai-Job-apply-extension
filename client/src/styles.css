@@ -1925,7 +1925,8 @@ a.tracker-card__title:hover {
 }
 
 .dash-btn--primary .cosmos-loader--inline .cosmos-loader__logo,
-.pricing-action-dark .cosmos-loader--inline .cosmos-loader__logo {
+.pricing-action-dark .cosmos-loader--inline .cosmos-loader__logo,
+.success-stories-button--black .cosmos-loader--inline .cosmos-loader__logo {
   color: #ffffff;
 }
 
@@ -3800,46 +3801,235 @@ a.tracker-card__title:hover {
   justify-content: center;
 }
 
-.job-steps-button {
+.success-stories-button {
+  --ssb-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --ssb-duration: 520ms;
+  --ssb-ink: #000000;
+  --ssb-paper: #ffffff;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  column-gap: 8px;
-  box-sizing: border-box;
-  min-height: 48px;
-  padding: 13px 24px;
-  border: 1px solid #1c45d6;
-  border-radius: 288px;
-  background: #1c45d6;
-  color: #ffffff;
-  cursor: pointer;
-  font: inherit;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 20px;
-  text-align: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
   text-decoration: none;
-  transition: background-color 160ms ease, border-color 160ms ease,
-    transform 160ms ease;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.job-steps-button:hover {
-  background: #1538b6;
-  border-color: #1538b6;
+.success-stories-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
-.job-steps-button:active {
-  transform: translateY(1px);
+.success-stories-button:focus-visible {
+  outline: none;
 }
 
-.job-steps-button:focus-visible {
-  outline: 3px solid #9eb2ff;
+.success-stories-button:focus-visible .success-stories-button__face {
+  outline: 3px solid #a3a3a3;
   outline-offset: 3px;
 }
 
-.job-steps-arrow {
-  width: 16px;
-  height: 16px;
+.success-stories-button--black {
+  --ssb-face-bg: var(--ssb-ink);
+  --ssb-face-fg: var(--ssb-paper);
+  --ssb-face-border: var(--ssb-ink);
+  --ssb-circle-bg: var(--ssb-paper);
+  --ssb-circle-fg: var(--ssb-ink);
+  --ssb-hover-face-bg: var(--ssb-paper);
+  --ssb-hover-face-fg: var(--ssb-ink);
+  --ssb-hover-face-border: var(--ssb-ink);
+  --ssb-hover-circle-bg: var(--ssb-ink);
+  --ssb-hover-circle-fg: var(--ssb-paper);
+}
+
+.success-stories-button--white {
+  --ssb-face-bg: var(--ssb-paper);
+  --ssb-face-fg: var(--ssb-ink);
+  --ssb-face-border: rgba(0, 0, 0, 0.16);
+  --ssb-circle-bg: var(--ssb-ink);
+  --ssb-circle-fg: var(--ssb-paper);
+  --ssb-hover-face-bg: var(--ssb-ink);
+  --ssb-hover-face-fg: var(--ssb-paper);
+  --ssb-hover-face-border: var(--ssb-ink);
+  --ssb-hover-circle-bg: var(--ssb-paper);
+  --ssb-hover-circle-fg: var(--ssb-ink);
+}
+
+.success-stories-button__face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  column-gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 22px 8px 8px;
+  border: 1.5px solid var(--ssb-face-border);
+  border-radius: 999px;
+  background: var(--ssb-face-bg);
+  color: var(--ssb-face-fg);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+  will-change: padding, column-gap;
+  transition:
+    background-color var(--ssb-duration) var(--ssb-ease),
+    color var(--ssb-duration) var(--ssb-ease),
+    border-color var(--ssb-duration) var(--ssb-ease),
+    padding var(--ssb-duration) var(--ssb-ease),
+    column-gap var(--ssb-duration) var(--ssb-ease),
+    transform 180ms var(--ssb-ease);
+}
+
+.success-stories-button:hover:not(:disabled) .success-stories-button__face {
+  background: var(--ssb-hover-face-bg);
+  color: var(--ssb-hover-face-fg);
+  border-color: var(--ssb-hover-face-border);
+  padding-left: 22px;
+  column-gap: 10px;
+}
+
+.success-stories-button:active:not(:disabled) .success-stories-button__face {
+  transform: translateY(1px);
+}
+
+.success-stories-button__circle-arrow {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ssb-circle-bg);
+  color: var(--ssb-circle-fg);
+  transform-origin: center;
+  will-change: transform, opacity, margin;
+  transition:
+    transform var(--ssb-duration) var(--ssb-ease),
+    opacity calc(var(--ssb-duration) * 0.7) var(--ssb-ease),
+    margin var(--ssb-duration) var(--ssb-ease),
+    background-color var(--ssb-duration) var(--ssb-ease),
+    color var(--ssb-duration) var(--ssb-ease);
+}
+
+.success-stories-button__circle-arrow svg {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  will-change: transform;
+  transition: transform var(--ssb-duration) var(--ssb-ease);
+}
+
+.success-stories-button__circle-arrow-halo {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--ssb-face-fg) 45%, transparent);
+  pointer-events: none;
+  transition:
+    opacity calc(var(--ssb-duration) * 0.55) var(--ssb-ease),
+    border-color var(--ssb-duration) var(--ssb-ease);
+}
+
+.success-stories-button:hover:not(:disabled) .success-stories-button__circle-arrow-halo {
+  border-color: color-mix(in srgb, var(--ssb-hover-face-fg) 20%, transparent);
+  opacity: 0;
+}
+
+.success-stories-button:hover:not(:disabled) .success-stories-button__circle-arrow {
+  margin-right: -36px;
+  opacity: 0;
+  transform: scale(0.55) translateX(10px);
+  background: var(--ssb-hover-circle-bg);
+  color: var(--ssb-hover-circle-fg);
+}
+
+.success-stories-button:hover:not(:disabled) .success-stories-button__circle-arrow svg {
+  transform: translateX(4px);
+}
+
+.success-stories-button__label {
+  white-space: nowrap;
+  transition: transform var(--ssb-duration) var(--ssb-ease);
+}
+
+.success-stories-button:hover:not(:disabled) .success-stories-button__label {
+  transform: translateX(-2px);
+}
+
+.success-stories-button__plain-arrow {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  opacity: 0;
+  overflow: visible;
+  transform: translateX(-8px) scale(0.85);
+  will-change: transform, opacity, margin;
+  margin-left: -22px;
+  transition:
+    transform var(--ssb-duration) var(--ssb-ease),
+    opacity calc(var(--ssb-duration) * 0.75) var(--ssb-ease),
+    margin var(--ssb-duration) var(--ssb-ease);
+}
+
+.success-stories-button__plain-arrow svg {
+  width: 22px;
+  height: 22px;
+}
+
+.success-stories-button:hover:not(:disabled) .success-stories-button__plain-arrow {
+  margin-left: 0;
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.success-stories-button__busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 22px;
+  border: 1.5px solid var(--ssb-face-border);
+  border-radius: 999px;
+  background: var(--ssb-face-bg);
+  color: var(--ssb-face-fg);
+}
+
+.success-stories-button--plain .success-stories-button__face {
+  padding: 12px 22px;
+  column-gap: 0;
+}
+
+.success-stories-button--plain:hover:not(:disabled) .success-stories-button__face {
+  padding: 12px 22px;
+  column-gap: 0;
+}
+
+.success-stories-button--plain:hover:not(:disabled) .success-stories-button__label {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .success-stories-button__face,
+  .success-stories-button__circle-arrow,
+  .success-stories-button__circle-arrow svg,
+  .success-stories-button__circle-arrow-halo,
+  .success-stories-button__label,
+  .success-stories-button__plain-arrow {
+    transition-duration: 1ms;
+  }
+}
+
+.job-steps-action .success-stories-button {
+  width: auto;
 }
 
 .job-steps-status {
@@ -4699,9 +4889,9 @@ a.tracker-card__title:hover {
 
 /* —— Landing pricing —— */
 .pricing-page {
-  --pricing-ink: var(--landing-ink, #15362b);
-  --pricing-muted: var(--landing-muted, #5f6b66);
-  --pricing-line: rgba(21, 54, 43, 0.1);
+  --pricing-ink: #000000;
+  --pricing-muted: #5f6b66;
+  --pricing-line: rgba(0, 0, 0, 0.1);
   --pricing-soft: #f3f6f4;
   --pricing-card: var(--landing-card, #ffffff);
   position: relative;
@@ -5174,6 +5364,11 @@ a.tracker-card__title:hover {
   background: #f3f6f4;
   border-color: #f3f6f4;
   color: var(--pricing-ink);
+}
+
+.team-hero .success-stories-button {
+  width: auto;
+  max-width: 100%;
 }
 
 .team-details {

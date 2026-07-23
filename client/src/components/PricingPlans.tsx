@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Check, Sparkles } from 'lucide-react';
 import type { PaidPlan } from '@atlas/shared';
 import { useAuthStore } from '../store/authStore';
@@ -9,6 +9,7 @@ import {
   startPlanCheckout,
 } from '../lib/razorpayCheckout';
 import { CosmosLoader } from './CosmosLogo';
+import { SuccessStoriesButton } from './SuccessStoriesButton';
 
 type Feature = {
   label: string;
@@ -50,7 +51,6 @@ const plans: Plan[] = [
     lockNote: 'Price locks forever when you upgrade',
     cta: 'Upgrade to Pro',
     highlighted: true,
-    badge: 'Most popular',
     paidPlan: 'pro',
     features: [
       { label: '300 assisted applies / month' },
@@ -216,29 +216,30 @@ export function PricingPlans() {
                     ) : null}
                   </div>
                   {plan.paidPlan ? (
-                    <button
-                      type="button"
-                      className={`pricing-action${plan.highlighted ? ' pricing-action-dark' : ''}`}
+                    <SuccessStoriesButton
+                      label={plan.cta}
+                      variant="black"
+                      showArrow={false}
                       disabled={busyPlan !== null}
                       onClick={() => void handleUpgrade(plan.paidPlan!)}
                     >
                       {busyPlan === plan.paidPlan ? (
-                        <CosmosLoader
-                          label=""
-                          size={20}
-                          className="cosmos-loader--inline"
-                        />
-                      ) : (
-                        <span>{plan.cta}</span>
-                      )}
-                    </button>
+                        <span className="success-stories-button__busy">
+                          <CosmosLoader
+                            label=""
+                            size={20}
+                            className="cosmos-loader--inline"
+                          />
+                        </span>
+                      ) : undefined}
+                    </SuccessStoriesButton>
                   ) : (
-                    <Link
+                    <SuccessStoriesButton
+                      label={plan.cta}
+                      variant="black"
+                      showArrow={false}
                       to="/register"
-                      className={`pricing-action${plan.highlighted ? ' pricing-action-dark' : ''}`}
-                    >
-                      <span>{plan.cta}</span>
-                    </Link>
+                    />
                   )}
                 </div>
                 <Divider />
@@ -272,12 +273,15 @@ export function PricingPlans() {
               <h3 id="team-heading">Team Plan</h3>
               <div className="team-price">Custom pricing</div>
               <p className="team-note">Talk to us for seats and volume</p>
-              <a
-                className="pricing-action pricing-action-dark"
-                href="mailto:sales@cosmovai.com?subject=Cosmo%20Team%20Plan"
-              >
-                <span>Contact sales</span>
-              </a>
+              <SuccessStoriesButton
+                label="Contact sales"
+                variant="white"
+                showArrow={false}
+                onClick={() => {
+                  window.location.href =
+                    'mailto:sales@cosmovai.com?subject=Cosmo%20Team%20Plan';
+                }}
+              />
             </div>
           </div>
           <div className="team-details">
