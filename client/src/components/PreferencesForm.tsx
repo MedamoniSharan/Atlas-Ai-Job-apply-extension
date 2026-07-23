@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   DEFAULT_JOB_PREFERENCES,
@@ -22,24 +22,46 @@ type ChipFieldProps = {
 
 function ChipField({ label, values, placeholder, onChange }: ChipFieldProps) {
   const [draft, setDraft] = useState('');
+  const draftRef = useRef(draft);
+  const valuesRef = useRef(values);
+  const onChangeRef = useRef(onChange);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function addChips(raw: string) {
+  draftRef.current = draft;
+  valuesRef.current = values;
+  onChangeRef.current = onChange;
+
+  function addChips(raw: string, base = valuesRef.current) {
     const parts = raw
       .split(/[,|\n]/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (parts.length === 0) return;
-    const seen = new Set(values.map((v) => v.toLowerCase()));
-    const next = [...values];
+    if (parts.length === 0) return base;
+    const seen = new Set(base.map((v) => v.toLowerCase()));
+    const next = [...base];
     for (const part of parts) {
       const key = part.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
       next.push(part);
     }
-    onChange(next);
+    onChangeRef.current(next);
     setDraft('');
+    return next;
   }
+
+  useEffect(() => {
+    const form = inputRef.current?.form;
+    if (!form) return;
+
+    // Flush typed (but not Added) chips before the form submit handler validates.
+    const onFormSubmit = () => {
+      const raw = draftRef.current;
+      if (raw.trim()) addChips(raw);
+    };
+    form.addEventListener('submit', onFormSubmit, true);
+    return () => form.removeEventListener('submit', onFormSubmit, true);
+  }, []);
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' || e.key === ',') {
@@ -70,6 +92,7 @@ function ChipField({ label, values, placeholder, onChange }: ChipFieldProps) {
           </span>
         ))}
         <input
+          ref={inputRef}
           className="chip-field__input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -98,10 +121,13 @@ export function PreferencesForm({
   submitLabel = 'Save preferences',
 }: PreferencesFormProps) {
   const [prefs, setPrefs] = useState<JobPreferences>(DEFAULT_JOB_PREFERENCES);
+  const prefsRef = useRef(prefs);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
+  prefsRef.current = prefs;
 
   useEffect(() => {
     let cancelled = false;
@@ -122,17 +148,22 @@ export function PreferencesForm({
     e.preventDefault();
     setError('');
     setMessage('');
-    if (prefs.titles.length === 0 && prefs.keywords.length === 0) {
+
+    // Chip fields flush drafts in the capture-phase submit listener above.
+    await new Promise((r) => setTimeout(r, 0));
+    const next = prefsRef.current;
+
+    if (next.titles.length === 0 && next.keywords.length === 0) {
       setError('Add at least one job title or keyword.');
       return;
     }
-    if (prefs.experienceMin > prefs.experienceMax) {
+    if (next.experienceMin > next.experienceMax) {
       setError('Min experience cannot exceed max experience.');
       return;
     }
 
     setSaving(true);
-    const res = await savePreferences(prefs);
+    const res = await savePreferences(next);
     setSaving(false);
     if (!res.success) {
       setError(res.message);

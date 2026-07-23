@@ -15,6 +15,7 @@ import { AdminLoginPage } from './admin/AdminLoginPage';
 import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ApplicationsPage } from './pages/ApplicationsPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { TrackerPage } from './pages/TrackerPage';
@@ -38,8 +39,12 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/applications" element={<DashboardPage />} />
-              <Route path="/get-started" element={<GetStartedPage />} />
+              <Route path="/applications" element={<ApplicationsPage />} />
+              <Route path="/get-extension" element={<GetStartedPage />} />
+              <Route
+                path="/get-started"
+                element={<Navigate to="/get-extension" replace />}
+              />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/tracker" element={<TrackerPage />} />
               <Route

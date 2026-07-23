@@ -1,11 +1,7 @@
-const CHROME_STORE_URL = import.meta.env.VITE_CHROME_EXTENSION_URL ?? '';
-
-const DEV_STEPS = [
-  'Open chrome://extensions in Chrome',
-  'Enable Developer mode (top right)',
-  'Click Load unpacked and select the extension/dist folder',
-  'Pin Atlas from the extensions toolbar',
-];
+import { useQueryClient } from '@tanstack/react-query';
+import { RefreshCw } from 'lucide-react';
+import { BrowserStoreButtons } from './BrowserStoreButtons';
+import { ONBOARDING_QUERY_KEY } from '../lib/onboarding';
 
 export function ExtensionOnboarding({
   compact = false,
@@ -14,80 +10,70 @@ export function ExtensionOnboarding({
   compact?: boolean;
   userEmail?: string;
 }) {
-  const installHref = CHROME_STORE_URL || 'https://www.google.com/chrome/';
+  const queryClient = useQueryClient();
+
+  async function refreshConnection() {
+    await queryClient.invalidateQueries({ queryKey: ONBOARDING_QUERY_KEY });
+    await queryClient.refetchQueries({ queryKey: ONBOARDING_QUERY_KEY });
+  }
 
   return (
     <section className={`onboarding ${compact ? 'onboarding--compact' : ''}`}>
       <div className="onboarding__header">
         <p className="onboarding__eyebrow">Next step</p>
-        <h3>Install the Atlas Chrome extension</h3>
+        <h3>Install the Cosmo browser extension</h3>
         <p className="muted">
-          Your dashboard stays empty until the extension is installed and signed
-          in with the same account{userEmail ? ` (${userEmail})` : ''}.
+          Add Cosmo from your browser store, then stay signed in here
+          {userEmail ? ` as ${userEmail}` : ''} so the extension connects
+          automatically.
         </p>
       </div>
 
+      <BrowserStoreButtons featured="chrome" />
+
       <ol className="onboarding__steps">
-        <li className="onboarding__step onboarding__step--done">
+        <li className="onboarding__step onboarding__step--active">
           <span className="onboarding__step-num">1</span>
           <div>
-            <strong>Account created</strong>
-            <p className="muted">You&apos;re signed in to Atlas.</p>
+            <strong>Add to Chrome</strong>
+            <p className="muted">
+              Open the Chrome Web Store card, click Add to Chrome, then confirm
+              Add extension.
+            </p>
           </div>
         </li>
-        <li className="onboarding__step onboarding__step--active">
+        <li className="onboarding__step">
           <span className="onboarding__step-num">2</span>
           <div>
-            <strong>Install extension</strong>
-            {CHROME_STORE_URL ? (
-              <p className="muted">Add Atlas from the Chrome Web Store.</p>
-            ) : (
-              <ul className="onboarding__substeps">
-                {DEV_STEPS.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ul>
-            )}
+            <strong>Pin Cosmo</strong>
+            <p className="muted">
+              Use the puzzle icon in Chrome’s toolbar and pin Cosmo.
+            </p>
           </div>
         </li>
         <li className="onboarding__step">
           <span className="onboarding__step-num">3</span>
           <div>
-            <strong>Stay signed in here</strong>
+            <strong>Open Naukri</strong>
             <p className="muted">
-              Keep this dashboard tab open while you use the extension — Atlas
-              syncs your sign-in automatically. Manual sign-in in the popup is
-              only needed if you never open the web app.
-            </p>
-          </div>
-        </li>
-        <li className="onboarding__step">
-          <span className="onboarding__step-num">4</span>
-          <div>
-            <strong>Browse Naukri</strong>
-            <p className="muted">
-              Visit a job page while logged into Naukri. Applications appear
-              here automatically.
+              Visit Naukri while logged in — the Cosmo co-pilot appears so you
+              can Start scanning.
             </p>
           </div>
         </li>
       </ol>
 
       <div className="onboarding__actions">
-        <a
-          className="primary-btn"
-          href={installHref}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          type="button"
+          className="secondary-btn"
+          onClick={() => {
+            void refreshConnection();
+          }}
         >
-          {CHROME_STORE_URL ? 'Install from Chrome Web Store' : 'Get Chrome'}
-        </a>
-        {!CHROME_STORE_URL && (
-          <p className="onboarding__hint muted">
-            After loading unpacked, this page updates automatically once the
-            extension signs in.
-          </p>
-        )}
+          <RefreshCw size={16} strokeWidth={2.2} aria-hidden />
+          Check connection
+        </button>
       </div>
     </section>
   );

@@ -144,7 +144,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
       });
       return;
     }
-    navigate(isNewAccount ? '/get-started' : '/dashboard');
+    navigate(isNewAccount ? '/get-extension' : '/dashboard');
   }
 
   const googleLogin = useGoogleLogin({

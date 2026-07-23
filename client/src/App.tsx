@@ -16,7 +16,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Rocket,
+  Puzzle,
   Search,
   Settings,
   Shield,
@@ -26,6 +26,7 @@ import { useAuthStore } from './store/authStore';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
 import { ensureSession, fetchApplications, fetchBillingMe } from './lib/api';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
+import { ShimmerButton } from './components/ui/ShimmerButton';
 
 export type ShellOutletContext = {
   search: string;
@@ -47,7 +48,9 @@ function userInitials(name?: string | null): string {
 
 function pageTitle(pathname: string): string {
   if (pathname.startsWith('/settings')) return 'Settings';
-  if (pathname.startsWith('/get-started')) return 'Get started';
+  if (pathname.startsWith('/get-extension') || pathname.startsWith('/get-started')) {
+    return 'Get extension';
+  }
   if (pathname.startsWith('/browse')) return 'Browse jobs';
   if (pathname.startsWith('/tracker')) return 'Tracker';
   if (pathname.startsWith('/profile')) return 'Profile';
@@ -162,12 +165,6 @@ export function AppLayout() {
             </span>
             Dashboard
           </NavLink>
-          <NavLink to="/browse" className="sidebar__link">
-            <span className="sidebar__icon" aria-hidden>
-              <Compass size={18} strokeWidth={1.9} className="icon-motion" />
-            </span>
-            Browse jobs
-          </NavLink>
           <NavLink to="/applications" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
               <Briefcase size={18} strokeWidth={1.9} className="icon-motion" />
@@ -182,6 +179,12 @@ export function AppLayout() {
               <BarChart3 size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Tracker
+          </NavLink>
+          <NavLink to="/browse" className="sidebar__link">
+            <span className="sidebar__icon" aria-hidden>
+              <Compass size={18} strokeWidth={1.9} className="icon-motion" />
+            </span>
+            Browse jobs
           </NavLink>
         </nav>
 
@@ -206,14 +209,12 @@ export function AppLayout() {
               Admin
             </NavLink>
           ) : null}
-          {needsSetup ? (
-            <NavLink to="/get-started" className="sidebar__link">
-              <span className="sidebar__icon" aria-hidden>
-                <Rocket size={18} strokeWidth={1.9} className="icon-motion" />
-              </span>
-              Get started
-            </NavLink>
-          ) : null}
+          <NavLink to="/get-extension" className="sidebar__link">
+            <span className="sidebar__icon" aria-hidden>
+              <Puzzle size={18} strokeWidth={1.9} className="icon-motion" />
+            </span>
+            Get extension
+          </NavLink>
         </nav>
 
         <div className="sidebar__footer">
@@ -268,9 +269,7 @@ export function AppLayout() {
                 ? 'so Cosmo can scan and apply on Naukri.'
                 : 'to start scanning applications from Naukri.'}
             </p>
-            <NavLink className="setup-banner__cta" to="/get-started">
-              Set up now
-            </NavLink>
+            <ShimmerButton to="/get-extension">Set up now</ShimmerButton>
           </div>
         )}
 
@@ -312,10 +311,10 @@ export function AppLayout() {
               <Bell size={18} strokeWidth={1.8} className="icon-motion" aria-hidden />
             </button>
             <NavLink
-              to="/get-started"
+              to="/get-extension"
               className="shell__icon-btn"
-              aria-label="Help"
-              title="Get started"
+              aria-label="Get extension"
+              title="Get extension"
             >
               <CircleHelp size={18} strokeWidth={1.8} className="icon-motion" aria-hidden />
             </NavLink>
