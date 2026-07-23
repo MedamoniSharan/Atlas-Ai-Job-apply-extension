@@ -324,8 +324,28 @@ export async function fetchBillingMe() {
 
 // ─── Admin API ───────────────────────────────────────────────
 
-export async function fetchAdminMetrics(days = 30) {
+export async function fetchAdminMetrics(params: {
+  range?: '7d' | '30d' | '90d' | 'month' | 'year';
+  days?: number;
+  year?: number;
+  month?: number;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.range) search.set('range', params.range);
+  if (params.days) search.set('days', String(params.days));
+  if (params.year) search.set('year', String(params.year));
+  if (params.month) search.set('month', String(params.month));
+  const qs = search.toString();
   return request<{
+    period: {
+      range: '7d' | '30d' | '90d' | 'month' | 'year';
+      grain: 'day' | 'month';
+      label: string;
+      year: number;
+      month: number | null;
+      since: string;
+      until: string;
+    };
     kpis: {
       totalUsers: number;
       newUsers7: number;
@@ -368,7 +388,7 @@ export async function fetchAdminMetrics(days = 30) {
         userEmail?: string;
       }>;
     };
-  }>(`/api/v1/admin/metrics?days=${days}`);
+  }>(`/api/v1/admin/metrics${qs ? `?${qs}` : ''}`);
 }
 
 export async function fetchAdminUsers(params: {
@@ -411,11 +431,17 @@ export async function fetchAdminUser(id: string) {
 
 export async function patchAdminUser(
   id: string,
-  body: { name?: string; role?: string; status?: string }
+  body: { name?: string; email?: string; role?: string; status?: string }
 ) {
   return request(`/api/v1/admin/users/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
+  });
+}
+
+export async function deleteAdminUser(id: string) {
+  return request<{ id: string; deleted: boolean }>(`/api/v1/admin/users/${id}`, {
+    method: 'DELETE',
   });
 }
 

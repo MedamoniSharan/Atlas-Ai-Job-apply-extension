@@ -14,6 +14,7 @@ export type AdminUsersQuery = z.infer<typeof adminUsersQuerySchema>;
 
 export const adminPatchUserSchema = z.object({
   name: z.string().min(1).max(120).optional(),
+  email: z.string().email().optional(),
   role: z.enum(['user', 'admin']).optional(),
   status: z.enum(['active', 'suspended']).optional(),
 });
@@ -83,7 +84,11 @@ export const adminAuditQuerySchema = z.object({
 export type AdminAuditQuery = z.infer<typeof adminAuditQuerySchema>;
 
 export const adminMetricsQuerySchema = z.object({
-  days: z.coerce.number().int().min(7).max(90).default(30),
+  /** Preset window or calendar month/year. `days` kept for backward compatibility. */
+  range: z.enum(['7d', '30d', '90d', 'month', 'year']).optional(),
+  days: z.coerce.number().int().min(7).max(90).optional(),
+  year: z.coerce.number().int().min(2020).max(2100).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
 });
 
 export type AdminMetricsQuery = z.infer<typeof adminMetricsQuerySchema>;

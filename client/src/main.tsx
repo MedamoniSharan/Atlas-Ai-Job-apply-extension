@@ -11,6 +11,7 @@ import { AdminSubscriptionsPage } from './admin/AdminSubscriptionsPage';
 import { AdminPaymentsPage } from './admin/AdminPaymentsPage';
 import { AdminPlansPage } from './admin/AdminPlansPage';
 import { AdminAuditPage } from './admin/AdminAuditPage';
+import { AdminLoginPage } from './admin/AdminLoginPage';
 import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -34,6 +35,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<AuthPage mode="login" />} />
             <Route path="/register" element={<AuthPage mode="register" />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/applications" element={<DashboardPage />} />

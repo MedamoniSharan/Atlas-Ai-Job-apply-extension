@@ -4,7 +4,6 @@ import {
   Navigate,
   Outlet,
   useLocation,
-  useNavigate,
 } from 'react-router-dom';
 import {
   CreditCard,
@@ -37,7 +36,6 @@ export function AdminLayout() {
   const [sessionReady, setSessionReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +58,7 @@ export function AdminLayout() {
   }
 
   if (!accessToken) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/login" replace />;
   }
 
   if (user?.role !== 'admin') {
@@ -121,7 +119,7 @@ export function AdminLayout() {
             className="admin-sidebar__signout"
             onClick={() => {
               clearSession();
-              navigate('/', { replace: true });
+              window.location.replace('/');
             }}
           >
             <LogOut size={14} strokeWidth={2} aria-hidden />

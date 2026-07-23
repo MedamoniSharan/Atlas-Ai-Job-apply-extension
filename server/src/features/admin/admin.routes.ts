@@ -78,6 +78,18 @@ adminRouter.patch(
   })
 );
 
+adminRouter.delete(
+  '/users/:id',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await adminService.deleteUser(
+      req.user!.sub,
+      String(req.params.id),
+      clientIp(req)
+    );
+    res.json(ok(data, 'User deleted'));
+  })
+);
+
 adminRouter.post(
   '/users/:id/plan',
   validateBody(adminSetPlanSchema),

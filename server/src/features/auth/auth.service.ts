@@ -109,18 +109,26 @@ async function issueTokens(user: {
 }
 
 export async function register(input: RegisterInput): Promise<AuthTokens> {
-  const existing = await UserModel.findOne({ email: input.email.toLowerCase() });
+  const email = input.email.toLowerCase();
+  if (!isAdminEmail(email)) {
+    throw new AppError(
+      'Account creation is via Google sign-in',
+      403,
+      'USE_GOOGLE_SIGN_IN'
+    );
+  }
+
+  const existing = await UserModel.findOne({ email });
   if (existing) {
     throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
   }
 
-  const email = input.email.toLowerCase();
   const passwordHash = await bcrypt.hash(input.password, 12);
   const user = await UserModel.create({
     email,
     passwordHash,
     name: input.name,
-    role: isAdminEmail(email) ? 'admin' : 'user',
+    role: 'admin',
   });
 
   return issueTokens(user);
@@ -143,6 +151,14 @@ export async function login(input: LoginInput): Promise<AuthTokens> {
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
+  }
+
+  if (user.role !== 'admin' && !isAdminEmail(user.email)) {
+    throw new AppError(
+      'Password sign-in is for admins only. Continue with Google instead.',
+      403,
+      'USE_GOOGLE_SIGN_IN'
+    );
   }
 
   return issueTokens(user);
@@ -193,9 +209,25 @@ export async function loginWithGoogle(input: GoogleAuthInput): Promise<AuthToken
     );
   }
 
+  if (isAdminEmail(email)) {
+    throw new AppError(
+      'Admin accounts must sign in with email and password at /admin/login',
+      403,
+      'USE_PASSWORD_SIGN_IN'
+    );
+  }
+
   let user = await UserModel.findOne({
     $or: [{ googleId }, { email }],
   });
+
+  if (user?.role === 'admin') {
+    throw new AppError(
+      'Admin accounts must sign in with email and password at /admin/login',
+      403,
+      'USE_PASSWORD_SIGN_IN'
+    );
+  }
 
   if (user) {
     if (user.googleId && user.googleId !== googleId) {

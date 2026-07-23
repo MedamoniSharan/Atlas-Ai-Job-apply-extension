@@ -21,6 +21,7 @@ import {
   PlanConfigModel,
   SubscriptionModel,
 } from '../billing/subscription.model';
+import { ApplicationModel } from '../applications/application.model';
 import {
   getPaidPlanAmount,
   invalidatePlanCache,
@@ -75,23 +76,86 @@ function daysAgo(n: number): Date {
   return startOfDay(d);
 }
 
+type MetricsPeriod = {
+  range: '7d' | '30d' | '90d' | 'month' | 'year';
+  since: Date;
+  until: Date;
+  grain: 'day' | 'month';
+  label: string;
+  year: number;
+  month?: number;
+};
+
+function resolveMetricsPeriod(query: AdminMetricsQuery): MetricsPeriod {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  let range = query.range;
+  if (!range) {
+    if (query.days === 7) range = '7d';
+    else if (query.days === 90) range = '90d';
+    else range = '30d';
+  }
+
+  if (range === '7d' || range === '30d' || range === '90d') {
+    const days = range === '7d' ? 7 : range === '90d' ? 90 : 30;
+    return {
+      range,
+      since: daysAgo(days),
+      until: now,
+      grain: 'day',
+      label: range,
+      year: currentYear,
+    };
+  }
+
+  if (range === 'month') {
+    const year = query.year ?? currentYear;
+    const month = query.month ?? currentMonth;
+    const since = new Date(year, month - 1, 1);
+    const until = new Date(year, month, 1);
+    return {
+      range,
+      since,
+      until,
+      grain: 'day',
+      label: `${year}-${String(month).padStart(2, '0')}`,
+      year,
+      month,
+    };
+  }
+
+  const year = query.year ?? currentYear;
+  return {
+    range: 'year',
+    since: new Date(year, 0, 1),
+    until: new Date(year + 1, 0, 1),
+    grain: 'month',
+    label: String(year),
+    year,
+  };
+}
+
+function dateInPeriod(period: MetricsPeriod): Record<string, Date> {
+  return { $gte: period.since, $lt: period.until };
+}
+
 export async function getMetrics(query: AdminMetricsQuery) {
-  const days = query.days ?? 30;
-  const since = daysAgo(days);
+  const period = resolveMetricsPeriod(query);
   const now = new Date();
   const day7 = daysAgo(7);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const createdInPeriod = { createdAt: dateInPeriod(period) };
+  const dateFormat = period.grain === 'month' ? '%Y-%m' : '%Y-%m-%d';
 
   const [
     totalUsers,
     newUsers7,
-    newUsers30,
+    newUsersPeriod,
     planMix,
     activeSubs,
     revenuePaid,
-    revenueMtd,
-    revenueYtd,
+    revenueInPeriod,
     failedPayments,
     cancelledSubs,
     recentPayments,
@@ -100,7 +164,7 @@ export async function getMetrics(query: AdminMetricsQuery) {
   ] = await Promise.all([
     UserModel.countDocuments(),
     UserModel.countDocuments({ createdAt: { $gte: day7 } }),
-    UserModel.countDocuments({ createdAt: { $gte: daysAgo(30) } }),
+    UserModel.countDocuments(createdInPeriod),
     UserModel.aggregate<{ _id: PlanTier; count: number }>([
       {
         $project: {
@@ -127,13 +191,13 @@ export async function getMetrics(query: AdminMetricsQuery) {
       {
         $match: {
           status: 'paid',
-          createdAt: { $gte: since },
+          ...createdInPeriod,
         },
       },
       {
         $group: {
           _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+            $dateToString: { format: dateFormat, date: '$createdAt' },
           },
           total: { $sum: '$amountPaise' },
           count: { $sum: 1 },
@@ -143,23 +207,20 @@ export async function getMetrics(query: AdminMetricsQuery) {
     ]),
     PaymentModel.aggregate<{ total: number }>([
       {
-        $match: { status: 'paid', createdAt: { $gte: monthStart } },
-      },
-      { $group: { _id: null, total: { $sum: '$amountPaise' } } },
-    ]),
-    PaymentModel.aggregate<{ total: number }>([
-      {
-        $match: { status: 'paid', createdAt: { $gte: yearStart } },
+        $match: {
+          status: 'paid',
+          ...createdInPeriod,
+        },
       },
       { $group: { _id: null, total: { $sum: '$amountPaise' } } },
     ]),
     PaymentModel.countDocuments({
       status: 'failed',
-      createdAt: { $gte: since },
+      ...createdInPeriod,
     }),
     SubscriptionModel.countDocuments({
       status: 'cancelled',
-      cancelledAt: { $gte: since },
+      cancelledAt: dateInPeriod(period),
     }),
     PaymentModel.find({ status: 'paid' })
       .sort({ createdAt: -1 })
@@ -188,11 +249,11 @@ export async function getMetrics(query: AdminMetricsQuery) {
     _id: string;
     count: number;
   }>([
-    { $match: { createdAt: { $gte: since } } },
+    { $match: createdInPeriod },
     {
       $group: {
         _id: {
-          $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+          $dateToString: { format: dateFormat, date: '$createdAt' },
         },
         count: { $sum: 1 },
       },
@@ -204,7 +265,7 @@ export async function getMetrics(query: AdminMetricsQuery) {
     _id: string;
     count: number;
   }>([
-    { $match: { createdAt: { $gte: since } } },
+    { $match: createdInPeriod },
     { $group: { _id: '$status', count: { $sum: 1 } } },
   ]);
 
@@ -227,16 +288,26 @@ export async function getMetrics(query: AdminMetricsQuery) {
   }
 
   const activePaid = (mixMap.pro ?? 0) + (mixMap.max ?? 0);
+  const revenuePeriodPaise = revenueInPeriod[0]?.total ?? 0;
 
   return {
+    period: {
+      range: period.range,
+      grain: period.grain,
+      label: period.label,
+      year: period.year,
+      month: period.month ?? null,
+      since: period.since.toISOString(),
+      until: period.until.toISOString(),
+    },
     kpis: {
       totalUsers,
       newUsers7,
-      newUsers30,
+      newUsers30: newUsersPeriod,
       activePaid,
       mrrPaise,
-      revenueMtdPaise: revenueMtd[0]?.total ?? 0,
-      revenueYtdPaise: revenueYtd[0]?.total ?? 0,
+      revenueMtdPaise: revenuePeriodPaise,
+      revenueYtdPaise: revenuePeriodPaise,
       failedPayments,
       churnCancels: cancelledSubs,
     },
@@ -429,6 +500,7 @@ export async function patchUser(
 
   const before = {
     name: user.name,
+    email: user.email,
     role: user.role,
     status: user.status,
   };
@@ -451,7 +523,18 @@ export async function patchUser(
     }
   }
 
-  if (input.name !== undefined) user.name = input.name;
+  if (input.email !== undefined) {
+    const email = input.email.toLowerCase().trim();
+    if (email !== user.email) {
+      const taken = await UserModel.findOne({ email, _id: { $ne: user._id } });
+      if (taken) {
+        throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
+      }
+      user.email = email;
+    }
+  }
+
+  if (input.name !== undefined) user.name = input.name.trim();
   if (input.role !== undefined) user.role = input.role;
   if (input.status !== undefined) user.status = input.status;
   await user.save();
@@ -464,6 +547,7 @@ export async function patchUser(
     before,
     after: {
       name: user.name,
+      email: user.email,
       role: user.role,
       status: user.status,
     },
@@ -471,6 +555,56 @@ export async function patchUser(
   });
 
   return getUser(userId);
+}
+
+export async function deleteUser(
+  adminId: string,
+  userId: string,
+  ip?: string
+) {
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    throw new AppError('User not found', 404, 'NOT_FOUND');
+  }
+
+  if (adminId === userId) {
+    throw new AppError('Cannot delete your own account', 400, 'SELF_DELETE');
+  }
+
+  if (user.role === 'admin') {
+    const adminCount = await UserModel.countDocuments({ role: 'admin' });
+    if (adminCount <= 1) {
+      throw new AppError('Cannot delete the last admin', 400, 'LAST_ADMIN');
+    }
+  }
+
+  const before = {
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    plan: user.plan,
+  };
+
+  await Promise.all([
+    ApplicationModel.deleteMany({ userId: user._id }),
+    SubscriptionModel.deleteMany({ userId: user._id }),
+    PaymentModel.deleteMany({ userId: user._id }),
+  ]);
+
+  await UserModel.deleteOne({ _id: user._id });
+
+  await writeAudit({
+    adminId,
+    action: 'user.delete',
+    targetType: 'user',
+    targetId: userId,
+    before,
+    after: { deleted: true },
+    ip,
+  });
+
+  return { id: userId, deleted: true as const };
 }
 
 export async function setUserPlan(

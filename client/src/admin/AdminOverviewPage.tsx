@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Area,
@@ -21,20 +22,64 @@ function formatInr(paise: number): string {
   return `₹${(paise / 100).toLocaleString('en-IN')}`;
 }
 
-const PIE_COLORS = ['#94a3b8', '#15362b', '#ff4704'];
+const PIE_COLORS = ['#64748b', '#0ea5e9', '#22c55e', '#f59e0b', '#a855f7'];
+
+const MONTHS = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+] as const;
+
+type Range = '7d' | '30d' | '90d' | 'month' | 'year';
+
+function yearOptions(): number[] {
+  const current = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = current; y >= current - 5; y -= 1) years.push(y);
+  return years;
+}
+
+function formatAxisDate(value: string, grain: 'day' | 'month'): string {
+  if (grain === 'month') {
+    const [y, m] = value.split('-');
+    if (!y || !m) return value;
+    return `${MONTHS[Number(m) - 1]?.label.slice(0, 3) ?? m} ${y}`;
+  }
+  return value.length >= 10 ? value.slice(5) : value;
+}
 
 export function AdminOverviewPage() {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['admin', 'metrics'],
+  const now = new Date();
+  const [range, setRange] = useState<Range>('30d');
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const queryParams = useMemo(() => {
+    if (range === 'month') return { range, year, month } as const;
+    if (range === 'year') return { range, year } as const;
+    return { range } as const;
+  }, [range, year, month]);
+
+  const { data, isLoading, isError, isFetching } = useQuery({
+    queryKey: ['admin', 'metrics', queryParams],
     queryFn: async () => {
-      const res = await fetchAdminMetrics(30);
+      const res = await fetchAdminMetrics(queryParams);
       if (!res.success) throw new Error(res.message);
       return res.data;
     },
     staleTime: 30_000,
   });
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return <CosmosLoader label="Loading metrics…" className="cosmos-loader--inline" />;
   }
 
@@ -42,24 +87,85 @@ export function AdminOverviewPage() {
     return <p className="admin-error">Could not load admin metrics.</p>;
   }
 
-  const { kpis, series, lists } = data;
+  const { kpis, series, lists, period } = data;
+  const grain = period.grain;
+  const periodLabel =
+    period.range === 'month'
+      ? `${MONTHS[(period.month ?? 1) - 1]?.label ?? ''} ${period.year}`
+      : period.range === 'year'
+        ? String(period.year)
+        : period.label;
+
   const revenueChart = series.revenueDaily.map((d) => ({
-    date: d.date.slice(5),
+    date: formatAxisDate(d.date, grain),
     revenue: d.amountPaise / 100,
     count: d.count,
   }));
   const signupChart = series.signupsDaily.map((d) => ({
-    date: d.date.slice(5),
+    date: formatAxisDate(d.date, grain),
     signups: d.count,
   }));
 
   return (
     <div className="admin-page">
+      <div className="admin-filters admin-filters--metrics">
+        <label>
+          Period
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value as Range)}
+            aria-label="Metrics period"
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="month">Month</option>
+            <option value="year">Year</option>
+          </select>
+        </label>
+
+        {range === 'month' || range === 'year' ? (
+          <label>
+            Year
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              aria-label="Year"
+            >
+              {yearOptions().map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {range === 'month' ? (
+          <label>
+            Month
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              aria-label="Month"
+            >
+              {MONTHS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {isFetching ? <span className="admin-note">Updating…</span> : null}
+      </div>
+
       <div className="admin-kpi-grid">
         <div className="admin-kpi">
           <span>Total users</span>
           <strong>{kpis.totalUsers}</strong>
-          <em>+{kpis.newUsers7} / 7d · +{kpis.newUsers30} / 30d</em>
+          <em>+{kpis.newUsers7} / 7d · +{kpis.newUsers30} in period</em>
         </div>
         <div className="admin-kpi">
           <span>Active paid</span>
@@ -67,20 +173,20 @@ export function AdminOverviewPage() {
           <em>MRR {formatInr(kpis.mrrPaise)}</em>
         </div>
         <div className="admin-kpi">
-          <span>Revenue MTD</span>
+          <span>Revenue ({periodLabel})</span>
           <strong>{formatInr(kpis.revenueMtdPaise)}</strong>
-          <em>YTD {formatInr(kpis.revenueYtdPaise)}</em>
+          <em>Selected period total</em>
         </div>
         <div className="admin-kpi">
           <span>Failed / churn</span>
           <strong>{kpis.failedPayments}</strong>
-          <em>{kpis.churnCancels} cancels (30d)</em>
+          <em>{kpis.churnCancels} cancels in period</em>
         </div>
       </div>
 
       <div className="admin-chart-grid">
         <section className="admin-panel">
-          <h2>Revenue (30d)</h2>
+          <h2>Revenue ({periodLabel})</h2>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={revenueChart}>
@@ -91,8 +197,8 @@ export function AdminOverviewPage() {
                 <Area
                   type="monotone"
                   dataKey="revenue"
-                  stroke="#15362b"
-                  fill="#15362b33"
+                  stroke="#0ea5e9"
+                  fill="#0ea5e933"
                   name="₹"
                 />
               </AreaChart>
@@ -101,7 +207,7 @@ export function AdminOverviewPage() {
         </section>
 
         <section className="admin-panel">
-          <h2>Signups (30d)</h2>
+          <h2>Signups ({periodLabel})</h2>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={signupChart}>
@@ -109,7 +215,7 @@ export function AdminOverviewPage() {
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Bar dataKey="signups" fill="#ff4704" name="Signups" />
+                <Bar dataKey="signups" fill="#22c55e" name="Signups" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -141,7 +247,7 @@ export function AdminOverviewPage() {
         </section>
 
         <section className="admin-panel">
-          <h2>Payment outcomes</h2>
+          <h2>Payment outcomes ({periodLabel})</h2>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={series.paymentOutcomes}>
@@ -149,7 +255,7 @@ export function AdminOverviewPage() {
                 <XAxis dataKey="status" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#15362b" name="Count" />
+                <Bar dataKey="count" fill="#a855f7" name="Count" />
               </BarChart>
             </ResponsiveContainer>
           </div>

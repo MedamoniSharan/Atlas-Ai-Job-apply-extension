@@ -245,7 +245,7 @@ export function AppLayout() {
               className="sidebar__signout"
               onClick={() => {
                 clearSession();
-                navigate('/', { replace: true });
+                window.location.replace('/');
               }}
             >
               <LogOut size={14} strokeWidth={2} aria-hidden />
