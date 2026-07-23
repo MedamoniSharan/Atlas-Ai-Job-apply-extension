@@ -26,4 +26,6 @@ export const env = {
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean),
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
 };

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  googleAuthSchema,
   loginSchema,
   ok,
   refreshTokenSchema,
@@ -26,6 +27,15 @@ authRouter.post(
   validateBody(loginSchema),
   asyncHandler(async (req, res) => {
     const tokens = await authService.login(req.body);
+    res.json(ok(tokens, 'Logged in successfully'));
+  })
+);
+
+authRouter.post(
+  '/google',
+  validateBody(googleAuthSchema),
+  asyncHandler(async (req, res) => {
+    const tokens = await authService.loginWithGoogle(req.body);
     res.json(ok(tokens, 'Logged in successfully'));
   })
 );

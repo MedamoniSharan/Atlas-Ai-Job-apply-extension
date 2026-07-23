@@ -145,6 +145,17 @@ export async function login(email: string, password: string) {
   );
 }
 
+export async function loginWithGoogle(code: string) {
+  return request<AuthTokens>(
+    '/api/v1/auth/google',
+    {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    },
+    false
+  );
+}
+
 export async function fetchMe() {
   return request<User>('/api/v1/auth/me');
 }

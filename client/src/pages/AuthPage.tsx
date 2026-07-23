@@ -1,9 +1,10 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CircleHelp } from 'lucide-react';
-import { login, register } from '../lib/api';
+import { useGoogleLogin } from '@react-oauth/google';
+import { loginWithGoogle } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosMark } from '../components/CosmosLogo';
+import Lightfall from '../components/Lightfall';
 import '../styles/landing-fonts.css';
 
 type Mode = 'login' | 'register';
@@ -50,6 +51,8 @@ const companyLogos: CompanyLogo[] = [
 
 const PEOPLE_PREVIEW =
   'https://simplify.jobs/cdn-cgi/image/width=256/https://assets.simplify.jobs/people_previews.png';
+
+const AUTH_LIGHTFALL_COLORS = ['#A6C8FF', '#5227FF', '#FF9FFC'];
 
 function GoogleMark() {
   return (
@@ -128,51 +131,69 @@ export function AuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const setSession = useAuthStore((s) => s.setSession);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError('');
-    setNotice('');
-    setLoading(true);
-    try {
-      const result =
-        mode === 'login'
-          ? await login(email, password)
-          : await register(name, email, password);
-
-      if (!result.success) {
-        setError(result.message);
-        return;
-      }
-
-      setSession(result.data);
-      const next = new URLSearchParams(location.search).get('next');
-      if (next && next.startsWith('/')) {
-        const [pathname, hash] = next.split('#');
-        navigate({
-          pathname: pathname || '/',
-          hash: hash || undefined,
-        });
-      } else {
-        navigate(mode === 'register' ? '/get-started' : '/dashboard');
-      }
-    } finally {
-      setLoading(false);
+  function finishAuth(isNewAccount: boolean) {
+    const next = new URLSearchParams(location.search).get('next');
+    if (next && next.startsWith('/')) {
+      const [pathname, hash] = next.split('#');
+      navigate({
+        pathname: pathname || '/',
+        hash: hash || undefined,
+      });
+      return;
     }
+    navigate(isNewAccount ? '/get-started' : '/dashboard');
   }
+
+  const googleLogin = useGoogleLogin({
+    flow: 'auth-code',
+    onSuccess: async ({ code }) => {
+      setError('');
+      setLoading(true);
+      try {
+        const result = await loginWithGoogle(code);
+        if (!result.success) {
+          setError(result.message);
+          return;
+        }
+        setSession(result.data);
+        finishAuth(mode === 'register');
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      setError('Google sign-in was cancelled or failed. Please try again.');
+    },
+  });
 
   return (
     <div className="auth-shell">
       <AuthPromoPanel />
 
       <main className="auth-form-shell">
+        <div className="auth-form-shell__lightfall" aria-hidden="true">
+          <Lightfall
+            colors={AUTH_LIGHTFALL_COLORS}
+            backgroundColor="#0A29FF"
+            speed={1}
+            streakCount={3}
+            streakWidth={1}
+            streakLength={1}
+            glow={1}
+            density={0.45}
+            twinkle={1}
+            zoom={2}
+            backgroundGlow={1}
+            opacity={1}
+            mouseInteraction
+            mouseStrength={1}
+            mouseRadius={0.6}
+          />
+        </div>
+
         <section className="auth-form-panel" aria-labelledby="auth-form-title">
           <div className="auth-form-panel__mobile-brand" aria-label="Cosmo home">
             <Link to="/" className="auth-brand">
@@ -181,145 +202,53 @@ export function AuthPage({ mode }: { mode: Mode }) {
           </div>
 
           <h1 id="auth-form-title">
-            {mode === 'login' ? 'Login to your account' : 'Create your account'}
+            {mode === 'login' ? 'Sign in to Cosmo' : 'Create your Cosmo account'}
           </h1>
           <p className="auth-form-panel__tagline">Apply to jobs in 1-click.</p>
           <p className="auth-form-panel__description">
             Power your entire job search, with our recruiter-approved AI.
           </p>
 
-          <div className="auth-social-stack" aria-label="Social sign in options">
+          <div className="auth-social-stack" aria-label="Sign in options">
             <button
               type="button"
               className="auth-social-button"
               aria-label="Continue with Google"
-              onClick={() =>
-                setNotice('Google sign-in is coming soon — use email for now.')
-              }
+              disabled={loading || !import.meta.env.VITE_GOOGLE_CLIENT_ID}
+              onClick={() => {
+                if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+                  setError('Google sign-in is not configured.');
+                  return;
+                }
+                googleLogin();
+              }}
             >
-              <GoogleMark />
-              <span>Continue with Google</span>
-            </button>
-          </div>
-
-          <div className="auth-divider" role="separator">
-            <span>Or {mode === 'login' ? 'login' : 'sign up'} with your email</span>
-          </div>
-
-          <form onSubmit={onSubmit} noValidate>
-            {mode === 'register' && (
-              <div className="auth-field">
-                <label htmlFor="name">Full name</label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="Full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-            )}
-
-            <div className="auth-field">
-              <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="Email Address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="auth-field auth-field--password">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-              {mode === 'login' ? (
-                <button
-                  type="button"
-                  className="auth-forgot-link"
-                  onClick={() =>
-                    setNotice('Password reset is coming soon — contact support if you are locked out.')
-                  }
-                >
-                  Forgot your password?
-                </button>
-              ) : null}
-            </div>
-
-            {mode === 'login' ? (
-              <div className="auth-form-options">
-                <label className="auth-remember-label" htmlFor="rememberDevice">
-                  <input
-                    id="rememberDevice"
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(event) => setRemember(event.target.checked)}
-                  />
-                  <span>Remember this device</span>
-                </label>
-                <button
-                  className="auth-help-button"
-                  type="button"
-                  aria-label="Password help"
-                  onClick={() =>
-                    setNotice('Use the password associated with your Cosmo account.')
-                  }
-                >
-                  <CircleHelp size={16} strokeWidth={2} className="icon-motion" aria-hidden />
-                </button>
-              </div>
-            ) : null}
-
-            <button className="auth-submit-button" type="submit" disabled={loading}>
               {loading ? (
                 <CosmosLoader label="" size={22} className="auth-submit-loader" />
-              ) : mode === 'login' ? (
-                'Sign in'
               ) : (
-                'Create account'
+                <GoogleMark />
               )}
+              <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
             </button>
+          </div>
 
-            {error ? (
-              <p className="error auth-status-message" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {notice ? (
-              <p className="auth-status-message" role="status">
-                {notice}
-              </p>
-            ) : null}
-
-            <p className="auth-register-copy">
-              {mode === 'login' ? (
-                <>
-                  Don&apos;t have an account? <Link to="/register">Register</Link>.
-                </>
-              ) : (
-                <>
-                  Already have an account? <Link to="/login">Sign in</Link>.
-                </>
-              )}
+          {error ? (
+            <p className="error auth-status-message" role="alert">
+              {error}
             </p>
-          </form>
+          ) : null}
+
+          <p className="auth-register-copy">
+            {mode === 'login' ? (
+              <>
+                Don&apos;t have an account? <Link to="/register">Register</Link>.
+              </>
+            ) : (
+              <>
+                Already have an account? <Link to="/login">Sign in</Link>.
+              </>
+            )}
+          </p>
         </section>
       </main>
     </div>

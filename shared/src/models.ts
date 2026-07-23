@@ -16,6 +16,12 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const googleAuthSchema = z.object({
+  code: z.string().min(1),
+});
+
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
+
 export const planTierSchema = z.enum(['free', 'pro', 'max']);
 
 export type PlanTier = z.infer<typeof planTierSchema>;

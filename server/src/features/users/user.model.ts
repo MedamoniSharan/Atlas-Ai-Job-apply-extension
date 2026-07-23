@@ -7,7 +7,8 @@ export type UserStatus = 'active' | 'suspended';
 
 export interface IUser extends Document {
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleId?: string;
   name: string;
   role: UserRole;
   status: UserStatus;
@@ -45,7 +46,8 @@ const preferencesSchema = new Schema(
 const userSchema = new Schema<IUser>(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String, required: false },
+    googleId: { type: String, required: false, unique: true, sparse: true },
     name: { type: String, required: true, trim: true },
     role: {
       type: String,

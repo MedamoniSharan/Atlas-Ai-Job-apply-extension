@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 import {
   AuthTokens,
+  GoogleAuthInput,
   LoginInput,
   RegisterInput,
   User,
@@ -15,6 +17,12 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from '../../middleware/auth';
+
+const googleOAuthClient = new OAuth2Client(
+  env.googleClientId,
+  env.googleClientSecret,
+  'postmessage'
+);
 
 function isAdminEmail(email: string): boolean {
   return env.adminEmails.includes(email.toLowerCase());
@@ -124,9 +132,86 @@ export async function login(input: LoginInput): Promise<AuthTokens> {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
   }
 
+  if (!user.passwordHash) {
+    throw new AppError(
+      'This account uses Google sign-in. Continue with Google instead.',
+      401,
+      'USE_GOOGLE_SIGN_IN'
+    );
+  }
+
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
+  }
+
+  return issueTokens(user);
+}
+
+export async function loginWithGoogle(input: GoogleAuthInput): Promise<AuthTokens> {
+  if (!env.googleClientId || !env.googleClientSecret) {
+    throw new AppError('Google sign-in is not configured', 503, 'GOOGLE_NOT_CONFIGURED');
+  }
+
+  let idToken: string | null | undefined;
+  try {
+    const { tokens } = await googleOAuthClient.getToken(input.code);
+    idToken = tokens.id_token;
+  } catch {
+    throw new AppError('Google sign-in failed', 401, 'GOOGLE_AUTH_FAILED');
+  }
+
+  if (!idToken) {
+    throw new AppError('Google sign-in failed', 401, 'GOOGLE_AUTH_FAILED');
+  }
+
+  let payload;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken,
+      audience: env.googleClientId,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    throw new AppError('Google sign-in failed', 401, 'GOOGLE_AUTH_FAILED');
+  }
+
+  const googleId = payload?.sub;
+  const email = payload?.email?.toLowerCase();
+  const emailVerified = payload?.email_verified;
+  const name =
+    payload?.name?.trim() ||
+    [payload?.given_name, payload?.family_name].filter(Boolean).join(' ').trim() ||
+    email?.split('@')[0] ||
+    'Google user';
+
+  if (!googleId || !email || !emailVerified) {
+    throw new AppError(
+      'Google account email is not verified',
+      401,
+      'GOOGLE_AUTH_FAILED'
+    );
+  }
+
+  let user = await UserModel.findOne({
+    $or: [{ googleId }, { email }],
+  });
+
+  if (user) {
+    if (user.googleId && user.googleId !== googleId) {
+      throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
+    }
+    if (!user.googleId) {
+      user.googleId = googleId;
+      await user.save();
+    }
+  } else {
+    user = await UserModel.create({
+      email,
+      googleId,
+      name,
+      role: isAdminEmail(email) ? 'admin' : 'user',
+    });
   }
 
   return issueTokens(user);
