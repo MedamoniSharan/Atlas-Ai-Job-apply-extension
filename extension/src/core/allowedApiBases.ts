@@ -1,11 +1,17 @@
 declare const __EXTENSION_API_ORIGIN__: string | undefined;
 declare const __EXTENSION_WEB_ORIGIN__: string | undefined;
 
+/** Deployed Cosmo API (Render). */
+export const PRODUCTION_API_BASE =
+  'https://atlas-ai-job-apply-extension-1.onrender.com';
+
 /**
- * API bases the extension may call. Built-in localhost for local/dev;
- * release builds inject EXTENSION_API_ORIGIN via esbuild define.
+ * API bases the extension may call. Built-in localhost for local/dev
+ * plus the production API; release builds can inject more via
+ * EXTENSION_API_ORIGIN.
  */
 const BUILTIN = [
+  PRODUCTION_API_BASE,
   'http://localhost:4000',
   'http://127.0.0.1:4000',
 ] as const;

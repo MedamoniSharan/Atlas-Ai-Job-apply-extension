@@ -4,7 +4,9 @@ import { fetchAdminPayments, reconcileAdminPayment } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader } from '../components/CosmosLogo';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const API_BASE =
+  import.meta.env.VITE_API_BASE?.trim() ||
+  'https://atlas-ai-job-apply-extension-1.onrender.com';
 
 export function AdminPaymentsPage() {
   const [status, setStatus] = useState('');

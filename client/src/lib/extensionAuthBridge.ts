@@ -1,5 +1,6 @@
 const API_BASE =
-  import.meta.env.VITE_API_BASE?.trim() || 'http://localhost:4000';
+  import.meta.env.VITE_API_BASE?.trim() ||
+  'https://atlas-ai-job-apply-extension-1.onrender.com';
 
 const MESSAGE_SOURCE = 'cosmo-web';
 const MESSAGE_TYPE = 'COSMO_AUTH_SYNC';

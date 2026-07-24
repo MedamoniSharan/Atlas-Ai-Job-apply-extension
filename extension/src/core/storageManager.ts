@@ -1,8 +1,8 @@
 import type { JobPreferences } from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from './defaults';
-import { resolveApiBase } from './allowedApiBases';
+import { PRODUCTION_API_BASE, resolveApiBase } from './allowedApiBases';
 
-const DEFAULT_API = 'http://localhost:4000';
+export const DEFAULT_API = PRODUCTION_API_BASE;
 
 export type AuthState = {
   accessToken: string | null;
@@ -101,4 +101,4 @@ export async function setApplyQueue(items: ApplyQueueItem[]): Promise<void> {
   await chrome.storage.local.set({ [KEYS.applyQueue]: items });
 }
 
-export { KEYS, DEFAULT_API };
+export { KEYS };

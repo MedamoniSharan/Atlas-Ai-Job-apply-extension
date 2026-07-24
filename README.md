@@ -44,7 +44,7 @@ Privacy / Terms (local): `http://localhost:5173/privacy` and `/terms`.
 ## Vertical slice
 
 1. Register / sign in on the dashboard.
-2. Sign in from the extension popup with the same credentials (`API Base URL` = `http://localhost:4000`).
+2. Sign in from the extension popup with the same credentials (`API Base URL` = `https://atlas-ai-job-apply-extension-1.onrender.com`, or `http://localhost:4000` for a local API).
 3. Open a Naukri job page while logged into Naukri in Chrome.
 4. The content script emits `JobDetected` / `ApplicationRecorded`.
 5. Events persist in `chrome.storage`, sync idempotently via `POST /api/v1/events/sync`, and appear on **Applications** (Socket.IO live updates).

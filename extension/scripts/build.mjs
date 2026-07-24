@@ -11,7 +11,8 @@ const watch = process.argv.includes('--watch');
 const release = process.argv.includes('--release');
 
 const apiOrigins = (
-  process.env.EXTENSION_API_ORIGIN || 'http://localhost:4000,http://127.0.0.1:4000'
+  process.env.EXTENSION_API_ORIGIN ||
+    'https://atlas-ai-job-apply-extension-1.onrender.com,http://localhost:4000,http://127.0.0.1:4000'
 )
   .split(',')
   .map((s) => s.trim().replace(/\/$/, ''))

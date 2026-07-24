@@ -5,6 +5,7 @@
   "description": "Naukri job co-pilot — scan and assist Easy Apply from your preferences, synced to Cosmo",
   "permissions": ["storage", "alarms", "tabs"],
   "host_permissions": [
+    "https://atlas-ai-job-apply-extension-1.onrender.com/*",
     "http://localhost:4000/*",
     "http://127.0.0.1:4000/*",
     "http://localhost:5173/*",

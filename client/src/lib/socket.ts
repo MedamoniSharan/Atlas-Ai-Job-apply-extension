@@ -3,7 +3,9 @@ import { io, Socket } from 'socket.io-client';
 import type { Application } from '@cosmo/shared';
 import { useAuthStore } from '../store/authStore';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? '';
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL?.trim() ||
+  'https://atlas-ai-job-apply-extension-1.onrender.com';
 
 export function useApplicationSocket(
   onUpdate: (app: Application) => void

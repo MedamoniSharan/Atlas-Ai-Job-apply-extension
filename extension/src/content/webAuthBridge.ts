@@ -5,7 +5,9 @@ const LEGACY_MESSAGE_SOURCE = 'atlas-web';
 const LEGACY_MESSAGE_TYPE = 'ATLAS_AUTH_SYNC';
 const STORAGE_KEY = 'cosmo-auth';
 const LEGACY_STORAGE_KEY = 'atlas-auth';
-const DEFAULT_API = 'http://localhost:4000';
+import { PRODUCTION_API_BASE } from '../core/allowedApiBases';
+
+const DEFAULT_API = PRODUCTION_API_BASE;
 
 type AuthSyncMessage = {
   source: string;

@@ -20,10 +20,11 @@ export default defineConfig({
       allow: [path.resolve(__dirname, '..')],
     },
     proxy: {
-      '/api': 'http://localhost:4000',
+      '/api': 'https://atlas-ai-job-apply-extension-1.onrender.com',
       '/socket.io': {
-        target: 'http://localhost:4000',
+        target: 'https://atlas-ai-job-apply-extension-1.onrender.com',
         ws: true,
+        changeOrigin: true,
       },
     },
   },
