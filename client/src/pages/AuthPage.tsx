@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../lib/api';
+import { googleClientId } from '../lib/googleAuth';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosMark } from '../components/CosmosLogo';
 import Lightfall from '../components/Lightfall';
@@ -186,7 +187,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
   const location = useLocation();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const googleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim());
+  const googleConfigured = Boolean(googleClientId());
 
   function finishAuth(isNewAccount: boolean) {
     const next = new URLSearchParams(location.search).get('next');

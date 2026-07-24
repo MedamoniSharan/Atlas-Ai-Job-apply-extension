@@ -22,11 +22,12 @@ import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LegalPage } from './pages/LegalPage';
+import { googleClientId } from './lib/googleAuth';
 import './styles.css';
 import './admin/admin.css';
 
 const queryClient = new QueryClient();
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
+const googleId = googleClientId();
 
 const app = (
   <QueryClientProvider client={queryClient}>
@@ -75,8 +76,8 @@ const app = (
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {googleClientId ? (
-      <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider>
+    {googleId ? (
+      <GoogleOAuthProvider clientId={googleId}>{app}</GoogleOAuthProvider>
     ) : (
       app
     )}
