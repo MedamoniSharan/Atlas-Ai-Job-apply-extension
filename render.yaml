@@ -1,0 +1,15 @@
+# Render Blueprint for the Atlas API (monorepo).
+# Dashboard → New → Blueprint, or set these manually on the Web Service.
+services:
+  - type: web
+    name: atlas-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm install && npm run build:server
+    startCommand: npm run start:server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "20"
