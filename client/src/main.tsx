@@ -26,53 +26,59 @@ import './styles.css';
 import './admin/admin.css';
 
 const queryClient = new QueryClient();
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
+
+const app = (
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/register" element={<AuthPage mode="register" />} />
+        <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+        <Route path="/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/applications" element={<ApplicationsPage />} />
+          <Route path="/get-extension" element={<GetStartedPage />} />
+          <Route
+            path="/get-started"
+            element={<Navigate to="/get-extension" replace />}
+          />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/tracker" element={<TrackerPage />} />
+          <Route
+            path="/browse"
+            element={
+              <ComingSoonPage
+                title="Browse jobs"
+                blurb="Job browsing inside Cosmo is coming soon. Use the Naukri co-pilot to scan matches for now."
+              />
+            }
+          />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminOverviewPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+          <Route path="payments" element={<AdminPaymentsPage />} />
+          <Route path="plans" element={<AdminPlansPage />} />
+          <Route path="audit" element={<AdminAuditPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  </QueryClientProvider>
+);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<AuthPage mode="login" />} />
-            <Route path="/register" element={<AuthPage mode="register" />} />
-            <Route path="/privacy" element={<LegalPage kind="privacy" />} />
-            <Route path="/terms" element={<LegalPage kind="terms" />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/applications" element={<ApplicationsPage />} />
-              <Route path="/get-extension" element={<GetStartedPage />} />
-              <Route
-                path="/get-started"
-                element={<Navigate to="/get-extension" replace />}
-              />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/tracker" element={<TrackerPage />} />
-              <Route
-                path="/browse"
-                element={
-                  <ComingSoonPage
-                    title="Browse jobs"
-                    blurb="Job browsing inside Cosmo is coming soon. Use the Naukri co-pilot to scan matches for now."
-                  />
-                }
-              />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Route>
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminOverviewPage />} />
-              <Route path="users" element={<AdminUsersPage />} />
-              <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
-              <Route path="payments" element={<AdminPaymentsPage />} />
-              <Route path="plans" element={<AdminPlansPage />} />
-              <Route path="audit" element={<AdminAuditPage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </GoogleOAuthProvider>
+    {googleClientId ? (
+      <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider>
+    ) : (
+      app
+    )}
   </StrictMode>
 );

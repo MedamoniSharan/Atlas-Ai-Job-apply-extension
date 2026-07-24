@@ -127,12 +127,66 @@ function AuthPromoPanel() {
   );
 }
 
+function GoogleSignInButton({
+  mode,
+  loading,
+  setLoading,
+  setError,
+  onAuthed,
+}: {
+  mode: Mode;
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  setError: (v: string) => void;
+  onAuthed: (isNewAccount: boolean) => void;
+}) {
+  const setSession = useAuthStore((s) => s.setSession);
+  const googleLogin = useGoogleLogin({
+    flow: 'auth-code',
+    onSuccess: async ({ code }) => {
+      setError('');
+      setLoading(true);
+      try {
+        const result = await loginWithGoogle(code);
+        if (!result.success) {
+          setError(result.message);
+          return;
+        }
+        setSession(result.data);
+        onAuthed(mode === 'register');
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      setError('Google sign-in was cancelled or failed. Please try again.');
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      className="auth-social-button"
+      aria-label="Continue with Google"
+      disabled={loading}
+      onClick={() => googleLogin()}
+    >
+      {loading ? (
+        <CosmosLoader label="" size={22} className="auth-submit-loader" />
+      ) : (
+        <GoogleMark />
+      )}
+      <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
+    </button>
+  );
+}
+
 export function AuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const setSession = useAuthStore((s) => s.setSession);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const googleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim());
 
   function finishAuth(isNewAccount: boolean) {
     const next = new URLSearchParams(location.search).get('next');
@@ -151,28 +205,6 @@ export function AuthPage({ mode }: { mode: Mode }) {
     }
     navigate(isNewAccount ? '/get-extension' : '/dashboard');
   }
-
-  const googleLogin = useGoogleLogin({
-    flow: 'auth-code',
-    onSuccess: async ({ code }) => {
-      setError('');
-      setLoading(true);
-      try {
-        const result = await loginWithGoogle(code);
-        if (!result.success) {
-          setError(result.message);
-          return;
-        }
-        setSession(result.data);
-        finishAuth(mode === 'register');
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: () => {
-      setError('Google sign-in was cancelled or failed. Please try again.');
-    },
-  });
 
   return (
     <div className="auth-shell">
@@ -215,26 +247,28 @@ export function AuthPage({ mode }: { mode: Mode }) {
           </p>
 
           <div className="auth-social-stack" aria-label="Sign in options">
-            <button
-              type="button"
-              className="auth-social-button"
-              aria-label="Continue with Google"
-              disabled={loading || !import.meta.env.VITE_GOOGLE_CLIENT_ID}
-              onClick={() => {
-                if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-                  setError('Google sign-in is not configured.');
-                  return;
+            {googleConfigured ? (
+              <GoogleSignInButton
+                mode={mode}
+                loading={loading}
+                setLoading={setLoading}
+                setError={setError}
+                onAuthed={finishAuth}
+              />
+            ) : (
+              <button
+                type="button"
+                className="auth-social-button"
+                aria-label="Continue with Google"
+                disabled
+                onClick={() =>
+                  setError('Google sign-in is not configured on this deploy.')
                 }
-                googleLogin();
-              }}
-            >
-              {loading ? (
-                <CosmosLoader label="" size={22} className="auth-submit-loader" />
-              ) : (
+              >
                 <GoogleMark />
-              )}
-              <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
-            </button>
+                <span>Continue with Google</span>
+              </button>
+            )}
           </div>
 
           {error ? (
