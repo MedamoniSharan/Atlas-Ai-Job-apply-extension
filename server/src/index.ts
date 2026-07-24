@@ -5,18 +5,31 @@ import { assertSecureEnv, env } from './config/env';
 import { logger } from './config/logger';
 import { initSocket } from './realtime/socket';
 
-async function main() {
-  assertSecureEnv();
+async function bootstrapData(): Promise<void> {
   await connectMongo();
   const { seedPlanConfigs } = await import('./features/billing/planConfig.service');
   await seedPlanConfigs();
+}
+
+async function main() {
+  assertSecureEnv();
 
   const app = createApp();
   const server = http.createServer(app);
   initSocket(server);
 
-  server.listen(env.port, () => {
-    logger.info('Server listening', { port: env.port, env: env.nodeEnv });
+  await new Promise<void>((resolve, reject) => {
+    server.listen(env.port, '0.0.0.0', () => {
+      logger.info('Server listening', { port: env.port, env: env.nodeEnv });
+      resolve();
+    });
+    server.on('error', reject);
+  });
+
+  void bootstrapData().catch((err) => {
+    logger.error('MongoDB bootstrap failed (API stays up; health shows mongo down)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
   });
 
   const shutdown = () => {
