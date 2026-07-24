@@ -22,6 +22,7 @@ import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LegalPage } from './pages/LegalPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { googleClientId } from './lib/googleAuth';
 import './styles.css';
 import './admin/admin.css';
@@ -68,7 +69,7 @@ const app = (
           <Route path="plans" element={<AdminPlansPage />} />
           <Route path="audit" element={<AdminAuditPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   </QueryClientProvider>
