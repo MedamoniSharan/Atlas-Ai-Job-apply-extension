@@ -1,5 +1,5 @@
-import type { JobPayload, JobPreferences } from '@atlas/shared';
-import { sanitizeJobMetaFields, stripEmbeddedLabels } from '@atlas/shared';
+import type { JobPayload, JobPreferences } from '@cosmo/shared';
+import { sanitizeJobMetaFields, stripEmbeddedLabels } from '@cosmo/shared';
 import {
   PlatformAdapter,
   SelectorRegistry,

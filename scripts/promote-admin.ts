@@ -18,7 +18,7 @@ async function main() {
   }
 
   const mongoUri =
-    process.env.MONGO_URI ?? 'mongodb://127.0.0.1:27017/atlas';
+    process.env.MONGO_URI ?? 'mongodb://127.0.0.1:27017/cosmo';
   await mongoose.connect(mongoUri);
 
   const result = await mongoose.connection.collection('users').findOneAndUpdate(

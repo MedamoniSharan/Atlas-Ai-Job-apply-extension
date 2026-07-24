@@ -1,15 +1,16 @@
 {
-  "name": "@atlas/extension",
+  "name": "@cosmo/extension",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:release": "node scripts/build.mjs --release",
     "dev": "node scripts/build.mjs --watch",
     "test": "vitest run",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@atlas/shared": "*",
+    "@cosmo/shared": "*",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

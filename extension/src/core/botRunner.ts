@@ -1,4 +1,4 @@
-import type { JobPayload, JobPreferences } from '@atlas/shared';
+import type { JobPayload, JobPreferences } from '@cosmo/shared';
 import {
   SearchResultJob,
   buildNaukriSearchUrl,
@@ -442,7 +442,7 @@ async function applyOneJob(
   if (result.needsUserInput) {
     await setCopilotState({ paused: true, currentTitle: base.title });
     await appendCopilotLog(
-      `Paused — Naukri is asking questions for "${base.title}". Answer them on the page; Atlas will continue when you save, or press Resume.`,
+      `Paused — Naukri is asking questions for "${base.title}". Answer them on the page; Cosmo will continue when you save, or press Resume.`,
       'warn'
     );
 
@@ -477,7 +477,7 @@ async function applyOneJob(
     if (result.needsUserInput) {
       await setCopilotState({ paused: true });
       await appendCopilotLog(
-        'Still waiting on Naukri questions. Finish them — Atlas will continue when saved, or press Resume.',
+        'Still waiting on Naukri questions. Finish them — Cosmo will continue when saved, or press Resume.',
         'warn'
       );
       const pause2 = await waitWhilePausedForQuestions(tabId);
@@ -810,7 +810,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
             'already_applied'
           );
           await appendCopilotLog(
-            `Already applied (Atlas) — skipped: ${job.title}`,
+            `Already applied (Cosmo) — skipped: ${job.title}`,
             'info'
           );
           continue;

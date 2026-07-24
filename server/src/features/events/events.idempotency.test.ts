@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jobPayloadSchema } from '@atlas/shared';
+import { jobPayloadSchema } from '@cosmo/shared';
 
 /**
  * Unit-level idempotency keying: same eventId maps to one logical application.

@@ -24,7 +24,12 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from './store/authStore';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
-import { ensureSession, fetchApplications, fetchBillingMe } from './lib/api';
+import {
+  ensureSession,
+  fetchApplications,
+  fetchBillingMe,
+  logout,
+} from './lib/api';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
 import { ShimmerButton } from './components/ui/ShimmerButton';
 
@@ -93,7 +98,6 @@ function pageTitle(pathname: string): string {
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const clearSession = useAuthStore((s) => s.clearSession);
   const { data: onboarding } = useOnboardingStatus();
   const [sessionReady, setSessionReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -276,8 +280,9 @@ export function AppLayout() {
               type="button"
               className="sidebar__signout"
               onClick={() => {
-                clearSession();
-                window.location.replace('/');
+                void logout().finally(() => {
+                  window.location.replace('/');
+                });
               }}
             >
               <LogOut size={14} strokeWidth={2} aria-hidden />

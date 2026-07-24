@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ok, OnboardingStatus, preferencesAreComplete } from '@atlas/shared';
+import { ok, OnboardingStatus, preferencesAreComplete } from '@cosmo/shared';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { UserModel } from '../users/user.model';

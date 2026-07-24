@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-import type { EventType, SyncStatus } from '@atlas/shared';
+import type { EventType, SyncStatus } from '@cosmo/shared';
 
 export interface IActivity extends Document {
   eventId: string;

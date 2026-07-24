@@ -5,7 +5,7 @@ import type {
   JobPreferences,
   OnboardingStatus,
   User,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { useAuthStore } from '../store/authStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -44,7 +44,26 @@ async function refreshSession(): Promise<boolean> {
   }
 }
 
-function logout(): void {
+/** Best-effort server revoke, then clear local session. */
+export async function logout(): Promise<void> {
+  const { accessToken, refreshToken } = useAuthStore.getState();
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    await fetch(`${API_BASE}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ refreshToken: refreshToken ?? undefined }),
+    });
+  } catch {
+    /* still clear locally */
+  }
+  useAuthStore.getState().clearSession();
+}
+
+function forceLocalLogout(): void {
   useAuthStore.getState().clearSession();
 }
 
@@ -84,7 +103,7 @@ async function request<T>(
         return request<T>(path, options, auth, true);
       }
     }
-    logout();
+    forceLocalLogout();
   }
 
   return body as ApiResponse<T>;
@@ -101,7 +120,7 @@ export async function ensureSession(): Promise<boolean> {
 
   const refreshed = await refreshSession();
   if (!refreshed) {
-    logout();
+    forceLocalLogout();
     return false;
   }
   return true;

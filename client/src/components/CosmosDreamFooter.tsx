@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { useInView } from 'motion/react';
 import { CosmosIconMark, CosmovaiWordmark } from './CosmosLogo';
 
-const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'];
-const moreLinks = ['Careers', 'Terms', 'Privacy'];
+const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'] as const;
+
+const moreLinks = [
+  { label: 'Careers', href: '#' as const, stub: true },
+  { label: 'Terms', to: '/terms' as const },
+  { label: 'Privacy', to: '/privacy' as const },
+] as const;
 
 function PoweredByCodex() {
   return (
@@ -57,6 +62,20 @@ function FooterLogo({ size }: { size: number }) {
   );
 }
 
+function MoreLink({ link }: { link: (typeof moreLinks)[number] }) {
+  if ('to' in link) {
+    return <Link to={link.to}>{link.label}</Link>;
+  }
+  return (
+    <a
+      href={link.href}
+      onClick={link.stub ? (e) => e.preventDefault() : undefined}
+    >
+      {link.label}
+    </a>
+  );
+}
+
 export function CosmosDreamFooter() {
   return (
     <div className="cosmos-page">
@@ -75,9 +94,7 @@ export function CosmosDreamFooter() {
           </div>
           <nav aria-label="More" className="footer-links">
             {moreLinks.map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()}>
-                {link}
-              </a>
+              <MoreLink key={link.label} link={link} />
             ))}
           </nav>
         </div>
@@ -98,9 +115,7 @@ export function CosmosDreamFooter() {
           <div className="mobile-nav-group">
             <h3>More</h3>
             {moreLinks.map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()}>
-                {link}
-              </a>
+              <MoreLink key={link.label} link={link} />
             ))}
           </div>
         </div>

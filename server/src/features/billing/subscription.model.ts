@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-import type { PaidPlan, PlanTier, SubscriptionStatus } from '@atlas/shared';
+import type { PaidPlan, PlanTier, SubscriptionStatus } from '@cosmo/shared';
 
 export type SubscriptionSource = 'razorpay' | 'admin_grant' | 'legacy';
 

@@ -1,6 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { env } from '../config/env';
+import { isCorsOriginAllowed } from '../config/corsOrigins';
 import { logger } from '../config/logger';
 import { verifyAccessToken } from '../middleware/auth';
 
@@ -14,15 +14,7 @@ export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (
-          env.corsOrigins.some(
-            (o) => origin === o || (o.endsWith('://') && origin.startsWith(o))
-          )
-        ) {
-          return callback(null, true);
-        }
-        if (env.nodeEnv === 'development') return callback(null, true);
+        if (isCorsOriginAllowed(origin)) return callback(null, true);
         return callback(new Error('CORS blocked'), false);
       },
       credentials: true,

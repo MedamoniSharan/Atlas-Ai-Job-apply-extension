@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Application } from '@atlas/shared';
-import { sanitizeJobMetaFields } from '@atlas/shared';
+import type { Application } from '@cosmo/shared';
+import { sanitizeJobMetaFields } from '@cosmo/shared';
 
 type ApplicationDetailDrawerProps = {
   app: Application | null;
@@ -188,7 +188,7 @@ export function ApplicationDetailDrawer({
           !app.skills?.length &&
           facts.length === 0 ? (
             <p className="job-drawer__empty">
-              Full details will appear after Atlas opens this job on Naukri.
+              Full details will appear after Cosmo opens this job on Naukri.
               Open the listing to view everything on the site.
             </p>
           ) : null}

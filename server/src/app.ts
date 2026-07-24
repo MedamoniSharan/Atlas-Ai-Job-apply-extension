@@ -3,8 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import { ok } from '@atlas/shared';
+import { ok } from '@cosmo/shared';
 import { env } from './config/env';
+import { isCorsOriginAllowed } from './config/corsOrigins';
 import { errorHandler, asyncHandler } from './middleware/errorHandler';
 import { authRouter } from './features/auth/auth.routes';
 import { eventsRouter } from './features/events/events.routes';
@@ -23,16 +24,7 @@ export function createApp() {
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (
-          env.corsOrigins.some(
-            (o) =>
-              origin === o || (o.endsWith('://') && origin.startsWith(o))
-          )
-        ) {
-          return callback(null, true);
-        }
-        if (env.nodeEnv === 'development') return callback(null, true);
+        if (isCorsOriginAllowed(origin)) return callback(null, true);
         return callback(new Error('Not allowed by CORS'));
       },
       credentials: true,

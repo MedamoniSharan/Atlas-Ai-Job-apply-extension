@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { User } from '@atlas/shared';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import type { User } from '@cosmo/shared';
 import {
   clearAuthFromExtension,
   syncAuthToExtension,
@@ -18,6 +18,23 @@ type AuthState = {
   clearSession: () => void;
 };
 
+/** Prefer cosmo-auth; migrate once from legacy atlas-auth. */
+const authStorage = createJSONStorage(() => {
+  if (typeof window === 'undefined') return localStorage;
+  try {
+    if (!localStorage.getItem('cosmo-auth')) {
+      const legacy = localStorage.getItem('atlas-auth');
+      if (legacy) {
+        localStorage.setItem('cosmo-auth', legacy);
+        localStorage.removeItem('atlas-auth');
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return localStorage;
+});
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -34,7 +51,8 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'atlas-auth',
+      name: 'cosmo-auth',
+      storage: authStorage,
       onRehydrateStorage: () => (state) => {
         if (state?.accessToken && state?.refreshToken) {
           syncAuthToExtension({

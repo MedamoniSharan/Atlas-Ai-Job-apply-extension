@@ -1,4 +1,4 @@
-# Atlas Job Assistant
+# Cosmo Job Assistant
 
 # System Design Document (design.md)
 
@@ -12,7 +12,7 @@
 
 # 1. System Overview
 
-Atlas Job Assistant is a SaaS platform consisting of:
+Cosmo Job Assistant is a SaaS platform consisting of:
 
 * React Dashboard
 * Chrome Extension
@@ -55,7 +55,7 @@ Every component must satisfy the following principles:
      ┌───────────────┬──────────────┬──────────────┐
      │               │              │              │
  MongoDB          Redis         BullMQ         Object Storage
-   Atlas          Cache          Queue       (S3/Cloudinary)
+   Cosmo          Cache          Queue       (S3/Cloudinary)
                            │
                     Chrome Extension
      ┌───────────────┬───────────────┬──────────────┐
@@ -272,7 +272,7 @@ Dashboard
 
 Extension
 
-* Authenticates with the backend using the user's Atlas token.
+* Authenticates with the backend using the user's Cosmo token.
 * Does not store or manage third-party job platform credentials.
 
 ---

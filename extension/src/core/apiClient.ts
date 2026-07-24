@@ -4,7 +4,7 @@ import type {
   EventEnvelope,
   JobPreferences,
   SyncEventsRequest,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import {
   getAuthState,
   setAuthState,
@@ -142,7 +142,7 @@ export async function fetchPreferences(): Promise<ApiResponse<JobPreferences>> {
   return result;
 }
 
-/** Jobs already applied in Atlas DB (shared with dashboard). */
+/** Jobs already applied in Cosmo DB (shared with dashboard). */
 export async function lookupAppliedJobs(input: {
   externalJobIds?: string[];
   urls?: string[];

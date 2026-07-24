@@ -1,4 +1,4 @@
-import type { PlanTier } from '@atlas/shared';
+import type { PlanTier } from '@cosmo/shared';
 import { fetchBillingMe } from './apiClient';
 import {
   clearApplyQuotaCache,

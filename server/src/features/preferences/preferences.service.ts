@@ -2,7 +2,7 @@ import {
   DEFAULT_JOB_PREFERENCES,
   JobPreferences,
   preferencesAreComplete,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { UserModel } from '../users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 

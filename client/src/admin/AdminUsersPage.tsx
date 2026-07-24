@@ -21,7 +21,7 @@ import {
   patchAdminUser,
 } from '../lib/api';
 import { CosmosLoader } from '../components/CosmosLogo';
-import type { PaidPlan } from '@atlas/shared';
+import type { PaidPlan } from '@cosmo/shared';
 
 type UserDetail = {
   id: string;

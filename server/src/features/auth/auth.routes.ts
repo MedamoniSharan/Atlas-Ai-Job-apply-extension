@@ -1,17 +1,38 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   googleAuthSchema,
   loginSchema,
   ok,
   refreshTokenSchema,
   registerSchema,
-} from '@atlas/shared';
+} from '@cosmo/shared';
+import { z } from 'zod';
 import { asyncHandler } from '../../middleware/errorHandler';
-import { requireAuth, AuthedRequest } from '../../middleware/auth';
+import {
+  requireAuth,
+  AuthedRequest,
+  verifyAccessToken,
+} from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import * as authService from './auth.service';
 
 export const authRouter = Router();
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many auth attempts — try again later',
+    data: null,
+    error: { code: 'RATE_LIMITED' },
+  },
+});
+
+authRouter.use(authLimiter);
 
 authRouter.post(
   '/register',
@@ -46,6 +67,34 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const tokens = await authService.refresh(req.body.refreshToken);
     res.json(ok(tokens, 'Token refreshed'));
+  })
+);
+
+const logoutBodySchema = z.object({
+  refreshToken: z.string().min(1).optional(),
+});
+
+authRouter.post(
+  '/logout',
+  validateBody(logoutBodySchema),
+  asyncHandler(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const payload = verifyAccessToken(authHeader.slice(7));
+        await authService.logout(payload.sub);
+        res.json(ok({ loggedOut: true }, 'Logged out'));
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
+    if (req.body?.refreshToken) {
+      await authService.logoutWithRefreshToken(req.body.refreshToken);
+    }
+
+    res.json(ok({ loggedOut: true }, 'Logged out'));
   })
 );
 

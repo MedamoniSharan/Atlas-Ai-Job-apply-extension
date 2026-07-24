@@ -1,5 +1,6 @@
-import type { JobPreferences } from '@atlas/shared';
+import type { JobPreferences } from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from './defaults';
+import { resolveApiBase } from './allowedApiBases';
 
 const DEFAULT_API = 'http://localhost:4000';
 
@@ -53,14 +54,21 @@ export async function getAuthState(): Promise<AuthState> {
   return {
     accessToken: (data[KEYS.accessToken] as string) ?? null,
     refreshToken: (data[KEYS.refreshToken] as string) ?? null,
-    apiBaseUrl: (data[KEYS.apiBaseUrl] as string) ?? DEFAULT_API,
+    apiBaseUrl: resolveApiBase(
+      (data[KEYS.apiBaseUrl] as string | undefined) ?? undefined,
+      DEFAULT_API
+    ),
   };
 }
 
 export async function setAuthState(
   partial: Partial<AuthState>
 ): Promise<void> {
-  await chrome.storage.local.set(partial);
+  const next: Partial<AuthState> = { ...partial };
+  if (partial.apiBaseUrl !== undefined) {
+    next.apiBaseUrl = resolveApiBase(partial.apiBaseUrl, DEFAULT_API);
+  }
+  await chrome.storage.local.set(next);
 }
 
 export async function clearAuth(): Promise<void> {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Download, Eye, FileText, Sparkles, X } from 'lucide-react';
-import type { PaidPlan, PlanTier } from '@atlas/shared';
+import type { PaidPlan, PlanTier } from '@cosmo/shared';
 import { fetchBillingMe } from '../lib/api';
 import {
   downloadPaymentInvoice,

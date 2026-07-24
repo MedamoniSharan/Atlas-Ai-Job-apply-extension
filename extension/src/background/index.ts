@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { EventEnvelope, EventType, JobPayload, JobPreferences } from '@atlas/shared';
-import { CONSENT_VERSION } from '@atlas/shared';
+import type { EventEnvelope, EventType, JobPayload, JobPreferences } from '@cosmo/shared';
+import { CONSENT_VERSION } from '@cosmo/shared';
 import { enqueue } from '../core/queueManager';
 import { flushQueue } from '../core/syncManager';
 import { reportHealth } from '../core/healthMonitor';
@@ -16,6 +16,7 @@ import {
   getCachedPreferences,
   DEFAULT_API,
 } from '../core/storageManager';
+import { resolveApiBase, injectedWebOrigins } from '../core/allowedApiBases';
 import { logger } from '../core/logger';
 import { handleError } from '../core/errorHandler';
 import { runScan } from '../core/scanManager';
@@ -143,8 +144,11 @@ async function sendExtensionConnected(): Promise<void> {
 
 /** Dashboard origins that host webBridge.js (auth sync). */
 const DASHBOARD_TAB_URLS = [
-  'http://localhost:5173/*',
-  'http://127.0.0.1:5173/*',
+  ...new Set([
+    'http://localhost:5173/*',
+    'http://127.0.0.1:5173/*',
+    ...injectedWebOrigins().map((origin) => `${origin}/*`),
+  ]),
 ];
 
 /**
@@ -226,6 +230,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
         }
         case 'LOGOUT': {
+          const auth = await getAuthState();
+          if (auth.refreshToken || auth.accessToken) {
+            try {
+              const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+              };
+              if (auth.accessToken) {
+                headers.Authorization = `Bearer ${auth.accessToken}`;
+              }
+              await fetch(`${auth.apiBaseUrl}/api/v1/auth/logout`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  refreshToken: auth.refreshToken ?? undefined,
+                }),
+              });
+            } catch {
+              /* still clear locally */
+            }
+          }
           await clearAuth();
           sendResponse({ ok: true });
           break;
@@ -243,10 +267,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             typeof message.refreshToken === 'string'
               ? message.refreshToken
               : null;
-          const apiBaseUrl =
-            typeof message.apiBaseUrl === 'string' && message.apiBaseUrl
-              ? message.apiBaseUrl
-              : DEFAULT_API;
+          const apiBaseUrl = resolveApiBase(
+            typeof message.apiBaseUrl === 'string' ? message.apiBaseUrl : '',
+            DEFAULT_API
+          );
 
           if (!accessToken || !refreshToken) {
             sendResponse({ ok: false, error: 'Missing tokens' });
@@ -308,7 +332,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         case 'SET_API_BASE': {
           await setAuthState({
-            apiBaseUrl: message.apiBaseUrl || DEFAULT_API,
+            apiBaseUrl: resolveApiBase(
+              message.apiBaseUrl || DEFAULT_API,
+              DEFAULT_API
+            ),
           });
           sendResponse({ ok: true });
           break;
@@ -380,7 +407,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (!auth.accessToken) {
             sendResponse({
               ok: false,
-              message: 'Sign in to Atlas from the extension popup first.',
+              message: 'Sign in to Cosmo from the extension popup first.',
             });
             break;
           }

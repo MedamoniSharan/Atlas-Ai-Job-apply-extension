@@ -11,9 +11,9 @@ echo "Installing dependencies..."
 npm install
 
 echo "Building shared package..."
-npm run build --workspace=@atlas/shared
+npm run build --workspace=@cosmo/shared
 
 echo "Ready. Next:"
 echo "  npm run dev:server"
 echo "  npm run dev:client"
-echo "  npm run build --workspace=@atlas/extension"
+echo "  npm run build --workspace=@cosmo/extension"

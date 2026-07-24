@@ -1,5 +1,5 @@
 import { FilterQuery } from 'mongoose';
-import { getIstDayBounds, getIstMonthBounds } from '@atlas/shared';
+import { getIstDayBounds, getIstMonthBounds } from '@cosmo/shared';
 import { IApplication } from './application.model';
 
 /** Non-skipped applies that count toward plan / safety caps. */

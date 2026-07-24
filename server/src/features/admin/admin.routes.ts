@@ -11,7 +11,7 @@ import {
   adminUsersQuerySchema,
   ok,
   planTierSchema,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { asyncHandler, AppError } from '../../middleware/errorHandler';
 import {
   AuthedRequest,

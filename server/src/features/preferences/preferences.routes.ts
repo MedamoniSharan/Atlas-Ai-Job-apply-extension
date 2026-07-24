@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { jobPreferencesUpdateSchema, ok } from '@atlas/shared';
+import { jobPreferencesUpdateSchema, ok } from '@cosmo/shared';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';

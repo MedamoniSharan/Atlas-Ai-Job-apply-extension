@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-import type { ApplicationStatus, Platform } from '@atlas/shared';
+import type { ApplicationStatus, Platform } from '@cosmo/shared';
 
 export interface IApplication extends Document {
   eventId: string;

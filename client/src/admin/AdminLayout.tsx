@@ -17,7 +17,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { ensureSession } from '../lib/api';
+import { ensureSession, logout } from '../lib/api';
 import { CosmosLogo, CosmosLoader } from '../components/CosmosLogo';
 
 function pageTitle(pathname: string): string {
@@ -32,7 +32,6 @@ function pageTitle(pathname: string): string {
 export function AdminLayout() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const clearSession = useAuthStore((s) => s.clearSession);
   const [sessionReady, setSessionReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
@@ -118,8 +117,9 @@ export function AdminLayout() {
             type="button"
             className="admin-sidebar__signout"
             onClick={() => {
-              clearSession();
-              window.location.replace('/');
+              void logout().finally(() => {
+                window.location.replace('/');
+              });
             }}
           >
             <LogOut size={14} strokeWidth={2} aria-hidden />

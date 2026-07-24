@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ok } from '@atlas/shared';
+import { ok } from '@cosmo/shared';
 import mongoose from 'mongoose';
 
 export const healthRouter = Router();

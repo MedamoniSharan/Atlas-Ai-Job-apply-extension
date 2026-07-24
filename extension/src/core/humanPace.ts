@@ -10,7 +10,7 @@ import {
   shouldTakeSessionBreak,
   type PaceMode,
   type PacePhase,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import {
   appendCopilotLog,
   getCopilotState,

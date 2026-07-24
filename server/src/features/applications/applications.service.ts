@@ -1,4 +1,4 @@
-import { Application, Platform } from '@atlas/shared';
+import { Application, Platform } from '@cosmo/shared';
 import { FilterQuery } from 'mongoose';
 import { ApplicationModel, IApplication } from './application.model';
 

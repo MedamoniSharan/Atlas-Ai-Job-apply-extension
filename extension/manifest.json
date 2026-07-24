@@ -3,9 +3,10 @@
   "name": "Cosmo Job Assistant",
   "version": "1.0.0",
   "description": "Naukri job co-pilot — scan and assist Easy Apply from your preferences, synced to Cosmo",
-  "permissions": ["storage", "alarms", "activeTab", "tabs"],
+  "permissions": ["storage", "alarms", "tabs"],
   "host_permissions": [
     "http://localhost:4000/*",
+    "http://127.0.0.1:4000/*",
     "http://localhost:5173/*",
     "http://127.0.0.1:5173/*",
     "https://www.naukri.com/*",

@@ -1,8 +1,8 @@
 {
-  "name": "atlas",
+  "name": "cosmo",
   "version": "1.0.0",
   "private": true,
-  "description": "Atlas Job Assistant \u2014 MERN + Chrome Extension",
+  "description": "Cosmo Job Assistant \u2014 MERN + Chrome Extension",
   "workspaces": [
     "shared",
     "server",
@@ -16,9 +16,9 @@
     "dev:client": "npm run dev --workspace=client",
     "dev:extension": "npm run build --workspace=extension -- --watch",
     "build": "npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=client && npm run build --workspace=extension",
-    "build:server": "npm run build --workspace=@atlas/shared && npm run build --workspace=@atlas/server",
-    "start:server": "npm run start --workspace=@atlas/server",
-    "test": "npm run test --workspace=@atlas/shared && npm run test --workspace=@atlas/server && npm run test --workspace=@atlas/extension",
+    "build:server": "npm run build --workspace=@cosmo/shared && npm run build --workspace=@cosmo/server",
+    "start:server": "npm run start --workspace=@cosmo/server",
+    "test": "npm run test --workspace=@cosmo/shared && npm run test --workspace=@cosmo/server && npm run test --workspace=@cosmo/extension",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
     "lint": "npm run lint --workspaces --if-present"

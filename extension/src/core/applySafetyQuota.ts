@@ -1,4 +1,4 @@
-import type { PlanTier } from '@atlas/shared';
+import type { PlanTier } from '@cosmo/shared';
 import { fetchBillingMe } from './apiClient';
 
 export type ApplyQuotaSnapshot = {
@@ -129,6 +129,6 @@ export function quotaBlockMessage(
     case 'day':
       return `Daily safety limit reached (${quota.dayUsed}/${quota.dayLimit} today on ${quota.plan}).`;
     case 'month':
-      return `Monthly apply limit reached (${quota.monthUsed}/${quota.monthLimit} this month). Upgrade in Atlas to continue.`;
+      return `Monthly apply limit reached (${quota.monthUsed}/${quota.monthLimit} this month). Upgrade in Cosmo to continue.`;
   }
 }

@@ -28,7 +28,7 @@ async function main() {
     process.exit(1);
   }
 
-  const mongoUri = process.env.MONGO_URI ?? 'mongodb://127.0.0.1:27017/atlas';
+  const mongoUri = process.env.MONGO_URI ?? 'mongodb://127.0.0.1:27017/cosmo';
   await mongoose.connect(mongoUri);
 
   const passwordHash = await bcrypt.hash(password, 12);

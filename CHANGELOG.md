@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Background service worker: auth, offline event queue, sync alarms, scan/apply orchestration, plan apply quotas.
 - Dashboard (React + Vite): Google sign-in, applications tracker, preferences, onboarding, Razorpay subscriptions.
 - Extension ↔ web auth bridge via `postMessage` / `webBridge.js` (currently localhost dashboard origins).
-- Shared Zod contracts (`@atlas/shared`) for events, preferences, billing limits, and apply safety pacing.
+- Shared Zod contracts (`@cosmo/shared`) for events, preferences, billing limits, and apply safety pacing.
 - Admin dashboard for users, plans, subscriptions, payments, and audit log.
 
 ### Known limitations (pre-store)
@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto Easy Apply automation may conflict with store policies and Naukri Terms of Service — review before publish.
 
 ## [Unreleased]
+
+### Changed
+
+- Full rebrand from Atlas to Cosmo (packages `@cosmo/*`, auth storage keys, extension UI, docs).
 
 ### Planned
 

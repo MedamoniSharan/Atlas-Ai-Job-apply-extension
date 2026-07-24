@@ -6,7 +6,7 @@ import {
   ok,
   verifyBillingPaymentSchema,
   verifySubscriptionSchema,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';

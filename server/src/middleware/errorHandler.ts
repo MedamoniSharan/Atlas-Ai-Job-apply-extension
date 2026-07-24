@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { fail } from '@atlas/shared';
+import { fail } from '@cosmo/shared';
 import { logger } from '../config/logger';
 
 export class AppError extends Error {

@@ -136,7 +136,12 @@ export function AuthPage({ mode }: { mode: Mode }) {
 
   function finishAuth(isNewAccount: boolean) {
     const next = new URLSearchParams(location.search).get('next');
-    if (next && next.startsWith('/')) {
+    if (
+      next &&
+      next.startsWith('/') &&
+      !next.startsWith('//') &&
+      !next.includes('://')
+    ) {
       const [pathname, hash] = next.split('#');
       navigate({
         pathname: pathname || '/',

@@ -1,7 +1,7 @@
 services:
   mongo:
     image: mongo:7
-    container_name: atlas-mongo
+    container_name: cosmo-mongo
     ports:
       - "27017:27017"
     volumes:

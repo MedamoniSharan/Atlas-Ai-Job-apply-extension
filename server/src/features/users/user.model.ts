@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-import type { JobPreferences } from '@atlas/shared';
+import type { JobPreferences } from '@cosmo/shared';
 
 export type PlanTier = 'free' | 'pro' | 'max';
 export type UserRole = 'user' | 'admin';

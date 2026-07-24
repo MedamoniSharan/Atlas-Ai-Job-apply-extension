@@ -4,7 +4,7 @@ import {
   PLAN_PRICES_PAISE,
   type PaidPlan,
   type PlanTier,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { PlanConfigModel, type IPlanConfig } from './subscription.model';
 
 type CachedPlan = {

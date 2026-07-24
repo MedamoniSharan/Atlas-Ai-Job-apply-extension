@@ -1,4 +1,4 @@
-import type { JobPayload, Platform } from '@atlas/shared';
+import type { JobPayload, Platform } from '@cosmo/shared';
 
 export interface PlatformAdapter {
   readonly platform: Platform;

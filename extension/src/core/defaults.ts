@@ -1,6 +1,6 @@
-import type { JobPreferences } from '@atlas/shared';
+import type { JobPreferences } from '@cosmo/shared';
 
-/** Local copy so the extension never bundles Zod from @atlas/shared. */
+/** Local copy so the extension never bundles Zod from @cosmo/shared. */
 export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   titles: [],
   keywords: [],

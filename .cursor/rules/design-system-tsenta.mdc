@@ -1,12 +1,12 @@
 ---
-description: Tsenta design-system tokens, component states, and accessibility rules for Atlas marketing/web UI.
+description: Tsenta design-system tokens, component states, and accessibility rules for Cosmo marketing/web UI.
 globs: client/**/*.{tsx,css,html}
 alwaysApply: false
 ---
 
 # Tsenta design system
 
-Deliver token-driven, accessible UI for the Atlas web client using Tsenta foundations.
+Deliver token-driven, accessible UI for the Cosmo web client using Tsenta foundations.
 
 ## Intent
 

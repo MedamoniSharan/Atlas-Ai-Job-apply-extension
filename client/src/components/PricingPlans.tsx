@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Sparkles } from 'lucide-react';
-import type { PaidPlan } from '@atlas/shared';
+import type { PaidPlan } from '@cosmo/shared';
 import { useAuthStore } from '../store/authStore';
 import {
   downloadPaymentInvoice,

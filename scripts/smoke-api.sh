@@ -21,7 +21,7 @@ console.log(JSON.stringify({
     eventId:id,
     timestamp:new Date().toISOString(),
     type:'ApplicationRecorded',
-    payload:{platform:'naukri',title:'Frontend Engineer',company:'Atlas Labs',location:'Bengaluru',status:'applied',url:'https://www.naukri.com/job-listings-1'},
+    payload:{platform:'naukri',title:'Frontend Engineer',company:'Cosmo Labs',location:'Bengaluru',status:'applied',url:'https://www.naukri.com/job-listings-1'},
     retryCount:0,
     syncStatus:'pending'
   }]

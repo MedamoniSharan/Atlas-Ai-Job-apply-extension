@@ -1,4 +1,4 @@
-import type { OnboardingStatus } from '@atlas/shared';
+import type { OnboardingStatus } from '@cosmo/shared';
 import { fetchOnboardingStatus } from '../lib/api';
 
 export const ONBOARDING_QUERY_KEY = ['onboarding'] as const;

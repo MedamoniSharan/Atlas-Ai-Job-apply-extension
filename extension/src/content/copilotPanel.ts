@@ -1,4 +1,4 @@
-import { CONSENT_VERSION, formatBreakCountdown } from '@atlas/shared';
+import { CONSENT_VERSION, formatBreakCountdown } from '@cosmo/shared';
 import {
   CopilotState,
   CopilotToast,
@@ -18,7 +18,7 @@ import {
   runningVideoHtml,
 } from '../shared/actionIcons';
 
-const ROOT_ID = 'atlas-copilot-root';
+const ROOT_ID = 'cosmo-copilot-root';
 const naukri = new NaukriAdapter();
 const NAUKRI_LOGIN_URL = 'https://www.naukri.com/nlogin/login';
 
@@ -56,29 +56,29 @@ export function mountCopilotPanel() {
         z-index: 2147483646;
         pointer-events: none;
         font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-        --atlas-bg: #f4f4f5;
-        --atlas-panel: #ffffff;
-        --atlas-elevated: #f4f4f5;
-        --atlas-line: #e4e4e7;
-        --atlas-text: #18181b;
-        --atlas-muted: #71717a;
-        --atlas-accent: #18181b;
-        --atlas-accent-ink: #ffffff;
-        --atlas-dim: rgba(24,24,27,.06);
-        --atlas-warn: #b45309;
-        --atlas-danger: #b91c1c;
-        --atlas-success: #15803d;
-        --atlas-skip: #a16207;
+        --cosmo-bg: #f4f4f5;
+        --cosmo-panel: #ffffff;
+        --cosmo-elevated: #f4f4f5;
+        --cosmo-line: #e4e4e7;
+        --cosmo-text: #18181b;
+        --cosmo-muted: #71717a;
+        --cosmo-accent: #18181b;
+        --cosmo-accent-ink: #ffffff;
+        --cosmo-dim: rgba(24,24,27,.06);
+        --cosmo-warn: #b45309;
+        --cosmo-danger: #b91c1c;
+        --cosmo-success: #15803d;
+        --cosmo-skip: #a16207;
       }
       #${ROOT_ID} * { box-sizing: border-box; font-family: inherit; }
-      #${ROOT_ID} .atlas-dock {
+      #${ROOT_ID} .cosmo-dock {
         pointer-events: auto;
         position: fixed;
         left: 16px;
         bottom: 16px;
         width: 400px;
       }
-      #${ROOT_ID} .atlas-panel {
+      #${ROOT_ID} .cosmo-panel {
         width: 100%;
         max-height: min(600px, calc(100vh - 32px));
         display: grid;
@@ -92,36 +92,36 @@ export function mountCopilotPanel() {
           "notice"
           "jobs"
           "footer";
-        background: var(--atlas-panel);
-        color: var(--atlas-text);
-        border: 1px solid var(--atlas-line);
+        background: var(--cosmo-panel);
+        color: var(--cosmo-text);
+        border: 1px solid var(--cosmo-line);
         border-radius: 16px;
         box-shadow:
           0 18px 40px rgba(24,24,27,.14),
           0 0 0 1px rgba(24,24,27,.04);
         overflow: hidden;
-        animation: atlas-panel-in .28s ease-out;
+        animation: cosmo-panel-in .28s ease-out;
       }
-      #${ROOT_ID} .atlas-head { grid-area: head; }
-      #${ROOT_ID} .atlas-stats { grid-area: stats; }
-      #${ROOT_ID} .atlas-meta { grid-area: meta; }
-      #${ROOT_ID} .atlas-safety { grid-area: safety; }
-      #${ROOT_ID} .atlas-now { grid-area: now; }
-      #${ROOT_ID} .atlas-notice { grid-area: notice; }
-      #${ROOT_ID} .atlas-section { grid-area: jobs; }
-      #${ROOT_ID} .atlas-footer { grid-area: footer; }
-      @keyframes atlas-panel-in {
+      #${ROOT_ID} .cosmo-head { grid-area: head; }
+      #${ROOT_ID} .cosmo-stats { grid-area: stats; }
+      #${ROOT_ID} .cosmo-meta { grid-area: meta; }
+      #${ROOT_ID} .cosmo-safety { grid-area: safety; }
+      #${ROOT_ID} .cosmo-now { grid-area: now; }
+      #${ROOT_ID} .cosmo-notice { grid-area: notice; }
+      #${ROOT_ID} .cosmo-section { grid-area: jobs; }
+      #${ROOT_ID} .cosmo-footer { grid-area: footer; }
+      @keyframes cosmo-panel-in {
         from { opacity: 0; transform: translateY(10px) scale(.98); }
         to { opacity: 1; transform: none; }
       }
-      #${ROOT_ID} .atlas-head {
+      #${ROOT_ID} .cosmo-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
         padding: 10px 12px 8px;
       }
-      #${ROOT_ID} .atlas-brand {
+      #${ROOT_ID} .cosmo-brand {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -131,52 +131,52 @@ export function mountCopilotPanel() {
         user-select: none;
         touch-action: none;
       }
-      #${ROOT_ID} .atlas-brand:active {
+      #${ROOT_ID} .cosmo-brand:active {
         cursor: grabbing;
       }
-      #${ROOT_ID}.is-dragging .atlas-brand {
+      #${ROOT_ID}.is-dragging .cosmo-brand {
         cursor: grabbing;
       }
-      #${ROOT_ID}.is-dragging .atlas-panel {
+      #${ROOT_ID}.is-dragging .cosmo-panel {
         box-shadow:
           0 22px 48px rgba(24,24,27,.22),
           0 0 0 1px rgba(24,24,27,.06);
       }
-      #${ROOT_ID} .atlas-brand .atlas-cosmos-logo {
+      #${ROOT_ID} .cosmo-brand .cosmo-cosmos-logo {
         width: 22px;
         height: 22px;
         flex-shrink: 0;
-        color: var(--atlas-text);
+        color: var(--cosmo-text);
         transform-box: fill-box;
         transform-origin: center;
         transition: color .2s ease;
       }
-      #${ROOT_ID}.is-running .atlas-brand .atlas-cosmos-logo {
-        animation: atlas-logo-spin 1.6s ease-in-out infinite;
+      #${ROOT_ID}.is-running .cosmo-brand .cosmo-cosmos-logo {
+        animation: cosmo-logo-spin 1.6s ease-in-out infinite;
       }
-      #${ROOT_ID}.is-paused .atlas-brand .atlas-cosmos-logo {
-        color: var(--atlas-text);
+      #${ROOT_ID}.is-paused .cosmo-brand .cosmo-cosmos-logo {
+        color: var(--cosmo-text);
         animation: none;
       }
-      #${ROOT_ID}:not(.is-running) .atlas-brand:hover .atlas-cosmos-logo {
-        animation: atlas-logo-hover 1.2s ease-in-out infinite;
+      #${ROOT_ID}:not(.is-running) .cosmo-brand:hover .cosmo-cosmos-logo {
+        animation: cosmo-logo-hover 1.2s ease-in-out infinite;
       }
-      @keyframes atlas-logo-spin {
+      @keyframes cosmo-logo-spin {
         0%, 100% { transform: scale(1) rotate(0deg); }
         50% { transform: scale(1.08) rotate(180deg); }
       }
-      @keyframes atlas-logo-hover {
+      @keyframes cosmo-logo-hover {
         0% { transform: scale(1) rotate(0deg); }
         50% { transform: scale(1.2) rotate(180deg); }
         100% { transform: scale(1) rotate(360deg); }
       }
-      #${ROOT_ID} .atlas-brand-copy {
+      #${ROOT_ID} .cosmo-brand-copy {
         display: grid;
         gap: 1px;
         min-width: 0;
         flex: 1 1 auto;
       }
-      #${ROOT_ID} .atlas-brand-text {
+      #${ROOT_ID} .cosmo-brand-text {
         font-weight: 750;
         font-size: 12px;
         letter-spacing: 0.04em;
@@ -186,22 +186,22 @@ export function mountCopilotPanel() {
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      #${ROOT_ID} .atlas-brand-sub {
+      #${ROOT_ID} .cosmo-brand-sub {
         font-size: 10px;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         letter-spacing: 0.02em;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      #${ROOT_ID} .atlas-actions {
+      #${ROOT_ID} .cosmo-actions {
         display: flex;
         gap: 4px;
         align-items: center;
         flex-shrink: 0;
         max-width: 58%;
       }
-      #${ROOT_ID} .atlas-actions-run {
+      #${ROOT_ID} .cosmo-actions-run {
         display: flex;
         gap: 4px;
         align-items: center;
@@ -257,7 +257,7 @@ export function mountCopilotPanel() {
         width: 16px;
         height: 16px;
         display: block;
-        animation: atlas-runner-cycle 0.45s ease-in-out infinite;
+        animation: cosmo-runner-cycle 0.45s ease-in-out infinite;
       }
       #${ROOT_ID} .btn-start .run-anim--video {
         width: 22px;
@@ -283,17 +283,17 @@ export function mountCopilotPanel() {
       #${ROOT_ID} .btn-start .run-dots i {
         font-style: normal;
         opacity: 0;
-        animation: atlas-run-dot 1.2s infinite;
+        animation: cosmo-run-dot 1.2s infinite;
       }
       #${ROOT_ID} .btn-start .run-dots i:nth-child(1) { animation-delay: 0s; }
       #${ROOT_ID} .btn-start .run-dots i:nth-child(2) { animation-delay: 0.2s; }
       #${ROOT_ID} .btn-start .run-dots i:nth-child(3) { animation-delay: 0.4s; }
-      @keyframes atlas-runner-cycle {
+      @keyframes cosmo-runner-cycle {
         0% { transform: translateX(0) translateY(0) rotate(-8deg); }
         50% { transform: translateX(1.5px) translateY(-1.5px) rotate(8deg); }
         100% { transform: translateX(0) translateY(0) rotate(-8deg); }
       }
-      @keyframes atlas-run-dot {
+      @keyframes cosmo-run-dot {
         0%, 20% { opacity: 0; }
         40%, 100% { opacity: 1; }
       }
@@ -325,26 +325,26 @@ export function mountCopilotPanel() {
       #${ROOT_ID} .btn-stop:not(:disabled):hover {
         background: rgba(248, 113, 113, 0.18) !important;
       }
-      #${ROOT_ID} .btn-pause .atlas-fi-icon,
-      #${ROOT_ID} .btn-stop .atlas-fi-icon {
+      #${ROOT_ID} .btn-pause .cosmo-fi-icon,
+      #${ROOT_ID} .btn-stop .cosmo-fi-icon {
         width: 18px;
         height: 18px;
         display: block;
         fill: currentColor;
       }
-      #${ROOT_ID} .atlas-fi-icon {
+      #${ROOT_ID} .cosmo-fi-icon {
         width: 18px;
         height: 18px;
         display: block;
         transition: transform .2s ease;
       }
-      #${ROOT_ID} .btn-pause:not(:disabled):hover .atlas-fi-icon,
-      #${ROOT_ID} .btn-stop:not(:disabled):hover .atlas-fi-icon,
-      #${ROOT_ID} .btn-icon:not(:disabled):hover .atlas-fi-icon {
+      #${ROOT_ID} .btn-pause:not(:disabled):hover .cosmo-fi-icon,
+      #${ROOT_ID} .btn-stop:not(:disabled):hover .cosmo-fi-icon,
+      #${ROOT_ID} .btn-icon:not(:disabled):hover .cosmo-fi-icon {
         transform: scale(1.12);
-        animation: atlas-fi-bob .55s ease-in-out infinite;
+        animation: cosmo-fi-bob .55s ease-in-out infinite;
       }
-      @keyframes atlas-fi-bob {
+      @keyframes cosmo-fi-bob {
         0%, 100% { transform: scale(1.08) translateY(0); }
         50% { transform: scale(1.14) translateY(-1px); }
       }
@@ -368,7 +368,7 @@ export function mountCopilotPanel() {
         color: #1e3a8a;
         background: rgba(147, 197, 253, 0.28) !important;
       }
-      #${ROOT_ID} .atlas-stats {
+      #${ROOT_ID} .cosmo-stats {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 6px;
@@ -387,7 +387,7 @@ export function mountCopilotPanel() {
         font-weight: 750;
         font-variant-numeric: tabular-nums;
         line-height: 1.1;
-        color: var(--atlas-text);
+        color: var(--cosmo-text);
       }
       #${ROOT_ID} .stat-l {
         display: block;
@@ -396,18 +396,18 @@ export function mountCopilotPanel() {
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
       }
-      #${ROOT_ID} .stat--applied .stat-n { color: var(--atlas-success); }
-      #${ROOT_ID} .stat--skipped .stat-n { color: var(--atlas-skip); }
-      #${ROOT_ID} .atlas-meta {
+      #${ROOT_ID} .stat--applied .stat-n { color: var(--cosmo-success); }
+      #${ROOT_ID} .stat--skipped .stat-n { color: var(--cosmo-skip); }
+      #${ROOT_ID} .cosmo-meta {
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 8px;
         padding: 0 12px 8px;
         font-size: 11px;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
       }
       #${ROOT_ID} .toggle {
         display: inline-flex;
@@ -417,39 +417,39 @@ export function mountCopilotPanel() {
         user-select: none;
       }
       #${ROOT_ID} .toggle input {
-        accent-color: var(--atlas-accent);
+        accent-color: var(--cosmo-accent);
         width: 13px;
         height: 13px;
       }
-      #${ROOT_ID} .atlas-now {
+      #${ROOT_ID} .cosmo-now {
         display: none;
         margin: 0 12px 8px;
         padding: 8px 10px;
         border-radius: 10px;
-        background: var(--atlas-dim);
-        border: 1px solid var(--atlas-line);
+        background: var(--cosmo-dim);
+        border: 1px solid var(--cosmo-line);
         font-size: 12px;
         line-height: 1.35;
-        color: var(--atlas-text);
+        color: var(--cosmo-text);
       }
-      #${ROOT_ID} .atlas-now.show { display: block; }
-      #${ROOT_ID} .atlas-now strong {
+      #${ROOT_ID} .cosmo-now.show { display: block; }
+      #${ROOT_ID} .cosmo-now strong {
         display: block;
         font-size: 10px;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         margin-bottom: 2px;
         font-weight: 700;
       }
-      #${ROOT_ID} .atlas-section {
+      #${ROOT_ID} .cosmo-section {
         min-height: 0;
         display: grid;
         grid-template-rows: auto minmax(0, 1fr);
-        border-top: 1px solid var(--atlas-line);
+        border-top: 1px solid var(--cosmo-line);
         overflow: hidden;
       }
-      #${ROOT_ID} .atlas-section-head {
+      #${ROOT_ID} .cosmo-section-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -458,12 +458,12 @@ export function mountCopilotPanel() {
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: var(--atlas-muted);
-        background: var(--atlas-panel);
+        color: var(--cosmo-muted);
+        background: var(--cosmo-panel);
         position: relative;
         z-index: 1;
       }
-      #${ROOT_ID} .atlas-jobs {
+      #${ROOT_ID} .cosmo-jobs {
         overflow: auto;
         padding: 0 8px 8px;
         display: grid;
@@ -497,26 +497,26 @@ export function mountCopilotPanel() {
         box-shadow:
           0 0 0 2px rgba(37,99,235,.12),
           0 6px 16px rgba(37,99,235,.1);
-        animation: atlas-job-pulse 1.8s ease-in-out infinite;
+        animation: cosmo-job-pulse 1.8s ease-in-out infinite;
       }
       #${ROOT_ID} .job-row.applying .job-title {
         color: #1e3a8a;
       }
-      @keyframes atlas-job-pulse {
+      @keyframes cosmo-job-pulse {
         0%, 100% { box-shadow: 0 0 0 2px rgba(37,99,235,.12), 0 6px 16px rgba(37,99,235,.08); }
         50% { box-shadow: 0 0 0 3px rgba(37,99,235,.22), 0 8px 18px rgba(37,99,235,.14); }
       }
       #${ROOT_ID} .job-title {
         font-weight: 650;
         font-size: 12px;
-        color: var(--atlas-text);
+        color: var(--cosmo-text);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
       #${ROOT_ID} .job-company {
         margin-top: 1px;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         font-size: 11px;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -533,38 +533,38 @@ export function mountCopilotPanel() {
         min-width: max-content;
         max-width: none;
         overflow: visible;
-        background: var(--atlas-elevated);
-        color: var(--atlas-muted);
+        background: var(--cosmo-elevated);
+        color: var(--cosmo-muted);
       }
       #${ROOT_ID} .job-badge.pending {
         background: rgba(124, 58, 237, 0.12);
         color: #6d28d9;
       }
-      #${ROOT_ID} .job-badge.applied { background: rgba(22,163,74,.14); color: var(--atlas-success); }
+      #${ROOT_ID} .job-badge.applied { background: rgba(22,163,74,.14); color: var(--cosmo-success); }
       #${ROOT_ID} .job-badge.skipped,
-      #${ROOT_ID} .job-badge.already_applied { background: rgba(202,138,4,.16); color: var(--atlas-skip); }
+      #${ROOT_ID} .job-badge.already_applied { background: rgba(202,138,4,.16); color: var(--cosmo-skip); }
       #${ROOT_ID} .job-badge.applying {
         background: #2563eb;
         color: #ffffff;
         box-shadow: 0 0 0 1px rgba(37,99,235,.25);
       }
-      #${ROOT_ID} .atlas-notice {
+      #${ROOT_ID} .cosmo-notice {
         display: none;
         margin: 0 12px 8px;
         padding: 8px 10px;
         font-size: 12px;
         line-height: 1.4;
-        background: var(--atlas-elevated);
-        color: var(--atlas-text);
-        border: 1px solid var(--atlas-line);
+        background: var(--cosmo-elevated);
+        color: var(--cosmo-text);
+        border: 1px solid var(--cosmo-line);
         border-radius: 10px;
       }
-      #${ROOT_ID} .atlas-notice.show { display: block; }
-      #${ROOT_ID} .atlas-notice.flash {
-        animation: atlas-copilot-flash 1s ease-in-out 4;
+      #${ROOT_ID} .cosmo-notice.show { display: block; }
+      #${ROOT_ID} .cosmo-notice.flash {
+        animation: cosmo-copilot-flash 1s ease-in-out 4;
       }
-      #${ROOT_ID} .atlas-notice.is-alert { font-weight: 650; }
-      #${ROOT_ID} .atlas-safety {
+      #${ROOT_ID} .cosmo-notice.is-alert { font-weight: 650; }
+      #${ROOT_ID} .cosmo-safety {
         margin: 0 12px 8px;
         padding: 7px 9px;
         font-size: 11px;
@@ -576,35 +576,35 @@ export function mountCopilotPanel() {
         border-radius: 10px;
         box-shadow: 0 0 0 1px rgba(37,99,235,.06);
       }
-      #${ROOT_ID} .atlas-safety.is-active {
-        animation: atlas-safety-glow 2s ease-in-out infinite;
+      #${ROOT_ID} .cosmo-safety.is-active {
+        animation: cosmo-safety-glow 2s ease-in-out infinite;
       }
-      @keyframes atlas-safety-glow {
+      @keyframes cosmo-safety-glow {
         0%, 100% { border-color: #bfdbfe; box-shadow: 0 0 0 1px rgba(37,99,235,.06); }
         50% { border-color: #93c5fd; box-shadow: 0 0 0 2px rgba(37,99,235,.14); }
       }
-      @keyframes atlas-copilot-flash {
+      @keyframes cosmo-copilot-flash {
         0%, 100% { filter: brightness(1); }
         50% { filter: brightness(1.25); }
       }
-      #${ROOT_ID} .atlas-empty {
-        color: var(--atlas-muted);
+      #${ROOT_ID} .cosmo-empty {
+        color: var(--cosmo-muted);
         font-size: 12px;
         padding: 12px 10px;
         text-align: center;
         line-height: 1.45;
       }
-      #${ROOT_ID} .atlas-footer {
-        border-top: 1px solid var(--atlas-line);
+      #${ROOT_ID} .cosmo-footer {
+        border-top: 1px solid var(--cosmo-line);
         padding: 10px 12px 12px;
         text-align: center;
       }
-      #${ROOT_ID} .atlas-footer a {
+      #${ROOT_ID} .cosmo-footer a {
         display: inline-flex;
         flex-direction: column;
         align-items: center;
         gap: 4px;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         font-size: 10px;
         font-weight: 500;
         letter-spacing: 0.02em;
@@ -612,18 +612,18 @@ export function mountCopilotPanel() {
         text-transform: lowercase;
         transition: color .15s ease;
       }
-      #${ROOT_ID} .atlas-footer a:hover {
-        color: var(--atlas-text);
+      #${ROOT_ID} .cosmo-footer a:hover {
+        color: var(--cosmo-text);
       }
-      #${ROOT_ID} .atlas-footer img {
+      #${ROOT_ID} .cosmo-footer img {
         display: block;
         width: 132px;
         height: auto;
       }
-      #${ROOT_ID}.collapsed .atlas-dock {
+      #${ROOT_ID}.collapsed .cosmo-dock {
         width: auto;
       }
-      #${ROOT_ID}.collapsed .atlas-panel {
+      #${ROOT_ID}.collapsed .cosmo-panel {
         width: auto;
         max-height: none;
         grid-template-rows: auto;
@@ -631,46 +631,46 @@ export function mountCopilotPanel() {
         animation: none;
         border-radius: 18px;
       }
-      #${ROOT_ID}.collapsed .atlas-actions-run,
-      #${ROOT_ID}.collapsed .atlas-brand-copy,
-      #${ROOT_ID}.collapsed .atlas-stats,
-      #${ROOT_ID}.collapsed .atlas-meta,
-      #${ROOT_ID}.collapsed .atlas-safety,
-      #${ROOT_ID}.collapsed .atlas-now,
-      #${ROOT_ID}.collapsed .atlas-section,
-      #${ROOT_ID}.collapsed .atlas-footer,
-      #${ROOT_ID}.collapsed .atlas-notice,
-      #${ROOT_ID}.collapsed .atlas-modal,
-      #${ROOT_ID}.collapsed #atlas-minimize { display: none !important; }
-      #${ROOT_ID}.collapsed .atlas-head {
+      #${ROOT_ID}.collapsed .cosmo-actions-run,
+      #${ROOT_ID}.collapsed .cosmo-brand-copy,
+      #${ROOT_ID}.collapsed .cosmo-stats,
+      #${ROOT_ID}.collapsed .cosmo-meta,
+      #${ROOT_ID}.collapsed .cosmo-safety,
+      #${ROOT_ID}.collapsed .cosmo-now,
+      #${ROOT_ID}.collapsed .cosmo-section,
+      #${ROOT_ID}.collapsed .cosmo-footer,
+      #${ROOT_ID}.collapsed .cosmo-notice,
+      #${ROOT_ID}.collapsed .cosmo-modal,
+      #${ROOT_ID}.collapsed #cosmo-minimize { display: none !important; }
+      #${ROOT_ID}.collapsed .cosmo-head {
         padding: 14px 16px;
         gap: 0;
         cursor: grab;
         user-select: none;
         touch-action: none;
       }
-      #${ROOT_ID}.collapsed .atlas-head:active {
+      #${ROOT_ID}.collapsed .cosmo-head:active {
         cursor: grabbing;
       }
-      #${ROOT_ID}.collapsed .atlas-actions {
+      #${ROOT_ID}.collapsed .cosmo-actions {
         display: none !important;
       }
-      #${ROOT_ID}.collapsed .atlas-brand {
+      #${ROOT_ID}.collapsed .cosmo-brand {
         pointer-events: none;
       }
-      #${ROOT_ID}.collapsed .atlas-brand .atlas-cosmos-logo {
+      #${ROOT_ID}.collapsed .cosmo-brand .cosmo-cosmos-logo {
         color: #18181b;
         width: 42px;
         height: 42px;
         transition: transform 0.2s ease;
       }
-      #${ROOT_ID}.collapsed .atlas-head:hover .atlas-cosmos-logo {
-        animation: atlas-logo-hover 1s ease-in-out infinite;
+      #${ROOT_ID}.collapsed .cosmo-head:hover .cosmo-cosmos-logo {
+        animation: cosmo-logo-hover 1s ease-in-out infinite;
       }
-      #${ROOT_ID}.collapsed.is-dragging .atlas-head {
+      #${ROOT_ID}.collapsed.is-dragging .cosmo-head {
         cursor: grabbing;
       }
-      #${ROOT_ID} .atlas-modal {
+      #${ROOT_ID} .cosmo-modal {
         display: none;
         position: absolute;
         left: 0;
@@ -681,12 +681,12 @@ export function mountCopilotPanel() {
         padding: 0;
         pointer-events: none;
       }
-      #${ROOT_ID} .atlas-modal.show { display: block; }
-      #${ROOT_ID} .atlas-modal-card {
+      #${ROOT_ID} .cosmo-modal.show { display: block; }
+      #${ROOT_ID} .cosmo-modal-card {
         width: 100%;
-        background: var(--atlas-bg);
-        color: var(--atlas-text);
-        border: 1px solid var(--atlas-line);
+        background: var(--cosmo-bg);
+        color: var(--cosmo-text);
+        border: 1px solid var(--cosmo-line);
         border-radius: 14px;
         padding: 16px;
         box-shadow: 0 16px 40px rgba(24,24,27,.16);
@@ -694,32 +694,32 @@ export function mountCopilotPanel() {
         gap: 10px;
         pointer-events: auto;
       }
-      #${ROOT_ID} .atlas-modal-card h3 {
+      #${ROOT_ID} .cosmo-modal-card h3 {
         margin: 0;
         font-size: 15px;
         font-weight: 700;
       }
-      #${ROOT_ID} .atlas-modal-card p {
+      #${ROOT_ID} .cosmo-modal-card p {
         margin: 0;
         font-size: 13px;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         line-height: 1.4;
       }
-      #${ROOT_ID} .atlas-modal-actions { display: grid; gap: 8px; }
+      #${ROOT_ID} .cosmo-modal-actions { display: grid; gap: 8px; }
       #${ROOT_ID} .btn-login {
-        background: var(--atlas-accent);
-        color: var(--atlas-accent-ink);
+        background: var(--cosmo-accent);
+        color: var(--cosmo-accent-ink);
         width: 100%;
         padding: 10px 12px;
       }
       #${ROOT_ID} .btn-resume-login {
-        background: var(--atlas-elevated);
-        color: var(--atlas-text);
-        border: 1px solid var(--atlas-line) !important;
+        background: var(--cosmo-elevated);
+        color: var(--cosmo-text);
+        border: 1px solid var(--cosmo-line) !important;
         width: 100%;
         padding: 10px 12px;
       }
-      #${ROOT_ID} .atlas-toast-host {
+      #${ROOT_ID} .cosmo-toast-host {
         pointer-events: none;
         position: fixed;
         top: 16px;
@@ -731,7 +731,7 @@ export function mountCopilotPanel() {
         gap: 8px;
         width: min(420px, calc(100vw - 32px));
       }
-      #${ROOT_ID} .atlas-toast {
+      #${ROOT_ID} .cosmo-toast {
         pointer-events: auto;
         display: grid;
         grid-template-columns: auto 1fr auto;
@@ -739,47 +739,47 @@ export function mountCopilotPanel() {
         align-items: start;
         padding: 12px 12px 12px 14px;
         border-radius: 12px;
-        background: var(--atlas-panel);
-        color: var(--atlas-text);
-        border: 1px solid var(--atlas-line);
+        background: var(--cosmo-panel);
+        color: var(--cosmo-text);
+        border: 1px solid var(--cosmo-line);
         box-shadow:
           0 16px 36px rgba(24,24,27,.16),
           0 0 0 1px rgba(24,24,27,.04);
-        animation: atlas-toast-in .28s ease-out;
+        animation: cosmo-toast-in .28s ease-out;
       }
-      #${ROOT_ID} .atlas-toast.is-out {
-        animation: atlas-toast-out .22s ease-in forwards;
+      #${ROOT_ID} .cosmo-toast.is-out {
+        animation: cosmo-toast-out .22s ease-in forwards;
       }
-      @keyframes atlas-toast-in {
+      @keyframes cosmo-toast-in {
         from { opacity: 0; transform: translateY(-8px) translateX(8px); }
         to { opacity: 1; transform: none; }
       }
-      @keyframes atlas-toast-out {
+      @keyframes cosmo-toast-out {
         to { opacity: 0; transform: translateY(-6px) translateX(6px); }
       }
-      #${ROOT_ID} .atlas-toast-icon {
+      #${ROOT_ID} .cosmo-toast-icon {
         width: 28px;
         height: 28px;
         border-radius: 50%;
         display: grid;
         place-items: center;
         background: rgba(22,163,74,.12);
-        color: var(--atlas-success);
+        color: var(--cosmo-success);
         font-size: 14px;
         font-weight: 800;
         line-height: 1;
         margin-top: 1px;
       }
-      #${ROOT_ID} .atlas-toast.is-pace .atlas-toast-icon {
+      #${ROOT_ID} .cosmo-toast.is-pace .cosmo-toast-icon {
         background: rgba(202,138,4,.14);
         color: #b45309;
         font-size: 13px;
       }
-      #${ROOT_ID} .atlas-toast.is-pace {
+      #${ROOT_ID} .cosmo-toast.is-pace {
         border-color: #fcd34d;
         background: #fffbeb;
       }
-      #${ROOT_ID} .atlas-toast-countdown {
+      #${ROOT_ID} .cosmo-toast-countdown {
         font-variant-numeric: tabular-nums;
         font-weight: 750;
         color: #b45309;
@@ -789,20 +789,20 @@ export function mountCopilotPanel() {
         min-width: 2.4em;
         text-align: right;
       }
-      #${ROOT_ID} .atlas-toast-copy {
+      #${ROOT_ID} .cosmo-toast-copy {
         min-width: 0;
       }
-      #${ROOT_ID} .atlas-toast-title {
+      #${ROOT_ID} .cosmo-toast-title {
         margin: 0;
         font-size: 13px;
         font-weight: 750;
-        color: var(--atlas-text);
+        color: var(--cosmo-text);
         line-height: 1.25;
       }
-      #${ROOT_ID} .atlas-toast-msg {
+      #${ROOT_ID} .cosmo-toast-msg {
         margin: 3px 0 0;
         font-size: 12px;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         line-height: 1.35;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -810,50 +810,50 @@ export function mountCopilotPanel() {
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
       }
-      #${ROOT_ID} .atlas-toast-close {
+      #${ROOT_ID} .cosmo-toast-close {
         width: 24px;
         height: 24px;
         padding: 0;
         border-radius: 7px;
         background: transparent;
-        color: var(--atlas-muted);
+        color: var(--cosmo-muted);
         border: 0 !important;
         font-size: 14px;
         line-height: 1;
       }
-      #${ROOT_ID} .atlas-toast-close:hover {
-        color: var(--atlas-text);
+      #${ROOT_ID} .cosmo-toast-close:hover {
+        color: var(--cosmo-text);
         background: rgba(24,24,27,.06);
       }
-      #${ROOT_ID}.collapsed .atlas-toast-host { display: grid !important; }
+      #${ROOT_ID}.collapsed .cosmo-toast-host { display: grid !important; }
     </style>
-    <div class="atlas-toast-host" id="atlas-toast-host" aria-live="polite"></div>
-    <div class="atlas-dock">
-    <div class="atlas-panel">
-      <div class="atlas-head">
-        <div class="atlas-brand">
-          ${cosmosLogoSvg(22, 'atlas-cosmos-logo')}
-          <div class="atlas-brand-copy">
-            <span class="atlas-brand-text">COSMO CO-PILOT</span>
-            <span class="atlas-brand-sub" id="atlas-status-label">Idle — press Start</span>
+    <div class="cosmo-toast-host" id="cosmo-toast-host" aria-live="polite"></div>
+    <div class="cosmo-dock">
+    <div class="cosmo-panel">
+      <div class="cosmo-head">
+        <div class="cosmo-brand">
+          ${cosmosLogoSvg(22, 'cosmo-cosmos-logo')}
+          <div class="cosmo-brand-copy">
+            <span class="cosmo-brand-text">COSMO CO-PILOT</span>
+            <span class="cosmo-brand-sub" id="cosmo-status-label">Idle — press Start</span>
           </div>
         </div>
-        <div class="atlas-actions">
-          <div class="atlas-actions-run">
-            <button type="button" class="btn-start" id="atlas-start">Start</button>
-            <button type="button" class="btn-pause" id="atlas-pause" title="Pause" aria-label="Pause"></button>
-            <button type="button" class="btn-stop" id="atlas-stop" title="Stop" aria-label="Stop"></button>
+        <div class="cosmo-actions">
+          <div class="cosmo-actions-run">
+            <button type="button" class="btn-start" id="cosmo-start">Start</button>
+            <button type="button" class="btn-pause" id="cosmo-pause" title="Pause" aria-label="Pause"></button>
+            <button type="button" class="btn-stop" id="cosmo-stop" title="Stop" aria-label="Stop"></button>
           </div>
           <button
             type="button"
             class="btn-icon"
-            id="atlas-minimize"
+            id="cosmo-minimize"
             title="Minimize"
             aria-label="Minimize co-pilot"
           ></button>
         </div>
       </div>
-      <div class="atlas-stats" id="atlas-stats" aria-label="Session stats">
+      <div class="cosmo-stats" id="cosmo-stats" aria-label="Session stats">
         <div class="stat">
           <span class="stat-n" id="stat-matched">0</span>
           <span class="stat-l">Matched</span>
@@ -867,46 +867,46 @@ export function mountCopilotPanel() {
           <span class="stat-l">Skipped</span>
         </div>
       </div>
-      <div class="atlas-meta">
-        <span id="atlas-keyword"></span>
+      <div class="cosmo-meta">
+        <span id="cosmo-keyword"></span>
       </div>
-      <p class="atlas-safety" id="atlas-safety" aria-live="polite"></p>
-      <div class="atlas-now" id="atlas-now"></div>
-      <p class="atlas-notice" id="atlas-notice"></p>
-      <section class="atlas-section">
-        <div class="atlas-section-head">
+      <p class="cosmo-safety" id="cosmo-safety" aria-live="polite"></p>
+      <div class="cosmo-now" id="cosmo-now"></div>
+      <p class="cosmo-notice" id="cosmo-notice"></p>
+      <section class="cosmo-section">
+        <div class="cosmo-section-head">
           <span>Scanned jobs</span>
-          <span id="atlas-jobs-count">0</span>
+          <span id="cosmo-jobs-count">0</span>
         </div>
-        <div class="atlas-jobs" id="atlas-jobs">
-          <div class="atlas-empty">Matched jobs will appear here as Atlas scans the list.</div>
+        <div class="cosmo-jobs" id="cosmo-jobs">
+          <div class="cosmo-empty">Matched jobs will appear here as Cosmo scans the list.</div>
         </div>
       </section>
-      <footer class="atlas-footer">
+      <footer class="cosmo-footer">
         <a href="https://codexcareer.com/" target="_blank" rel="noreferrer" aria-label="powered by codexcareer">
           <img src="${chrome.runtime.getURL('assets/codexcareer-logo.png')}" alt="codexcareer" width="132" height="43" />
           <span>powered by codexcareer</span>
         </a>
       </footer>
     </div>
-    <div class="atlas-modal" id="atlas-done-modal" role="dialog" aria-modal="true">
-      <div class="atlas-modal-card">
-        <h3 id="atlas-done-title">Applies done</h3>
-        <p id="atlas-done-body">
+    <div class="cosmo-modal" id="cosmo-done-modal" role="dialog" aria-modal="true">
+      <div class="cosmo-modal-card">
+        <h3 id="cosmo-done-title">Applies done</h3>
+        <p id="cosmo-done-body">
           Session finished. Continue to the next page of jobs, or close and review on your dashboard.
         </p>
-        <div class="atlas-modal-actions">
-          <button type="button" class="btn-resume-login" id="atlas-done-next">
+        <div class="cosmo-modal-actions">
+          <button type="button" class="btn-resume-login" id="cosmo-done-next">
             Next page jobs
           </button>
-          <button type="button" class="btn-login" id="atlas-done-close">
+          <button type="button" class="btn-login" id="cosmo-done-close">
             Close — view dashboard
           </button>
         </div>
       </div>
     </div>
-    <div class="atlas-modal" id="atlas-consent-modal" role="dialog" aria-modal="true">
-      <div class="atlas-modal-card">
+    <div class="cosmo-modal" id="cosmo-consent-modal" role="dialog" aria-modal="true">
+      <div class="cosmo-modal-card">
         <h3>Start co-pilot session</h3>
         <p>
           Cosmo will open Naukri in your browser and submit Easy Apply using your
@@ -914,31 +914,31 @@ export function mountCopilotPanel() {
           is an assisted co-pilot — not unattended bulk apply.
         </p>
         <label class="toggle" style="margin: 10px 0 14px; display:flex; gap:8px; align-items:flex-start;">
-          <input type="checkbox" id="atlas-consent-check" />
+          <input type="checkbox" id="cosmo-consent-check" />
           <span>I understand applies use my Naukri account</span>
         </label>
-        <div class="atlas-modal-actions">
-          <button type="button" class="btn-resume-login" id="atlas-consent-start" disabled>
+        <div class="cosmo-modal-actions">
+          <button type="button" class="btn-resume-login" id="cosmo-consent-start" disabled>
             Start session
           </button>
-          <button type="button" class="btn-login" id="atlas-consent-cancel">
+          <button type="button" class="btn-login" id="cosmo-consent-cancel">
             Cancel
           </button>
         </div>
       </div>
     </div>
-    <div class="atlas-modal" id="atlas-login-modal" role="dialog" aria-modal="false">
-      <div class="atlas-modal-card">
-        <h3 id="atlas-login-title">Log in to Naukri to continue</h3>
-        <p id="atlas-login-help">
+    <div class="cosmo-modal" id="cosmo-login-modal" role="dialog" aria-modal="false">
+      <div class="cosmo-modal-card">
+        <h3 id="cosmo-login-title">Log in to Naukri to continue</h3>
+        <p id="cosmo-login-help">
           Opens Naukri login in a new tab. After you sign in, return here and
           press Continue — Cosmo will refresh this page and resume.
         </p>
-        <div class="atlas-modal-actions">
-          <button type="button" class="btn-login" id="atlas-open-login">
+        <div class="cosmo-modal-actions">
+          <button type="button" class="btn-login" id="cosmo-open-login">
             Open login in new tab
           </button>
-          <button type="button" class="btn-resume-login" id="atlas-logged-in">
+          <button type="button" class="btn-resume-login" id="cosmo-logged-in">
             Confirm you&apos;re logged in
           </button>
         </div>
@@ -948,35 +948,35 @@ export function mountCopilotPanel() {
   `;
   document.documentElement.appendChild(root);
 
-  const jobsEl = root.querySelector('#atlas-jobs') as HTMLElement;
-  const jobsCountEl = root.querySelector('#atlas-jobs-count') as HTMLElement;
+  const jobsEl = root.querySelector('#cosmo-jobs') as HTMLElement;
+  const jobsCountEl = root.querySelector('#cosmo-jobs-count') as HTMLElement;
   const matchedEl = root.querySelector('#stat-matched') as HTMLElement;
   const appliedEl = root.querySelector('#stat-applied') as HTMLElement;
   const skippedEl = root.querySelector('#stat-skipped') as HTMLElement;
-  const statusLabelEl = root.querySelector('#atlas-status-label') as HTMLElement;
-  const keywordEl = root.querySelector('#atlas-keyword') as HTMLElement;
-  const nowEl = root.querySelector('#atlas-now') as HTMLElement;
-  const noticeEl = root.querySelector('#atlas-notice') as HTMLElement;
-  const toastHost = root.querySelector('#atlas-toast-host') as HTMLElement;
-  const loginModal = root.querySelector('#atlas-login-modal') as HTMLElement;
-  const consentModal = root.querySelector('#atlas-consent-modal') as HTMLElement;
-  const doneModal = root.querySelector('#atlas-done-modal') as HTMLElement;
-  const doneTitle = root.querySelector('#atlas-done-title') as HTMLElement;
-  const doneBody = root.querySelector('#atlas-done-body') as HTMLElement;
-  const doneNextBtn = root.querySelector('#atlas-done-next') as HTMLButtonElement;
-  const doneCloseBtn = root.querySelector('#atlas-done-close') as HTMLButtonElement;
-  const consentCheck = root.querySelector('#atlas-consent-check') as HTMLInputElement;
-  const consentStartBtn = root.querySelector('#atlas-consent-start') as HTMLButtonElement;
-  const consentCancelBtn = root.querySelector('#atlas-consent-cancel') as HTMLButtonElement;
-  const safetyEl = root.querySelector('#atlas-safety') as HTMLElement;
-  const startBtn = root.querySelector('#atlas-start') as HTMLButtonElement;
-  const pauseBtn = root.querySelector('#atlas-pause') as HTMLButtonElement;
-  const stopBtn = root.querySelector('#atlas-stop') as HTMLButtonElement;
-  const openLoginBtn = root.querySelector('#atlas-open-login') as HTMLButtonElement;
-  const loggedInBtn = root.querySelector('#atlas-logged-in') as HTMLButtonElement;
-  const loginHelp = root.querySelector('#atlas-login-help') as HTMLElement;
-  const loginTitle = root.querySelector('#atlas-login-title') as HTMLElement;
-  const minimizeBtn = root.querySelector('#atlas-minimize') as HTMLButtonElement;
+  const statusLabelEl = root.querySelector('#cosmo-status-label') as HTMLElement;
+  const keywordEl = root.querySelector('#cosmo-keyword') as HTMLElement;
+  const nowEl = root.querySelector('#cosmo-now') as HTMLElement;
+  const noticeEl = root.querySelector('#cosmo-notice') as HTMLElement;
+  const toastHost = root.querySelector('#cosmo-toast-host') as HTMLElement;
+  const loginModal = root.querySelector('#cosmo-login-modal') as HTMLElement;
+  const consentModal = root.querySelector('#cosmo-consent-modal') as HTMLElement;
+  const doneModal = root.querySelector('#cosmo-done-modal') as HTMLElement;
+  const doneTitle = root.querySelector('#cosmo-done-title') as HTMLElement;
+  const doneBody = root.querySelector('#cosmo-done-body') as HTMLElement;
+  const doneNextBtn = root.querySelector('#cosmo-done-next') as HTMLButtonElement;
+  const doneCloseBtn = root.querySelector('#cosmo-done-close') as HTMLButtonElement;
+  const consentCheck = root.querySelector('#cosmo-consent-check') as HTMLInputElement;
+  const consentStartBtn = root.querySelector('#cosmo-consent-start') as HTMLButtonElement;
+  const consentCancelBtn = root.querySelector('#cosmo-consent-cancel') as HTMLButtonElement;
+  const safetyEl = root.querySelector('#cosmo-safety') as HTMLElement;
+  const startBtn = root.querySelector('#cosmo-start') as HTMLButtonElement;
+  const pauseBtn = root.querySelector('#cosmo-pause') as HTMLButtonElement;
+  const stopBtn = root.querySelector('#cosmo-stop') as HTMLButtonElement;
+  const openLoginBtn = root.querySelector('#cosmo-open-login') as HTMLButtonElement;
+  const loggedInBtn = root.querySelector('#cosmo-logged-in') as HTMLButtonElement;
+  const loginHelp = root.querySelector('#cosmo-login-help') as HTMLElement;
+  const loginTitle = root.querySelector('#cosmo-login-title') as HTMLElement;
+  const minimizeBtn = root.querySelector('#cosmo-minimize') as HTMLButtonElement;
   let pauseIconMode: 'pause' | 'play' | 'idle' | null = null;
   let startIconMode: 'idle' | 'running' | 'paused' | null = null;
   const runningMp4 = chrome.runtime.getURL('assets/running.mp4');
@@ -985,12 +985,12 @@ export function mountCopilotPanel() {
   mountStopIcon(stopBtn);
   mountMinimizeIcon(minimizeBtn);
 
-  const RESUME_AFTER_LOGIN_KEY = 'atlas_resume_after_login';
-  const RETURN_URL_KEY = 'atlas_return_after_login';
-  const COLLAPSED_KEY = 'atlas_copilot_collapsed';
-  const DOCK_POS_KEY = 'atlas_copilot_dock_pos';
-  const dockEl = root.querySelector('.atlas-dock') as HTMLElement;
-  const headEl = root.querySelector('.atlas-head') as HTMLElement;
+  const RESUME_AFTER_LOGIN_KEY = 'cosmo_resume_after_login';
+  const RETURN_URL_KEY = 'cosmo_return_after_login';
+  const COLLAPSED_KEY = 'cosmo_copilot_collapsed';
+  const DOCK_POS_KEY = 'cosmo_copilot_dock_pos';
+  const dockEl = root.querySelector('.cosmo-dock') as HTMLElement;
+  const headEl = root.querySelector('.cosmo-head') as HTMLElement;
 
   function clampDockPosition(left: number, top: number) {
     const width = dockEl.offsetWidth || 64;
@@ -1076,7 +1076,7 @@ export function mountCopilotPanel() {
       beginDockDrag(event, headEl);
       return;
     }
-    if (!(event.target as HTMLElement).closest('.atlas-brand')) return;
+    if (!(event.target as HTMLElement).closest('.cosmo-brand')) return;
     beginDockDrag(event, headEl);
   });
 
@@ -1119,7 +1119,7 @@ export function mountCopilotPanel() {
         paceToastEl = null;
         lastPaceLabel = '';
       }
-      if (clearState && !toastHost.querySelector('.atlas-toast:not(.is-pace)')) {
+      if (clearState && !toastHost.querySelector('.cosmo-toast:not(.is-pace)')) {
         void clearCopilotToast();
       }
     }, 220);
@@ -1128,21 +1128,21 @@ export function mountCopilotPanel() {
   function showToast(toast: CopilotToast) {
     if (!toast?.id || toast.id === lastToastId) return;
     lastToastId = toast.id;
-    Array.from(toastHost.querySelectorAll('.atlas-toast:not(.is-pace)')).forEach(
+    Array.from(toastHost.querySelectorAll('.cosmo-toast:not(.is-pace)')).forEach(
       (n) => n.remove()
     );
     const el = document.createElement('div');
-    el.className = 'atlas-toast';
+    el.className = 'cosmo-toast';
     el.setAttribute('role', 'status');
     el.innerHTML = `
-      <div class="atlas-toast-icon" aria-hidden="true">✓</div>
-      <div class="atlas-toast-copy">
-        <p class="atlas-toast-title">${escapeHtml(toast.title)}</p>
-        <p class="atlas-toast-msg">${escapeHtml(toast.message)}</p>
+      <div class="cosmo-toast-icon" aria-hidden="true">✓</div>
+      <div class="cosmo-toast-copy">
+        <p class="cosmo-toast-title">${escapeHtml(toast.title)}</p>
+        <p class="cosmo-toast-msg">${escapeHtml(toast.message)}</p>
       </div>
-      <button type="button" class="atlas-toast-close" aria-label="Dismiss">×</button>
+      <button type="button" class="cosmo-toast-close" aria-label="Dismiss">×</button>
     `;
-    const closeBtn = el.querySelector('.atlas-toast-close') as HTMLButtonElement;
+    const closeBtn = el.querySelector('.cosmo-toast-close') as HTMLButtonElement;
     closeBtn.addEventListener('click', () => dismissToast(el));
     toastHost.appendChild(el);
     if (toastHideTimer) clearTimeout(toastHideTimer);
@@ -1161,15 +1161,15 @@ export function mountCopilotPanel() {
       lastPaceLabel = label;
       if (paceToastEl?.isConnected) paceToastEl.remove();
       const el = document.createElement('div');
-      el.className = 'atlas-toast is-pace';
+      el.className = 'cosmo-toast is-pace';
       el.setAttribute('role', 'status');
       el.innerHTML = `
-        <div class="atlas-toast-icon" aria-hidden="true">⏱</div>
-        <div class="atlas-toast-copy">
-          <p class="atlas-toast-title">Slowing down</p>
-          <p class="atlas-toast-msg" data-pace-msg></p>
+        <div class="cosmo-toast-icon" aria-hidden="true">⏱</div>
+        <div class="cosmo-toast-copy">
+          <p class="cosmo-toast-title">Slowing down</p>
+          <p class="cosmo-toast-msg" data-pace-msg></p>
         </div>
-        <span class="atlas-toast-countdown" data-pace-cd></span>
+        <span class="cosmo-toast-countdown" data-pace-cd></span>
       `;
       toastHost.prepend(el);
       paceToastEl = el;
@@ -1192,7 +1192,7 @@ export function mountCopilotPanel() {
     root.classList.toggle('collapsed', collapsed);
     minimizeBtn.title = 'Minimize';
     minimizeBtn.setAttribute('aria-label', 'Minimize co-pilot');
-    if (!minimizeBtn.querySelector('.atlas-fi-minimize')) {
+    if (!minimizeBtn.querySelector('.cosmo-fi-minimize')) {
       mountMinimizeIcon(minimizeBtn);
     }
     headEl.setAttribute(
@@ -1288,7 +1288,7 @@ export function mountCopilotPanel() {
     jobsCountEl.textContent = String(jobs.length);
     if (!jobs.length) {
       jobsEl.innerHTML =
-        '<div class="atlas-empty">Matched jobs will appear here as Atlas scans the list.</div>';
+        '<div class="cosmo-empty">Matched jobs will appear here as Cosmo scans the list.</div>';
       return;
     }
     const order: Record<ScannedJobItem['status'], number> = {
@@ -1402,7 +1402,7 @@ export function mountCopilotPanel() {
         state.sessionBreakUntil &&
           Date.parse(state.sessionBreakUntil) > Date.now()
       );
-    if (!stopBtn.querySelector('.atlas-fi-stop')) {
+    if (!stopBtn.querySelector('.cosmo-fi-stop')) {
       mountStopIcon(stopBtn);
     }
     const nextPauseMode: 'pause' | 'play' | 'idle' = !state.running
@@ -1512,7 +1512,7 @@ export function mountCopilotPanel() {
             ? 'Confirm you’re logged into Naukri, then press Confirm.'
             : 'Log into Naukri in the new tab, then press Confirm here.'
           : waitingOnQuestions
-            ? 'Answer Naukri’s questions and save. Atlas continues when apply succeeds, or press Resume.'
+            ? 'Answer Naukri’s questions and save. Cosmo continues when apply succeeds, or press Resume.'
             : noticeEl.textContent);
       const flashKey = alert?.at || noticeEl.textContent;
       if (flashKey && flashKey !== lastFlashedAlertAt) {
@@ -1643,7 +1643,7 @@ export function mountCopilotPanel() {
     setCollapsed(true);
   });
 
-  root.querySelector('.atlas-head')?.addEventListener('click', (event) => {
+  root.querySelector('.cosmo-head')?.addEventListener('click', (event) => {
     if (!root.classList.contains('collapsed')) return;
     if ((event.target as HTMLElement).closest('button')) return;
     if (dragMoved) {

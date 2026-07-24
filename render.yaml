@@ -1,8 +1,8 @@
-# Render Blueprint for the Atlas API (monorepo).
+# Render Blueprint for the Cosmo API (monorepo).
 # Dashboard → New → Blueprint, or set these manually on the Web Service.
 services:
   - type: web
-    name: atlas-api
+    name: cosmo-api
     runtime: node
     plan: free
     rootDir: .

@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, FileText, MoreVertical } from 'lucide-react';
-import type { Application } from '@atlas/shared';
+import type { Application } from '@cosmo/shared';
 
 export type TimelineItem = {
   id: string;

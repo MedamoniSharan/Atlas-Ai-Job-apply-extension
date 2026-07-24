@@ -1,4 +1,4 @@
-import type { EventEnvelope } from '@atlas/shared';
+import type { EventEnvelope } from '@cosmo/shared';
 import { KEYS } from './storageManager';
 import { logger } from './logger';
 

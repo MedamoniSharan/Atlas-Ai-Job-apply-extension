@@ -12,7 +12,7 @@ import {
   type AdminUsersQuery,
   type PaidPlan,
   type PlanTier,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { UserModel } from '../users/user.model';
 import { PaymentModel } from '../billing/payment.model';

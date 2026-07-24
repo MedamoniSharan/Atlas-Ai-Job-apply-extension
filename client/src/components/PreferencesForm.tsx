@@ -4,7 +4,7 @@ import {
   DEFAULT_JOB_PREFERENCES,
   type JobPreferences,
   type WorkMode,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { fetchPreferences, savePreferences } from '../lib/api';
 import { CosmosLoader } from './CosmosLogo';
 

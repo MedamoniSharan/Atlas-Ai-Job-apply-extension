@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import type { UserRole } from '@atlas/shared';
+import type { UserRole } from '@cosmo/shared';
 import { env } from '../config/env';
 import { AppError } from './errorHandler';
 

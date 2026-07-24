@@ -14,7 +14,7 @@ import {
   type PaidPlan,
   type VerifyBillingPaymentInput,
   type VerifySubscriptionInput,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { ApplicationModel } from '../applications/application.model';

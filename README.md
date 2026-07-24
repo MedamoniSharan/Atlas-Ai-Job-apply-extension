@@ -1,4 +1,4 @@
-# Atlas Job Assistant
+# Cosmo Job Assistant
 
 MERN + Chrome Extension (Manifest V3) MVP for syncing job applications from supported platforms into a dashboard.
 
@@ -17,7 +17,7 @@ npm run docker:up
 
 # 2. Install + build shared contracts
 npm install
-npm run build --workspace=@atlas/shared
+npm run build --workspace=@cosmo/shared
 
 # 3. API (http://localhost:4000)
 cp .env.example .env   # already present for local defaults
@@ -27,11 +27,19 @@ npm run dev:server
 npm run dev:client
 
 # 5. Extension
-npm run build --workspace=@atlas/extension
+npm run build --workspace=@cosmo/extension
 # Chrome → Extensions → Load unpacked → select extension/dist
+
+# Store / production package (no sourcemaps; requires HTTPS origins):
+# EXTENSION_API_ORIGIN=https://api.example.com \
+# EXTENSION_WEB_ORIGIN=https://app.example.com \
+# EXTENSION_GECKO_ID=cosmo@cosmovai.com \
+# npm run build:release --workspace=@cosmo/extension
 ```
 
 Or run `bash scripts/bootstrap.sh`.
+
+Privacy / Terms (local): `http://localhost:5173/privacy` and `/terms`.
 
 ## Vertical slice
 
@@ -99,7 +107,7 @@ Admin API base: `/api/v1/admin/*` (requires JWT with `role: admin`).
 
 ```bash
 npm test
-npm run test --workspace=@atlas/extension
+npm run test --workspace=@cosmo/extension
 ```
 
 ## Design

@@ -1,4 +1,4 @@
-import type { JobPayload } from '@atlas/shared';
+import type { JobPayload } from '@cosmo/shared';
 import {
   handleBlockedPage,
   paceModeFromStealth,

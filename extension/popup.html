@@ -155,7 +155,14 @@
         </form>
 
         <div class="popup-actions">
-          <button id="scan-now" type="button" class="btn-primary">Scan now</button>
+          <label class="check scan-consent">
+            <input id="scan-consent" type="checkbox" />
+            I understand Cosmo will assist Easy Apply on Naukri as an assisted
+            co-pilot (not unattended bulk apply).
+          </label>
+          <button id="scan-now" type="button" class="btn-primary" disabled>
+            Scan now
+          </button>
           <button id="logout" type="button" class="btn-ghost">Sign out</button>
         </div>
       </section>

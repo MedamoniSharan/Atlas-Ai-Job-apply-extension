@@ -363,6 +363,14 @@ button:disabled {
   border-top: 1px solid var(--border);
 }
 
+.popup-actions .scan-consent {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .hint {
   margin: 0;
   font-size: 0.72rem;

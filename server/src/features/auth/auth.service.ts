@@ -8,7 +8,7 @@ import {
   User,
   type UserRole,
   type UserStatus,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { env } from '../../config/env';
 import { UserModel } from '../users/user.model';
 import { AppError } from '../../middleware/errorHandler';
@@ -268,6 +268,32 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
   }
 
   return issueTokens(user);
+}
+
+/** Invalidate the stored refresh token (client-only clear is no longer enough). */
+export async function logout(userId: string): Promise<void> {
+  await UserModel.findByIdAndUpdate(userId, {
+    $unset: { refreshTokenHash: 1 },
+  });
+}
+
+/** Logout using the refresh token body (extension / no access token). */
+export async function logoutWithRefreshToken(
+  refreshToken: string
+): Promise<void> {
+  let payload;
+  try {
+    payload = verifyRefreshToken(refreshToken);
+  } catch {
+    return;
+  }
+  const user = await UserModel.findById(payload.sub);
+  if (!user?.refreshTokenHash) return;
+  const match = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+  if (!match) return;
+  await UserModel.findByIdAndUpdate(user._id, {
+    $unset: { refreshTokenHash: 1 },
+  });
 }
 
 export async function me(userId: string): Promise<User> {

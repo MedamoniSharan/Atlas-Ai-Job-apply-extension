@@ -1,4 +1,4 @@
-import { ArrowRight, Star, Users } from 'lucide-react';
+import { ArrowRight, Puzzle } from 'lucide-react';
 
 const CHROME_STORE_URL = import.meta.env.VITE_CHROME_EXTENSION_URL ?? '';
 
@@ -49,8 +49,8 @@ export function ChromeInstallCta() {
         <span className="chrome-cta__gradient">your job search?</span>
       </h2>
       <p className="chrome-cta__sub">
-        Join thousands of professionals who&apos;ve accelerated their career
-        with Cosmo.
+        Install the Cosmo co-pilot for Naukri and sync applications to your
+        dashboard.
       </p>
       <a
         className="chrome-cta__btn"
@@ -65,13 +65,10 @@ export function ChromeInstallCta() {
       </a>
       <div className="chrome-cta__meta">
         <span>
-          <Star size={14} fill="#f5b301" stroke="#f5b301" aria-hidden="true" />
-          Chrome Web Store 4.9
+          <Puzzle size={14} strokeWidth={2} aria-hidden="true" />
+          Free to install
         </span>
-        <span>
-          <Users size={14} strokeWidth={2} aria-hidden="true" />
-          30,000+ users
-        </span>
+        <span>Naukri co-pilot</span>
       </div>
     </section>
   );

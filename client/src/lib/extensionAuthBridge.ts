@@ -1,8 +1,8 @@
 const API_BASE =
   import.meta.env.VITE_API_BASE?.trim() || 'http://localhost:4000';
 
-const MESSAGE_SOURCE = 'atlas-web';
-const MESSAGE_TYPE = 'ATLAS_AUTH_SYNC';
+const MESSAGE_SOURCE = 'cosmo-web';
+const MESSAGE_TYPE = 'COSMO_AUTH_SYNC';
 
 type AuthSyncMessage = {
   source: typeof MESSAGE_SOURCE;

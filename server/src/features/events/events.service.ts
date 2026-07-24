@@ -5,7 +5,7 @@ import {
   getPlanAppliesPerHour,
   jobPayloadSchema,
   type EventEnvelope,
-} from '@atlas/shared';
+} from '@cosmo/shared';
 import { ActivityModel } from './activity.model';
 import { ApplicationModel, IApplication } from '../applications/application.model';
 import { UserModel } from '../users/user.model';

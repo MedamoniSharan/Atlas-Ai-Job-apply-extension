@@ -1,5 +1,5 @@
-import type { JobPreferences, WorkMode } from '@atlas/shared';
-import { CONSENT_VERSION } from '@atlas/shared';
+import type { JobPreferences, WorkMode } from '@cosmo/shared';
+import { CONSENT_VERSION } from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
 
@@ -294,7 +294,25 @@ document.getElementById('logout')!.addEventListener('click', async () => {
   await refreshUi();
 });
 
+const scanConsentEl = document.getElementById(
+  'scan-consent'
+) as HTMLInputElement;
+const scanNowBtn = document.getElementById('scan-now') as HTMLButtonElement;
+
+scanConsentEl.addEventListener('change', () => {
+  scanNowBtn.disabled = !scanConsentEl.checked;
+});
+
 document.getElementById('scan-now')!.addEventListener('click', async () => {
+  if (!scanConsentEl.checked) {
+    scanStateEl.textContent = 'Accept the co-pilot consent checkbox to start.';
+    showToast(
+      'Consent required',
+      'Confirm the assisted co-pilot notice before scanning.',
+      'error'
+    );
+    return;
+  }
   scanStateEl.textContent = 'Starting co-pilot on Naukri…';
   const result = await send<{
     ok: boolean;

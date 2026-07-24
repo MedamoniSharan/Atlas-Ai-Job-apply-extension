@@ -1,11 +1,12 @@
 import http from 'http';
 import { createApp } from './app';
 import { connectMongo } from './config/database';
-import { env } from './config/env';
+import { assertSecureEnv, env } from './config/env';
 import { logger } from './config/logger';
 import { initSocket } from './realtime/socket';
 
 async function main() {
+  assertSecureEnv();
   await connectMongo();
   const { seedPlanConfigs } = await import('./features/billing/planConfig.service');
   await seedPlanConfigs();

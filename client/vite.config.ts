@@ -11,7 +11,7 @@ export default defineConfig({
     // Import shared TypeScript source so Vite gets real ESM named exports
     // (shared/dist is CommonJS and breaks named imports like DEFAULT_JOB_PREFERENCES).
     alias: {
-      '@atlas/shared': path.resolve(__dirname, '../shared/src/index.ts'),
+      '@cosmo/shared': path.resolve(__dirname, '../shared/src/index.ts'),
     },
   },
   server: {

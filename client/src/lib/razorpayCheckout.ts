@@ -1,4 +1,4 @@
-import type { PaidPlan } from '@atlas/shared';
+import type { PaidPlan } from '@cosmo/shared';
 import {
   cancelSubscription,
   createSubscription,

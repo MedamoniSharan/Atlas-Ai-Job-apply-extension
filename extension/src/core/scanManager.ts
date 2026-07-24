@@ -1,4 +1,4 @@
-import type { JobPayload, JobPreferences } from '@atlas/shared';
+import type { JobPayload, JobPreferences } from '@cosmo/shared';
 import {
   SearchResultJob,
   buildNaukriSearchUrl,
