@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,7 +16,6 @@ import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
-import { ComingSoonPage } from './pages/ComingSoonPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -29,6 +28,14 @@ import './admin/admin.css';
 
 const queryClient = new QueryClient();
 const googleId = googleClientId();
+const CODEX_CAREER_URL = 'https://codexcareer.com';
+
+function RedirectToCodexCareer() {
+  useEffect(() => {
+    window.location.replace(CODEX_CAREER_URL);
+  }, []);
+  return null;
+}
 
 const app = (
   <QueryClientProvider client={queryClient}>
@@ -48,17 +55,9 @@ const app = (
             path="/get-started"
             element={<Navigate to="/get-extension" replace />}
           />
+          <Route path="/browse" element={<RedirectToCodexCareer />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/tracker" element={<TrackerPage />} />
-          <Route
-            path="/browse"
-            element={
-              <ComingSoonPage
-                title="Browse jobs"
-                blurb="Job browsing inside Cosmo is coming soon. Use the Naukri co-pilot to scan matches for now."
-              />
-            }
-          />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
         <Route path="/admin" element={<AdminLayout />}>

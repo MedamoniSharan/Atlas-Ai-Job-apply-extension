@@ -1,6 +1,8 @@
 import { ArrowRight, Puzzle } from 'lucide-react';
-
-const CHROME_STORE_URL = import.meta.env.VITE_CHROME_EXTENSION_URL ?? '';
+import {
+  CHROME_EXTENSION_ZIP_FILENAME,
+  CHROME_EXTENSION_ZIP_URL,
+} from '../lib/chromeExtension';
 
 function ChromeIcon({ size = 18 }: { size?: number }) {
   return (
@@ -39,9 +41,6 @@ function ChromeIcon({ size = 18 }: { size?: number }) {
 }
 
 export function ChromeInstallCta() {
-  const href = CHROME_STORE_URL || '/register';
-  const external = Boolean(CHROME_STORE_URL);
-
   return (
     <section className="chrome-cta" aria-labelledby="chrome-cta-title">
       <h2 id="chrome-cta-title" className="chrome-cta__title">
@@ -49,24 +48,22 @@ export function ChromeInstallCta() {
         <span className="chrome-cta__gradient">your job search?</span>
       </h2>
       <p className="chrome-cta__sub">
-        Install the Cosmo co-pilot for Naukri and sync applications to your
-        dashboard.
+        Download the Cosmo Chrome extension zip, load it in Chrome, and sync
+        applications to your dashboard.
       </p>
       <a
         className="chrome-cta__btn"
-        href={href}
-        {...(external
-          ? { target: '_blank', rel: 'noreferrer noopener' }
-          : {})}
+        href={CHROME_EXTENSION_ZIP_URL}
+        download={CHROME_EXTENSION_ZIP_FILENAME}
       >
         <ChromeIcon />
-        <span>Add to Chrome — Free</span>
+        <span>Download for Chrome — Free</span>
         <ArrowRight size={18} strokeWidth={2.2} aria-hidden="true" />
       </a>
       <div className="chrome-cta__meta">
         <span>
           <Puzzle size={14} strokeWidth={2} aria-hidden="true" />
-          Free to install
+          Free zip install
         </span>
         <span>Naukri co-pilot</span>
       </div>

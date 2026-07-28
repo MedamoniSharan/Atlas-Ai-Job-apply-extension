@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import {
   DEFAULT_JOB_PREFERENCES,
   type JobPreferences,
@@ -144,6 +144,12 @@ export function PreferencesForm({
     };
   }, []);
 
+  useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(''), 3200);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
@@ -184,122 +190,131 @@ export function PreferencesForm({
   }
 
   return (
-    <form className="prefs-form" onSubmit={onSubmit}>
-      <ChipField
-        label="Job titles"
-        values={prefs.titles}
-        placeholder="Software Engineer"
-        onChange={(titles) => setPrefs((p) => ({ ...p, titles }))}
-      />
-      <ChipField
-        label="Keywords"
-        values={prefs.keywords}
-        placeholder="React, Node.js"
-        onChange={(keywords) => setPrefs((p) => ({ ...p, keywords }))}
-      />
-      <ChipField
-        label="Locations"
-        values={prefs.locations}
-        placeholder="Bengaluru, Remote"
-        onChange={(locations) => setPrefs((p) => ({ ...p, locations }))}
-      />
+    <>
+      {message && (
+        <div className="app-toast" role="status" aria-live="polite">
+          <span className="app-toast__icon" aria-hidden="true">
+            <Check size={14} strokeWidth={2.6} />
+          </span>
+          <p>{message}</p>
+        </div>
+      )}
+      <form className="prefs-form" onSubmit={onSubmit}>
+        <ChipField
+          label="Job titles"
+          values={prefs.titles}
+          placeholder="Software Engineer"
+          onChange={(titles) => setPrefs((p) => ({ ...p, titles }))}
+        />
+        <ChipField
+          label="Keywords"
+          values={prefs.keywords}
+          placeholder="React, Node.js"
+          onChange={(keywords) => setPrefs((p) => ({ ...p, keywords }))}
+        />
+        <ChipField
+          label="Locations"
+          values={prefs.locations}
+          placeholder="Bengaluru, Remote"
+          onChange={(locations) => setPrefs((p) => ({ ...p, locations }))}
+        />
 
-      <div className="prefs-row">
+        <div className="prefs-row">
+          <label>
+            Experience min (yrs)
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={prefs.experienceMin}
+              onChange={(e) =>
+                setPrefs((p) => ({
+                  ...p,
+                  experienceMin: Number(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label>
+            Experience max (yrs)
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={prefs.experienceMax}
+              onChange={(e) =>
+                setPrefs((p) => ({
+                  ...p,
+                  experienceMax: Number(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label>
+            Min salary (LPA)
+            <input
+              type="number"
+              min={0}
+              max={500}
+              step={0.5}
+              value={prefs.minSalaryLpa ?? ''}
+              onChange={(e) =>
+                setPrefs((p) => ({
+                  ...p,
+                  minSalaryLpa:
+                    e.target.value === '' ? undefined : Number(e.target.value),
+                }))
+              }
+            />
+          </label>
+        </div>
+
         <label>
-          Experience min (yrs)
-          <input
-            type="number"
-            min={0}
-            max={50}
-            value={prefs.experienceMin}
+          Work mode
+          <select
+            value={prefs.workMode}
             onChange={(e) =>
               setPrefs((p) => ({
                 ...p,
-                experienceMin: Number(e.target.value),
+                workMode: e.target.value as WorkMode,
               }))
             }
-          />
+          >
+            <option value="any">Any</option>
+            <option value="office">Office</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="remote">Remote</option>
+          </select>
         </label>
-        <label>
-          Experience max (yrs)
-          <input
-            type="number"
-            min={0}
-            max={50}
-            value={prefs.experienceMax}
-            onChange={(e) =>
-              setPrefs((p) => ({
-                ...p,
-                experienceMax: Number(e.target.value),
-              }))
-            }
-          />
-        </label>
-        <label>
-          Min salary (LPA)
-          <input
-            type="number"
-            min={0}
-            max={500}
-            step={0.5}
-            value={prefs.minSalaryLpa ?? ''}
-            onChange={(e) =>
-              setPrefs((p) => ({
-                ...p,
-                minSalaryLpa:
-                  e.target.value === '' ? undefined : Number(e.target.value),
-              }))
-            }
-          />
-        </label>
-      </div>
 
-      <label>
-        Work mode
-        <select
-          value={prefs.workMode}
-          onChange={(e) =>
-            setPrefs((p) => ({
-              ...p,
-              workMode: e.target.value as WorkMode,
-            }))
-          }
-        >
-          <option value="any">Any</option>
-          <option value="office">Office</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="remote">Remote</option>
-        </select>
-      </label>
+        <div className="prefs-toggles">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={prefs.autoScanEnabled}
+              onChange={(e) =>
+                setPrefs((p) => ({ ...p, autoScanEnabled: e.target.checked }))
+              }
+            />
+            Auto-scan Naukri from preferences
+          </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={prefs.autoApplyEnabled}
+              onChange={(e) =>
+                setPrefs((p) => ({ ...p, autoApplyEnabled: e.target.checked }))
+              }
+            />
+            Auto-apply Easy Apply jobs (requires Naukri login)
+          </label>
+        </div>
 
-      <div className="prefs-toggles">
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={prefs.autoScanEnabled}
-            onChange={(e) =>
-              setPrefs((p) => ({ ...p, autoScanEnabled: e.target.checked }))
-            }
-          />
-          Auto-scan Naukri from preferences
-        </label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={prefs.autoApplyEnabled}
-            onChange={(e) =>
-              setPrefs((p) => ({ ...p, autoApplyEnabled: e.target.checked }))
-            }
-          />
-          Auto-apply Easy Apply jobs (requires Naukri login)
-        </label>
-      </div>
-
-      {error && <p className="error">{error}</p>}
-      {message && <p className="success">{message}</p>}
-      <button className="primary-btn" type="submit" disabled={saving}>
-        {saving ? 'Saving…' : submitLabel}
-      </button>
-    </form>
+        {error && <p className="error">{error}</p>}
+        <button className="primary-btn" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : submitLabel}
+        </button>
+      </form>
+    </>
   );
 }

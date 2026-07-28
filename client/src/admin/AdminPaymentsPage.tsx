@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchAdminPayments, reconcileAdminPayment } from '../lib/api';
+import { API_BASE } from '../lib/endpoints';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader } from '../components/CosmosLogo';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE?.trim() ||
-  'https://atlas-ai-job-apply-extension-1.onrender.com';
 
 export function AdminPaymentsPage() {
   const [status, setStatus] = useState('');

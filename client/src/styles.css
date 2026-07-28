@@ -3577,7 +3577,29 @@ a.tracker-card__title:hover {
   gap: 0;
 }
 
-.auth-submit-loader .cosmos-loader__logo {
+.auth-social-button__loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  color: #111827;
+}
+
+.auth-social-button__loader .cosmos-loader__logo {
+  color: #111827;
+  flex-shrink: 0;
+}
+
+.auth-social-button__loader .cosmos-loader__label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.auth-submit-button .auth-submit-loader .cosmos-loader__logo,
+.admin-login button .auth-submit-loader .cosmos-loader__logo {
   color: #ffffff;
 }
 
@@ -4054,6 +4076,57 @@ a.tracker-card__title:hover {
 .success {
   color: var(--color-surface-raised);
   margin: 0;
+}
+
+.app-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 16px 10px 12px;
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  border: 1px solid color-mix(in srgb, var(--color-surface-raised) 18%, white);
+  box-shadow:
+    0 10px 28px rgba(21, 54, 43, 0.14),
+    0 0 0 1px rgba(21, 54, 43, 0.04);
+  transform: translateX(-50%);
+  animation: app-toast-in 220ms ease-out both;
+}
+
+.app-toast__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.app-toast p {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-on-muted);
+  line-height: 1.3;
+}
+
+@keyframes app-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .sr-only {

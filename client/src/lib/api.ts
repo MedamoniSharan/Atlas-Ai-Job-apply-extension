@@ -7,10 +7,7 @@ import type {
   User,
 } from '@cosmo/shared';
 import { useAuthStore } from '../store/authStore';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE?.trim() ||
-  'https://atlas-ai-job-apply-extension-1.onrender.com';
+import { API_BASE } from './endpoints';
 
 function isAuthFailure(
   status: number,

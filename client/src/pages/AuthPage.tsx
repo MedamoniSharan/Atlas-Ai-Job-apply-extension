@@ -160,6 +160,7 @@ function GoogleSignInButton({
       }
     },
     onError: () => {
+      setLoading(false);
       setError('Google sign-in was cancelled or failed. Please try again.');
     },
   });
@@ -168,16 +169,26 @@ function GoogleSignInButton({
     <button
       type="button"
       className="auth-social-button"
-      aria-label="Continue with Google"
+      aria-label={loading ? 'Signing in' : 'Continue with Google'}
       disabled={loading}
-      onClick={() => googleLogin()}
+      onClick={() => {
+        setError('');
+        setLoading(true);
+        googleLogin();
+      }}
     >
       {loading ? (
-        <CosmosLoader label="" size={22} className="auth-submit-loader" />
+        <CosmosLoader
+          label="Signing in…"
+          size={22}
+          className="auth-submit-loader auth-social-button__loader"
+        />
       ) : (
-        <GoogleMark />
+        <>
+          <GoogleMark />
+          <span>Continue with Google</span>
+        </>
       )}
-      <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
     </button>
   );
 }

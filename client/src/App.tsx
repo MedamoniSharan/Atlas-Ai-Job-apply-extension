@@ -12,7 +12,7 @@ import {
   Bell,
   Briefcase,
   CircleHelp,
-  Compass,
+  ExternalLink,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -87,7 +87,6 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/get-extension') || pathname.startsWith('/get-started')) {
     return 'Get extension';
   }
-  if (pathname.startsWith('/browse')) return 'Browse jobs';
   if (pathname.startsWith('/tracker')) return 'Tracker';
   if (pathname.startsWith('/profile')) return 'Profile';
   if (pathname.startsWith('/applications')) return 'Applications';
@@ -215,12 +214,17 @@ export function AppLayout() {
             </span>
             Tracker
           </NavLink>
-          <NavLink to="/browse" className="sidebar__link">
+          <a
+            href="https://codexcareer.com"
+            className="sidebar__link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <span className="sidebar__icon" aria-hidden>
-              <Compass size={18} strokeWidth={1.9} className="icon-motion" />
+              <ExternalLink size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
-            Browse jobs
-          </NavLink>
+            All jobs
+          </a>
         </nav>
 
         <nav className="sidebar__nav sidebar__nav--secondary">

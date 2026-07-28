@@ -271,7 +271,7 @@ export function DashboardPage() {
   const extensionRows = useMemo<StatsRow[]>(() => {
     const connected = Boolean(onboarding?.extensionConnected);
     const prefs = Boolean(onboarding?.preferencesCompleted);
-    const chromeReady = Boolean(import.meta.env.VITE_CHROME_EXTENSION_URL);
+    const chromeReady = true;
     const edgeReady = Boolean(import.meta.env.VITE_EDGE_EXTENSION_URL);
     const firefoxReady = Boolean(import.meta.env.VITE_FIREFOX_EXTENSION_URL);
     const storeTotal = Math.max(

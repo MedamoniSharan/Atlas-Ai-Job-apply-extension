@@ -3,10 +3,15 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { fileURLToPath } from 'url';
+import { writeZipFromDirectory } from './zipDirectory.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
+const clientPublicZip = path.resolve(
+  root,
+  '../client/public/cosmo-chrome-extension.zip'
+);
 const watch = process.argv.includes('--watch');
 const release = process.argv.includes('--release');
 
@@ -147,9 +152,11 @@ if (watch) {
 } else {
   await ctx.rebuild();
   await ctx.dispose();
+
+  writeZipFromDirectory(dist, clientPublicZip);
   console.log(
     release
-      ? `Release extension built to dist/ (API: ${apiOrigins.join(', ')}; web: ${webOrigins.join(', ')})`
-      : 'Extension built to dist/'
+      ? `Release extension built to dist/ + ${path.relative(root, clientPublicZip)} (API: ${apiOrigins.join(', ')}; web: ${webOrigins.join(', ')})`
+      : `Extension built to dist/ + ${path.relative(root, clientPublicZip)}`
   );
 }

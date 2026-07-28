@@ -65,7 +65,7 @@ export function GetStartedPage() {
         )}
 
         <section className="get-extension__stores" aria-labelledby="stores-heading">
-          <h3 id="stores-heading">Choose your browser</h3>
+          <h3 id="stores-heading">Download for Chrome</h3>
           <BrowserStoreButtons featured="chrome" />
         </section>
 

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { CosmosMark } from './CosmosLogo';
-
-const CHROME_STORE_URL = import.meta.env.VITE_CHROME_EXTENSION_URL ?? '';
+import {
+  CHROME_EXTENSION_ZIP_FILENAME,
+  CHROME_EXTENSION_ZIP_URL,
+} from '../lib/chromeExtension';
 
 const featureItems = [
   {
@@ -81,8 +83,8 @@ export function LandingNavbar() {
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
-  const extensionHref = CHROME_STORE_URL || '/register';
-  const extensionExternal = Boolean(CHROME_STORE_URL);
+  const extensionHref = CHROME_EXTENSION_ZIP_URL;
+  const extensionDownload = CHROME_EXTENSION_ZIP_FILENAME;
 
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
@@ -213,9 +215,7 @@ export function LandingNavbar() {
           <a
             className="capsule-ext"
             href={extensionHref}
-            {...(extensionExternal
-              ? { target: '_blank', rel: 'noreferrer noopener' }
-              : {})}
+            download={extensionDownload}
           >
             <ChromeGlyph />
             Get Extension
@@ -270,10 +270,8 @@ export function LandingNavbar() {
           ))}
           <a
             href={extensionHref}
+            download={extensionDownload}
             onClick={() => setMenuOpen(false)}
-            {...(extensionExternal
-              ? { target: '_blank', rel: 'noreferrer noopener' }
-              : {})}
           >
             Get Extension
           </a>

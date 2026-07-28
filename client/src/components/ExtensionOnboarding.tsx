@@ -23,7 +23,8 @@ export function ExtensionOnboarding({
         <p className="onboarding__eyebrow">Next step</p>
         <h3>Install the Cosmo browser extension</h3>
         <p className="muted">
-          Add Cosmo from your browser store, then stay signed in here
+          Download the Cosmo Chrome zip, load it unpacked, then stay signed in
+          here
           {userEmail ? ` as ${userEmail}` : ''} so the extension connects
           automatically.
         </p>
@@ -35,10 +36,11 @@ export function ExtensionOnboarding({
         <li className="onboarding__step onboarding__step--active">
           <span className="onboarding__step-num">1</span>
           <div>
-            <strong>Add to Chrome</strong>
+            <strong>Download the zip</strong>
             <p className="muted">
-              Open the Chrome Web Store card, click Add to Chrome, then confirm
-              Add extension.
+              Click Download zip, unzip the file, then open{' '}
+              <code>chrome://extensions</code>, turn on Developer mode, and
+              choose Load unpacked.
             </p>
           </div>
         </li>
