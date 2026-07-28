@@ -9,6 +9,8 @@ async function bootstrapData(): Promise<void> {
   await connectMongo();
   const { seedPlanConfigs } = await import('./features/billing/planConfig.service');
   await seedPlanConfigs();
+  const { ensureAdminFromEnv } = await import('./features/auth/ensureAdmin');
+  await ensureAdminFromEnv();
 }
 
 async function main() {

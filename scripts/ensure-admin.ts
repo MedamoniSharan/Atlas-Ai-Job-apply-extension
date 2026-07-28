@@ -1,7 +1,10 @@
 /**
  * Create or reset an admin password account.
  * Usage:
+ *   npx tsx scripts/ensure-admin.ts
  *   npx tsx scripts/ensure-admin.ts --email=admin@cosmo.com --password='your-password' --name=Admin
+ *
+ * Without flags, uses ADMIN_EMAILS + ADMIN_PASSWORD from .env.
  */
 import path from 'path';
 import bcrypt from 'bcryptjs';
@@ -17,13 +20,19 @@ function arg(name: string): string | undefined {
 }
 
 async function main() {
-  const email = arg('email')?.toLowerCase().trim();
-  const password = arg('password');
+  const envEmails = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const email =
+    arg('email')?.toLowerCase().trim() || envEmails[0];
+  const password = arg('password') || process.env.ADMIN_PASSWORD?.trim();
   const name = arg('name')?.trim() || 'Admin';
 
-  if (!email || !password || password.length < 8) {
+  if (!email || !password) {
     console.error(
-      "Usage: npx tsx scripts/ensure-admin.ts --email=admin@cosmo.com --password='your-password' [--name=Admin]"
+      "Usage: npx tsx scripts/ensure-admin.ts [--email=admin@cosmo.com] [--password='your-password'] [--name=Admin]\n" +
+        'Or set ADMIN_EMAILS and ADMIN_PASSWORD in .env'
     );
     process.exit(1);
   }

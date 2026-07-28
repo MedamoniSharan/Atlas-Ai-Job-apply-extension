@@ -30,6 +30,8 @@ export const env = {
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean),
+  /** Bootstrap password for ADMIN_EMAILS accounts (create/reset on server start). */
+  adminPassword: process.env.ADMIN_PASSWORD?.trim() || '',
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
 };
