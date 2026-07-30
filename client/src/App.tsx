@@ -259,7 +259,7 @@ export function AppLayout() {
         <div className="sidebar__footer">
           <a
             className="sidebar__help"
-            href="mailto:support@cosmovai.com?subject=Cosmo%20feedback"
+            href="mailto:codexcareer-info@gmail.com?subject=Cosmo%20feedback"
           >
             <span className="sidebar__help-icon" aria-hidden>
               <CircleHelp size={18} strokeWidth={1.9} className="icon-motion" />

@@ -7,9 +7,9 @@
 
 | Channel | Address |
 |---------|---------|
-| General / product help | hello@cosmovai.com |
-| Support | support@cosmovai.com |
-| Sales / billing | sales@cosmovai.com |
+| General / product help | codexcareer-info@gmail.com |
+| Support | codexcareer-info@gmail.com |
+| Sales / billing | codexcareer-info@gmail.com |
 
 When emailing, include:
 
@@ -41,7 +41,7 @@ When emailing, include:
 ### Billing
 
 - Paid plans are managed on the Cosmo website via Razorpay Subscriptions.  
-- For failed charges or cancellation questions, email sales@cosmovai.com with your account email.
+- For failed charges or cancellation questions, email codexcareer-info@gmail.com with your account email.
 
 ### Privacy & terms
 
@@ -54,4 +54,4 @@ If the API is unreachable, the extension queues events locally and retries when 
 
 ## Security reports
 
-Report suspected vulnerabilities to support@cosmovai.com with subject `Security report`. Do not include real user credentials in the report.
+Report suspected vulnerabilities to codexcareer-info@gmail.com with subject `Security report`. Do not include real user credentials in the report.

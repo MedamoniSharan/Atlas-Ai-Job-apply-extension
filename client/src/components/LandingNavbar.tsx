@@ -37,7 +37,7 @@ const moreItems = [
 ] as const;
 
 const contactItems = [
-  { title: 'Support', href: 'mailto:hello@cosmovai.com' },
+  { title: 'Support', href: 'mailto:codexcareer-info@gmail.com' },
   { title: 'Get Extension', href: '#get-extension' },
 ] as const;
 
