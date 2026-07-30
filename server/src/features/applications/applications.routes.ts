@@ -80,3 +80,33 @@ applicationsRouter.get(
     res.json(ok(result));
   })
 );
+
+applicationsRouter.patch(
+  '/:id/tracker',
+  requireAuth,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const id = typeof req.params.id === 'string' ? req.params.id : '';
+    const columnRaw =
+      typeof (req.body as { column?: unknown })?.column === 'string'
+        ? (req.body as { column: string }).column
+        : '';
+    const allowed = new Set(['applied', 'matched', 'skipped']);
+    if (!id || !allowed.has(columnRaw)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid application id or column',
+      });
+      return;
+    }
+    const updated = await applicationsService.moveApplicationColumn(
+      req.user!.sub,
+      id,
+      columnRaw as applicationsService.TrackerColumn
+    );
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Application not found' });
+      return;
+    }
+    res.json(ok(updated));
+  })
+);

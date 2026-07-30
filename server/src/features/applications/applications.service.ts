@@ -253,3 +253,59 @@ export async function lookupAppliedJobs(
     urls: [...appliedUrls],
   };
 }
+
+export type TrackerColumn = 'applied' | 'matched' | 'skipped';
+
+/**
+ * Move an application between Tracker Kanban columns (Applied / Matched / Skipped).
+ */
+export async function moveApplicationColumn(
+  userId: string,
+  applicationId: string,
+  column: TrackerColumn
+): Promise<Application | null> {
+  const doc = await ApplicationModel.findOne({ _id: applicationId, userId });
+  if (!doc) return null;
+
+  const metadata = {
+    ...((doc.metadata as Record<string, unknown> | undefined) ?? {}),
+  };
+
+  if (column === 'applied') {
+    doc.status = 'applied';
+    if (!doc.appliedAt) doc.appliedAt = new Date();
+    metadata.skipped = false;
+    delete metadata.skipReason;
+    // Keep companySiteApply if set; clear skip-only flags.
+    if (metadata.source !== 'auto_apply' && metadata.source !== 'manual') {
+      metadata.source = metadata.source ?? 'manual';
+    }
+  } else if (column === 'matched') {
+    if (doc.status === 'applied') {
+      doc.status = 'detected';
+    } else if (!['detected', 'viewed', 'saved', 'interview', 'offer'].includes(doc.status)) {
+      doc.status = 'detected';
+    }
+    metadata.skipped = false;
+    delete metadata.skipReason;
+    metadata.companySiteApply = false;
+    if (metadata.source === 'auto_apply') {
+      metadata.source = 'auto_scan';
+    }
+  } else {
+    // skipped
+    if (doc.status === 'applied') {
+      doc.status = 'detected';
+    }
+    metadata.skipped = true;
+    if (!metadata.skipReason || typeof metadata.skipReason !== 'string') {
+      metadata.skipReason = 'Moved to Skipped';
+    }
+    metadata.companySiteApply = false;
+  }
+
+  doc.metadata = metadata;
+  doc.markModified('metadata');
+  await doc.save();
+  return toApplication(doc);
+}

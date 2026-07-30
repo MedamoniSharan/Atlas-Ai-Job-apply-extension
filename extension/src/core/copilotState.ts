@@ -52,6 +52,10 @@ export type SessionCompletePrompt = {
   matched: number;
   skipped: number;
   at: string;
+  /** When true, show Next page — normally false (scan auto-pages to 30). */
+  offerNextPage?: boolean;
+  /** Full batch applied successfully. */
+  allApplied?: boolean;
 };
 
 export type LoginPauseReason = 'loggedOut' | 'uncertain';

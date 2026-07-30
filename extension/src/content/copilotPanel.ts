@@ -478,7 +478,7 @@ export function mountCopilotPanel() {
         display: grid;
         grid-template-columns: minmax(0, 1fr) max-content;
         gap: 8px;
-        align-items: center;
+        align-items: start;
         padding: 8px 9px;
         border-radius: 10px;
         background: #fafafa;
@@ -486,10 +486,15 @@ export function mountCopilotPanel() {
         font-size: 12px;
         line-height: 1.3;
         transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+        cursor: pointer;
       }
       #${ROOT_ID} .job-row:hover {
         background: #f4f4f5;
         border-color: #e4e4e7;
+      }
+      #${ROOT_ID} .job-row.is-open {
+        background: #fffbeb;
+        border-color: #fcd34d;
       }
       #${ROOT_ID} .job-row.applying {
         background: #eff6ff;
@@ -522,6 +527,14 @@ export function mountCopilotPanel() {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      #${ROOT_ID} .job-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        min-width: 0;
+        max-width: 140px;
+      }
       #${ROOT_ID} .job-badge {
         font-size: 10px;
         font-weight: 700;
@@ -547,6 +560,35 @@ export function mountCopilotPanel() {
         background: #2563eb;
         color: #ffffff;
         box-shadow: 0 0 0 1px rgba(37,99,235,.25);
+      }
+      #${ROOT_ID} .job-reason {
+        display: none;
+        margin: 0;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.25;
+        color: var(--cosmo-skip);
+        text-align: right;
+        word-break: break-word;
+      }
+      #${ROOT_ID} .job-row.is-open .job-reason {
+        display: block;
+      }
+      #${ROOT_ID} .job-detail {
+        display: none;
+        grid-column: 1 / -1;
+        margin-top: 2px;
+        padding: 7px 8px;
+        border-radius: 8px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #9a3412;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+      #${ROOT_ID} .job-row.is-open .job-detail {
+        display: block;
       }
       #${ROOT_ID} .cosmo-notice {
         display: none;
@@ -891,12 +933,12 @@ export function mountCopilotPanel() {
     </div>
     <div class="cosmo-modal" id="cosmo-done-modal" role="dialog" aria-modal="true">
       <div class="cosmo-modal-card">
-        <h3 id="cosmo-done-title">Applies done</h3>
+        <h3 id="cosmo-done-title">All jobs matched and applied</h3>
         <p id="cosmo-done-body">
-          Session finished. Continue to the next page of jobs, or close and review on your dashboard.
+          Cosmo finished matching and applying. Close to review on your dashboard.
         </p>
         <div class="cosmo-modal-actions">
-          <button type="button" class="btn-resume-login" id="cosmo-done-next">
+          <button type="button" class="btn-resume-login" id="cosmo-done-next" style="display:none">
             Next page jobs
           </button>
           <button type="button" class="btn-login" id="cosmo-done-close">
@@ -979,6 +1021,7 @@ export function mountCopilotPanel() {
   const minimizeBtn = root.querySelector('#cosmo-minimize') as HTMLButtonElement;
   let pauseIconMode: 'pause' | 'play' | 'idle' | null = null;
   let startIconMode: 'idle' | 'running' | 'paused' | null = null;
+  let selectedJobId: string | null = null;
   const runningMp4 = chrome.runtime.getURL('assets/running.mp4');
 
   mountPauseIcon(pauseBtn);
@@ -1226,6 +1269,7 @@ export function mountCopilotPanel() {
   }
 
   function showLoginModal(show: boolean) {
+    if (show) setCollapsed(false);
     loginModal.classList.toggle('show', show);
   }
 
@@ -1244,6 +1288,7 @@ export function mountCopilotPanel() {
   }
 
   function showConsentModal(show: boolean) {
+    if (show) setCollapsed(false);
     consentModal.classList.toggle('show', show);
     if (show) {
       consentCheck.checked = false;
@@ -1253,16 +1298,29 @@ export function mountCopilotPanel() {
 
   function showDoneModal(
     show: boolean,
-    summary?: { applied: number; matched: number; skipped: number }
+    summary?: {
+      applied: number;
+      matched: number;
+      skipped: number;
+      offerNextPage?: boolean;
+      allApplied?: boolean;
+    }
   ) {
+    if (show) setCollapsed(false);
     doneModal.classList.toggle('show', show);
     if (show && summary) {
-      doneTitle.textContent =
-        summary.applied > 0 ? 'Applies done' : 'Session finished';
-      doneBody.textContent =
-        summary.applied > 0
-          ? `Applied to ${summary.applied} job(s) (matched ${summary.matched}, skipped ${summary.skipped}). Go to the next page of jobs, or close and review on your Cosmo dashboard.`
-          : `Matched ${summary.matched}, skipped ${summary.skipped}. Continue to the next page, or close and visit your Cosmo dashboard.`;
+      const allDone = Boolean(summary.allApplied) || summary.applied > 0;
+      doneTitle.textContent = allDone
+        ? 'All jobs matched and applied'
+        : 'Session finished';
+      doneBody.textContent = allDone
+        ? `Matched and applied ${summary.applied} job(s) (matched ${summary.matched}, skipped ${summary.skipped}). Review them on your Cosmo dashboard.`
+        : `Found ${summary.matched}/${30} matches after auto page scan (skipped ${summary.skipped}). Apply starts only at 30 — close and review on your dashboard, or Start again with broader prefs.`;
+      const offerNext = Boolean(summary.offerNextPage) && !allDone;
+      doneNextBtn.style.display = offerNext ? '' : 'none';
+      doneCloseBtn.textContent = allDone
+        ? 'Close — view dashboard'
+        : 'Close — view dashboard';
     }
   }
 
@@ -1304,16 +1362,54 @@ export function mountCopilotPanel() {
     jobsEl.innerHTML = sorted
       .slice(0, 50)
       .map((j) => {
+        const reason = (j.skipReason || '').trim();
+        const open = selectedJobId === j.id ? ' is-open' : '';
+        const hasReason =
+          Boolean(reason) ||
+          j.status === 'skipped' ||
+          j.status === 'already_applied';
+        const reasonText = reason || 'No reason recorded';
         return `
-      <div class="job-row ${j.status}" data-job-id="${escapeHtml(j.id)}" title="${escapeHtml(j.skipReason || `${j.title} · ${j.company}`)}">
+      <div class="job-row ${j.status}${open}" data-job-id="${escapeHtml(j.id)}" title="${escapeHtml(reason || `${j.title} · ${j.company}`)}" role="button" tabindex="0">
         <div>
           <div class="job-title">${escapeHtml(j.title)}</div>
           <div class="job-company">${escapeHtml(j.company)}</div>
         </div>
-        <span class="job-badge ${j.status}">${statusLabel(j.status, j.skipReason)}</span>
+        <div class="job-side">
+          <span class="job-badge ${j.status}">${statusLabel(j.status, j.skipReason)}</span>
+          ${hasReason ? `<p class="job-reason">${escapeHtml(reasonText)}</p>` : ''}
+        </div>
+        ${
+          hasReason
+            ? `<div class="job-detail">Why skipped: ${escapeHtml(reasonText)}</div>`
+            : ''
+        }
       </div>`;
       })
       .join('');
+
+    for (const row of Array.from(jobsEl.querySelectorAll('.job-row'))) {
+      const el = row as HTMLElement;
+      const id = el.getAttribute('data-job-id') || '';
+      const toggle = () => {
+        selectedJobId = selectedJobId === id ? null : id;
+        renderJobs(jobs);
+        const openEl = jobsEl.querySelector(
+          `.job-row.is-open`
+        ) as HTMLElement | null;
+        openEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggle();
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
+      });
+    }
 
     const currentEl = jobsEl.querySelector('.job-row.applying') as HTMLElement | null;
     currentEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1618,6 +1714,7 @@ export function mountCopilotPanel() {
   });
 
   startBtn.addEventListener('click', () => {
+    setCollapsed(false);
     chrome.runtime.sendMessage({ type: 'GET_SAFETY_STATUS' }, (res) => {
       if (res?.blocked) {
         noticeEl.classList.add('show', 'is-alert');
@@ -1702,13 +1799,17 @@ export function mountCopilotPanel() {
       message?.type === 'LOGIN_REVERIFIED' ||
       message?.type === 'COPILOT_ALERT' ||
       message?.type === 'COPILOT_TOAST' ||
-      message?.type === 'COPILOT_COLLAPSE'
+      message?.type === 'COPILOT_COLLAPSE' ||
+      message?.type === 'COPILOT_EXPAND'
     ) {
       if (message?.type === 'COPILOT_TOAST' && message.toast) {
         showToast(message.toast as CopilotToast);
       }
       if (message?.type === 'COPILOT_COLLAPSE') {
         setCollapsed(true);
+      }
+      if (message?.type === 'COPILOT_EXPAND') {
+        setCollapsed(false);
       }
       if (message?.type === 'SHOW_LOGIN_PROMPT') {
         const reason =
@@ -1725,7 +1826,16 @@ export function mountCopilotPanel() {
     }
   });
 
-  void refresh();
+  void refresh().then(async () => {
+    try {
+      const state = await getCopilotState();
+      if (state.running || state.paused || state.needsLogin) {
+        setCollapsed(false);
+      }
+    } catch {
+      /* ignore */
+    }
+  });
   void resumeAfterLoginIfNeeded();
 }
 

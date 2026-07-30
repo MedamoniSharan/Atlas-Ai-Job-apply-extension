@@ -1,0 +1,22 @@
+---
+description: Never open multiple browser tabs during agent or Cosmo work
+alwaysApply: true
+---
+
+# No Multiple Browser Tabs
+
+**Strict rule:** Do not open multiple browser tabs — not in Cursor browser tools, and not in the Cosmo extension.
+
+## Agent (Cursor browser)
+
+- Never create extra tabs via browser tools (`browser_tabs` action `new`, etc.).
+- Reuse a single existing tab for all browser automation and inspection.
+- If a tab already exists, navigate/lock that tab instead of opening another.
+- Only open a tab if none exist, and keep using that one tab for the rest of the session.
+
+## Cosmo extension
+
+- Co-pilot / scan / apply must reuse **one** Naukri work tab (`ensureNaukriWorkTab`).
+- Navigate jobs with `chrome.tabs.update` on that tab — never `chrome.tabs.create` per job.
+- Block `target=_blank` / `window.open` spam; close child tabs opened from the work tab.
+- Login tab is the only intentional extra tab, and must be allow-listed.

@@ -5,6 +5,15 @@ import {
   buildNaukriSearchUrl,
   matchesPreferences,
   hasNaukriSessionCookieHint,
+  salaryMeetsMinimum,
+  ctcFiltersForMinSalary,
+  salaryBucketLabelsForMin,
+  workModeFilterLabel,
+  wfhTypeForWorkMode,
+  applyPreferenceFilters,
+  preferenceFiltersAlreadyApplied,
+  preferenceSkipReason,
+  searchUrlHasPreferenceFilters,
 } from './naukriAdapter';
 import { backoffMs } from '../core/queueManager';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
@@ -266,21 +275,389 @@ describe('NaukriAdapter', () => {
 });
 
 describe('preference matching helpers', () => {
-  it('builds a naukri search URL from prefs', () => {
+  it('builds a naukri search URL from the primary job title', () => {
     const url = buildNaukriSearchUrl({
       ...DEFAULT_JOB_PREFERENCES,
-      titles: ['Software Engineer'],
-      keywords: ['React'],
+      titles: ['Software Engineer', 'Full Stack Developer'],
+      keywords: ['React', 'Node'],
       locations: ['Bengaluru'],
     });
     expect(url).toContain('naukri.com');
-    expect(url).toContain('k=');
+    expect(url).toContain('k=Software+Engineer');
+    expect(url).not.toContain('React');
     expect(url).toContain('Bengaluru');
+  });
+
+  it('falls back to keywords when titles are empty', () => {
+    const url = buildNaukriSearchUrl({
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: [],
+      keywords: ['React', 'Node', 'TypeScript'],
+      locations: [],
+    });
+    expect(url).toContain('k=React+Node');
+    expect(url).not.toContain('TypeScript');
+  });
+
+  it('adds Naukri ctcFilter buckets for min salary', () => {
+    const url = buildNaukriSearchUrl({
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Software Engineer'],
+      minSalaryLpa: 10,
+    });
+    expect(url).toContain('ctcFilter=10to15');
+    expect(url).toContain('ctcFilter=15to25');
+    expect(url).not.toContain('ctcFilter=0to3');
+    expect(ctcFiltersForMinSalary(10)).toEqual([
+      '10to15',
+      '15to25',
+      '25to50',
+      '50to75',
+      '75to100',
+      '100to500',
+    ]);
+  });
+
+  it('adds wfhType for work mode preferences', () => {
+    expect(
+      buildNaukriSearchUrl({
+        ...DEFAULT_JOB_PREFERENCES,
+        titles: ['Dev'],
+        workMode: 'remote',
+      })
+    ).toContain('wfhType=2');
+    expect(
+      buildNaukriSearchUrl({
+        ...DEFAULT_JOB_PREFERENCES,
+        titles: ['Dev'],
+        workMode: 'hybrid',
+      })
+    ).toContain('wfhType=3');
+    expect(
+      buildNaukriSearchUrl({
+        ...DEFAULT_JOB_PREFERENCES,
+        titles: ['Dev'],
+        workMode: 'office',
+      })
+    ).toContain('wfhType=0');
+    expect(
+      buildNaukriSearchUrl({
+        ...DEFAULT_JOB_PREFERENCES,
+        titles: ['Dev'],
+        workMode: 'any',
+      })
+    ).not.toContain('wfhType');
+    expect(wfhTypeForWorkMode('remote')).toBe('2');
+    expect(workModeFilterLabel('remote')).toBe('Remote');
+    expect(workModeFilterLabel('office')).toBe('Work from office');
+    expect(workModeFilterLabel('any')).toBeNull();
+    expect(salaryBucketLabelsForMin(10)).toEqual([
+      '10-15 Lakhs',
+      '15-25 Lakhs',
+      '25-50 Lakhs',
+      '50-75 Lakhs',
+      '75-100 Lakhs',
+      '100+ Lakhs',
+    ]);
+  });
+
+  it('detects when search URL is missing preference filters', () => {
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      minSalaryLpa: 10,
+      workMode: 'remote' as const,
+    };
+    expect(
+      searchUrlHasPreferenceFilters(
+        'https://www.naukri.com/dev-jobs?k=Dev',
+        prefs
+      )
+    ).toBe(false);
+    expect(
+      searchUrlHasPreferenceFilters(
+        'https://www.naukri.com/dev-jobs?k=Dev&ctcFilter=10to15&wfhType=2',
+        prefs
+      )
+    ).toBe(true);
+  });
+
+  it('does not treat missing sidebar as already filtered', () => {
+    document.body.innerHTML = `<main><input placeholder="Search jobs" /></main>`;
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      minSalaryLpa: 10,
+      workMode: 'remote' as const,
+    };
+    expect(preferenceFiltersAlreadyApplied(document, prefs)).toBe(false);
+    const result = applyPreferenceFilters(document, prefs);
+    expect(result.ready).toBe(false);
+  });
+
+  it('clicks All Filters salary and work mode checkboxes from prefs', () => {
+    document.body.innerHTML = `
+      <aside>
+        <button type="button">All Filters</button>
+        <div class="styles_filterContainer__x">
+          <div class="styles_filterHeading__x"><span>Work mode</span></div>
+          <div class="styles_filterOptns__x" data-filter-id="wfhType">
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Work from office-wfhType-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Work from office-wfhType-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Work from office">Work from office</span>
+              </label>
+            </div>
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Remote-wfhType-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Remote-wfhType-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Remote">Remote</span>
+              </label>
+            </div>
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Hybrid-wfhType-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Hybrid-wfhType-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Hybrid">Hybrid</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="styles_filterContainer__x">
+          <div class="styles_filterHeading__x"><span>Salary</span></div>
+          <div class="styles_filterOptns__x" data-filter-id="salaryRange">
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-3-6 Lakhs-ctcFilter-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-3-6 Lakhs-ctcFilter-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="3-6 Lakhs">3-6 Lakhs</span>
+              </label>
+            </div>
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-10-15 Lakhs-ctcFilter-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-10-15 Lakhs-ctcFilter-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="10-15 Lakhs">10-15 Lakhs</span>
+              </label>
+            </div>
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-15-25 Lakhs-ctcFilter-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-15-25 Lakhs-ctcFilter-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="15-25 Lakhs">15-25 Lakhs</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="styles_filterContainer__x">
+          <div class="styles_filterHeading__x"><span>Department</span></div>
+          <div class="styles_filterOptns__x" data-filter-id="department">
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Engineering - Software & QA-functionAreaIdGid-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Engineering - Software & QA-functionAreaIdGid-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Engineering - Software & QA">Engineering - Software & QA</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div>Remote jobs</div>
+      </aside>
+    `;
+
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      minSalaryLpa: 10,
+      workMode: 'remote' as const,
+    };
+
+    expect(preferenceFiltersAlreadyApplied(document, prefs)).toBe(false);
+    const result = applyPreferenceFilters(document, prefs);
+    expect(result.ok).toBe(true);
+    expect(result.ready).toBe(true);
+    expect(result.applied.some((a) => a.includes('10-15 Lakhs'))).toBe(true);
+    expect(result.applied.some((a) => a.includes('Remote'))).toBe(true);
+    expect(result.applied.some((a) => /Engineering/i.test(a))).toBe(false);
+
+    expect(
+      (document.getElementById('chk-10-15 Lakhs-ctcFilter-') as HTMLInputElement)
+        .checked
+    ).toBe(true);
+    expect(
+      (document.getElementById('chk-Remote-wfhType-') as HTMLInputElement).checked
+    ).toBe(true);
+    expect(
+      (
+        document.getElementById(
+          'chk-Engineering - Software & QA-functionAreaIdGid-'
+        ) as HTMLInputElement
+      ).checked
+    ).toBe(false);
+    expect(preferenceFiltersAlreadyApplied(document, prefs)).toBe(true);
+  });
+
+  it('strictly enforces disclosed salary then title/keywords', () => {
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Software Engineer'],
+      keywords: ['React'],
+      minSalaryLpa: 10,
+    };
+    expect(
+      matchesPreferences(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-1',
+          salaryText: '3-6 Lacs PA',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toBe(false);
+    expect(
+      matchesPreferences(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-2',
+          salaryText: 'Not Disclosed',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toBe(false);
+    expect(
+      matchesPreferences(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-3',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toBe(false);
+    expect(
+      matchesPreferences(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-4',
+          salaryText: '10-15 LPA',
+          skills: ['Java'],
+        },
+        prefs
+      )
+    ).toBe(false);
+    expect(
+      matchesPreferences(
+        {
+          title: 'Marketing Manager',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-5',
+          salaryText: '10-15 LPA',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toBe(false);
+    expect(
+      matchesPreferences(
+        {
+          title: 'Senior Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-6',
+          salaryText: '10-15 LPA',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toBe(true);
+    expect(salaryMeetsMinimum('12 LPA', 10)).toBe(true);
+    expect(salaryMeetsMinimum('8-9 Lacs', 10)).toBe(false);
+  });
+
+  it('returns specific skip reasons for preference failures', () => {
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Software Engineer'],
+      keywords: ['React'],
+      minSalaryLpa: 10,
+      experienceMin: 2,
+      experienceMax: 5,
+    };
+    expect(
+      preferenceSkipReason(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-1',
+          experienceText: '0-1 Yrs',
+          salaryText: '12 LPA',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toMatch(/Experience/i);
+    expect(
+      preferenceSkipReason(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-2',
+          experienceText: '3-4 Yrs',
+          salaryText: 'Not Disclosed',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toMatch(/Salary not disclosed/i);
+    expect(
+      preferenceSkipReason(
+        {
+          title: 'Marketing Manager',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-3',
+          experienceText: '3-4 Yrs',
+          salaryText: '12 LPA',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toMatch(/title/i);
+    expect(
+      preferenceSkipReason(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-4',
+          experienceText: '3-4 Yrs',
+          salaryText: '12 LPA',
+          skills: ['Java'],
+        },
+        prefs
+      )
+    ).toMatch(/Keywords/i);
+    expect(
+      preferenceSkipReason(
+        {
+          title: 'Software Engineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-5',
+          experienceText: '3-4 Yrs',
+          salaryText: '12 LPA',
+          skills: ['React'],
+        },
+        prefs
+      )
+    ).toBeNull();
   });
 
   it('filters by experience range', () => {
     const prefs = {
       ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Dev'],
       experienceMin: 2,
       experienceMax: 5,
     };
@@ -291,6 +668,7 @@ describe('preference matching helpers', () => {
           company: 'Acme',
           url: 'https://www.naukri.com/job-listings-1',
           experienceText: '0-1 Yrs',
+          salaryText: '10-12 LPA',
         },
         prefs
       )
@@ -302,6 +680,7 @@ describe('preference matching helpers', () => {
           company: 'Acme',
           url: 'https://www.naukri.com/job-listings-1',
           experienceText: '3-4 Yrs',
+          salaryText: '10-12 LPA',
         },
         prefs
       )

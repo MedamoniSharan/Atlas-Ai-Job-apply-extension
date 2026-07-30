@@ -17,18 +17,18 @@ const PACE_RANGES: Record<
   Record<PacePhase, { min: number; max: number }>
 > = {
   assisted: {
-    nav: { min: 3000, max: 6000 },
-    scroll: { min: 2000, max: 5000 },
-    dwell: { min: 4000, max: 10000 },
-    betweenJobs: { min: 8000, max: 18000 },
-    read: { min: 25000, max: 45000 },
+    nav: { min: 2500, max: 4800 },
+    scroll: { min: 1600, max: 3200 },
+    dwell: { min: 3200, max: 6500 },
+    betweenJobs: { min: 5500, max: 11000 },
+    read: { min: 15000, max: 26000 },
   },
   stealth: {
-    nav: { min: 4000, max: 8000 },
-    scroll: { min: 3000, max: 6000 },
-    dwell: { min: 6000, max: 12000 },
-    betweenJobs: { min: 12000, max: 25000 },
-    read: { min: 30000, max: 50000 },
+    nav: { min: 3200, max: 6000 },
+    scroll: { min: 2200, max: 4200 },
+    dwell: { min: 4500, max: 8500 },
+    betweenJobs: { min: 8000, max: 15000 },
+    read: { min: 20000, max: 35000 },
   },
 };
 

@@ -53,7 +53,10 @@ export function ApplicationDetailDrawer({
 
   const facts = [
     { label: 'Experience', value: meta.experience },
-    { label: 'Salary', value: meta.salary },
+    {
+      label: 'Salary',
+      value: meta.salary?.trim() || 'Not disclosed',
+    },
     { label: 'Location', value: app.location },
     { label: 'Posted', value: meta.postedAt },
     { label: 'Openings', value: meta.openings },
@@ -66,10 +69,11 @@ export function ApplicationDetailDrawer({
     { label: 'Education', value: meta.education },
     {
       label: 'Rating',
-      value:
-        app.rating || app.reviews
-          ? [app.rating, app.reviews].filter(Boolean).join(' · ')
-          : undefined,
+      value: app.rating || undefined,
+    },
+    {
+      label: 'Reviews',
+      value: app.reviews || undefined,
     },
   ].filter((f) => f.value?.trim());
 
@@ -128,9 +132,10 @@ export function ApplicationDetailDrawer({
         </header>
 
         <div className="job-drawer__body">
-          {app.metadata?.skipReason ? (
-            <p className="job-drawer__skip">
-              Skipped: {app.metadata.skipReason}
+          {app.metadata?.skipReason || app.metadata?.skipped ? (
+            <p className="job-drawer__skip" role="status">
+              <strong>Why skipped:</strong>{' '}
+              {app.metadata.skipReason || 'No reason recorded'}
             </p>
           ) : null}
 

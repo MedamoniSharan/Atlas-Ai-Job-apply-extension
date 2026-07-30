@@ -30,6 +30,7 @@ import {
   getCopilotState,
   raiseCopilotAlert,
   setCopilotState,
+  broadcastCopilotToNaukriTabs,
 } from '../core/copilotState';
 import { getApplyQuotaSnapshot } from '../core/planApplyQuota';
 import {
@@ -44,6 +45,11 @@ import {
   continueNextPage,
   closeSessionComplete,
 } from '../core/botRunner';
+import {
+  allowExtraTab,
+  clearAllowedExtraTab,
+  installTabSpamGuard,
+} from '../core/singleTab';
 
 /** Tracks an opened Naukri login tab so we can re-verify when it closes. */
 let pendingNaukriLogin: {
@@ -110,11 +116,14 @@ async function reverifyAfterLoginTabClosed(naukriTabId: number): Promise<void> {
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  clearAllowedExtraTab(tabId);
   if (!pendingNaukriLogin || pendingNaukriLogin.loginTabId !== tabId) return;
   const naukriTabId = pendingNaukriLogin.naukriTabId;
   pendingNaukriLogin = null;
   void reverifyAfterLoginTabClosed(naukriTabId);
 });
+
+installTabSpamGuard();
 
 async function persistAndSync(
   type: EventType,
@@ -444,7 +453,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 payload as unknown as Record<string, unknown>
               );
             },
+          }).then(async () => {
+            /* session finished */
           });
+          // Open Cosmo dock on Naukri (consent / progress) even if it was minimized.
+          void broadcastCopilotToNaukriTabs({ type: 'COPILOT_EXPAND' });
+          // Retry expand after the Naukri tab/content script loads.
+          setTimeout(() => {
+            void broadcastCopilotToNaukriTabs({ type: 'COPILOT_EXPAND' });
+          }, 2500);
+          setTimeout(() => {
+            void broadcastCopilotToNaukriTabs({ type: 'COPILOT_EXPAND' });
+          }, 5000);
           sendResponse({ ok: true });
           break;
         }
@@ -512,6 +532,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             url: loginUrl,
             active: true,
           });
+          if (created.id != null) {
+            allowExtraTab(created.id);
+          }
           if (created.id != null && naukriTabId != null) {
             pendingNaukriLogin = {
               loginTabId: created.id,

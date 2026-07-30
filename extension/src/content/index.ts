@@ -2,8 +2,13 @@ import type { JobPayload } from '@cosmo/shared';
 import {
   NaukriAdapter,
   SearchResultJob,
+  expandJobDetailSections,
+  clickInSameTab,
+  applyPreferenceFiltersAsync,
+  preferenceFiltersAlreadyApplied,
   hasNaukriSessionCookieHint,
 } from '../adapters/naukriAdapter';
+import type { JobPreferences } from '@cosmo/shared';
 import { resolveAdapter } from '../adapters';
 import { logger } from '../core/logger';
 import { mountCopilotPanel } from './copilotPanel';
@@ -198,7 +203,7 @@ async function runEasyApply(): Promise<{
     };
   }
 
-  btn.click();
+  clickInSameTab(btn);
   await new Promise((r) => setTimeout(r, 2200));
 
   if (naukri.detectApplicationStatus(document) === 'applied') {
@@ -311,6 +316,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'READ_JOB_DETAIL': {
+        expandJobDetailSections(document);
+        // Allow "Read more" expansions to paint before scraping.
+        await new Promise((r) => setTimeout(r, 350));
+        expandJobDetailSections(document);
         const job = naukri.readJob(document);
         sendResponse({
           job: job ?? null,
@@ -322,6 +331,42 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const jobs: SearchResultJob[] = naukri.readSearchResults(document);
         logger.info('Scan scrape complete', { count: jobs.length });
         sendResponse({ jobs });
+        break;
+      }
+      case 'APPLY_PREFERENCE_FILTERS': {
+        const prefs = (message?.prefs ?? {}) as JobPreferences;
+        // 1) Open All Filters  2) tick prefs  3) settle — then bot scans.
+        let result = await applyPreferenceFiltersAsync(document, prefs, 550);
+        for (let attempt = 0; attempt < 12 && !result.ready; attempt++) {
+          await new Promise((r) => setTimeout(r, 800));
+          result = await applyPreferenceFiltersAsync(document, prefs, 550);
+        }
+
+        if (
+          preferenceFiltersAlreadyApplied(document, prefs) &&
+          !result.applied.length
+        ) {
+          sendResponse({
+            ok: true,
+            alreadyApplied: true,
+            openedAllFilters: result.openedAllFilters ?? true,
+            applied: [],
+            skipped: result.skipped,
+            ready: true,
+          });
+          break;
+        }
+
+        if (result.ready && !result.applied.length) {
+          await new Promise((r) => setTimeout(r, 700));
+          result = await applyPreferenceFiltersAsync(document, prefs, 550);
+        }
+
+        await new Promise((r) => setTimeout(r, 1500));
+        sendResponse({
+          ...result,
+          alreadyApplied: preferenceFiltersAlreadyApplied(document, prefs),
+        });
         break;
       }
       case 'SCROLL_SEARCH_RESULTS': {

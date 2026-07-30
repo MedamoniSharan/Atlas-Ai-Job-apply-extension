@@ -1,0 +1,33 @@
+---
+description: Rule 3 — Naukri All Filters sidebar salary/work-mode clicks must actually tick
+globs: extension/src/adapters/naukriAdapter.ts,extension/src/content/index.ts,extension/src/core/botRunner.ts
+alwaysApply: false
+---
+
+# Rule 3: Naukri sidebar filters must click
+
+When applying Cosmo prefs on Naukri search, **Salary** and **Work mode** under All Filters must actually tick — keyword-only search is not enough.
+
+## Real DOM (do not guess)
+
+```html
+<div class="styles_chckBoxCont__…">
+  <input id="chk-10-15 Lakhs-ctcFilter-" type="checkbox" style="display:none" />
+  <label for="chk-10-15 Lakhs-ctcFilter-">
+    <i class="ni-icon-unchecked"></i>
+    <span class="styles_filterLabel__…" title="10-15 Lakhs">10-15 Lakhs</span>
+  </label>
+</div>
+```
+
+- Filter ids: `*-ctcFilter-` (salary), `*-wfhType-` (work mode)
+- Containers: `[data-filter-id="salaryRange"]`, `[data-filter-id="wfhType"]`
+- Higher salary bands need **View more** first
+
+## Click requirements
+
+1. Prefer finding by `input[id*="ctcFilter"]` / `input[id*="wfhType"]` + title/label text
+2. Never treat a lone `styles_filterLabel` span as the click target row without walking up to `chckBoxCont` / `label`
+3. Native `input.click()` alone fails (`display:none`) — use a full **pointerdown → mouse → click** sequence on the **label / icon / chckBoxCont**, with React `onChange` fallback
+4. Do not match page copy like "Remote jobs"; scope to filter options
+5. Verify with `input.checked` / `ni-icon-checked` after click; retry if it did not stick

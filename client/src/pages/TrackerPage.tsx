@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Application } from '@cosmo/shared';
-import { fetchApplications } from '../lib/api';
+import { fetchApplications, moveApplicationTracker } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 import { ApplicationDetailDrawer } from '../components/ApplicationDetailDrawer';
 import { CosmosLoader } from '../components/CosmosLogo';
@@ -21,6 +21,47 @@ function columnFor(app: Application): ColumnId {
     return 'applied';
   }
   return 'matched';
+}
+
+/** Optimistic local shape after a tracker move. */
+function applyColumnLocally(app: Application, column: ColumnId): Application {
+  const metadata = { ...(app.metadata ?? {}) };
+  if (column === 'applied') {
+    return {
+      ...app,
+      status: 'applied',
+      appliedAt: app.appliedAt ?? new Date().toISOString(),
+      metadata: {
+        ...metadata,
+        skipped: false,
+        skipReason: undefined,
+      },
+    };
+  }
+  if (column === 'matched') {
+    return {
+      ...app,
+      status: app.status === 'applied' ? 'detected' : app.status,
+      metadata: {
+        ...metadata,
+        skipped: false,
+        skipReason: undefined,
+        companySiteApply: false,
+        source:
+          metadata.source === 'auto_apply' ? 'auto_scan' : metadata.source,
+      },
+    };
+  }
+  return {
+    ...app,
+    status: app.status === 'applied' ? 'detected' : app.status,
+    metadata: {
+      ...metadata,
+      skipped: true,
+      skipReason: metadata.skipReason || 'Moved to Skipped',
+      companySiteApply: false,
+    },
+  };
 }
 
 function companyInitials(company: string): string {
@@ -66,13 +107,75 @@ function TrackerLogo({ app }: { app: Application }) {
 export function TrackerPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Application | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overColumn, setOverColumn] = useState<ColumnId | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const dragMoved = useRef(false);
+
+  const queryKey = ['applications', 'tracker'] as const;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['applications', 'tracker'],
+    queryKey,
     queryFn: async () => {
       const res = await fetchApplications({ page: 1, limit: 100 });
       if (!res.success) throw new Error(res.message);
       return res.data;
+    },
+  });
+
+  const moveMutation = useMutation({
+    mutationFn: async ({
+      id,
+      column,
+    }: {
+      id: string;
+      column: ColumnId;
+    }) => {
+      const res = await moveApplicationTracker(id, column);
+      if (!res.success) throw new Error(res.message || 'Move failed');
+      return res.data;
+    },
+    onMutate: async ({ id, column }) => {
+      setMoveError(null);
+      await queryClient.cancelQueries({ queryKey });
+      const prev = queryClient.getQueryData<{
+        items: Application[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>(queryKey);
+      if (prev) {
+        queryClient.setQueryData(queryKey, {
+          ...prev,
+          items: prev.items.map((app) =>
+            app.id === id ? applyColumnLocally(app, column) : app
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(queryKey, ctx.prev);
+      setMoveError(err instanceof Error ? err.message : 'Could not move card');
+    },
+    onSuccess: (updated) => {
+      const prev = queryClient.getQueryData<{
+        items: Application[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>(queryKey);
+      if (prev && updated) {
+        queryClient.setQueryData(queryKey, {
+          ...prev,
+          items: prev.items.map((app) =>
+            app.id === updated.id ? updated : app
+          ),
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
     },
   });
 
@@ -96,6 +199,17 @@ export function TrackerPage() {
 
   const total = data?.items.length ?? 0;
 
+  function handleDrop(column: ColumnId) {
+    const id = draggingId;
+    setOverColumn(null);
+    setDraggingId(null);
+    if (!id) return;
+    const app = data?.items.find((a) => a.id === id);
+    if (!app) return;
+    if (columnFor(app) === column) return;
+    moveMutation.mutate({ id, column });
+  }
+
   return (
     <div className="dash tracker">
       <div className="tracker__toolbar">
@@ -103,12 +217,16 @@ export function TrackerPage() {
           <p className="tracker__sub">
             Kanban view of your Naukri applications
             {total ? ` · ${total} total` : ''}
+            {' · '}
+            Drag cards between columns
           </p>
         </div>
         <Link className="dash-btn dash-btn--ghost" to="/dashboard">
           Open Dashboard
         </Link>
       </div>
+
+      {moveError ? <p className="error">{moveError}</p> : null}
 
       {isLoading && (
         <CosmosLoader
@@ -142,8 +260,27 @@ export function TrackerPage() {
           {COLUMNS.map((col) => (
             <section
               key={col.id}
-              className={`tracker-col tracker-col--${col.id}`}
+              className={`tracker-col tracker-col--${col.id}${
+                overColumn === col.id ? ' is-drop-target' : ''
+              }${draggingId ? ' is-dragging-active' : ''}`}
               aria-label={col.title}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setOverColumn(col.id);
+              }}
+              onDragLeave={(e) => {
+                if (
+                  e.currentTarget.contains(e.relatedTarget as Node | null)
+                ) {
+                  return;
+                }
+                setOverColumn((cur) => (cur === col.id ? null : cur));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDrop(col.id);
+              }}
             >
               <header className="tracker-col__head">
                 <div>
@@ -156,15 +293,40 @@ export function TrackerPage() {
               </header>
               <div className="tracker-col__list">
                 {columns[col.id].length === 0 ? (
-                  <p className="tracker-col__empty">No cards</p>
+                  <p className="tracker-col__empty">
+                    {draggingId ? 'Drop here' : 'No cards'}
+                  </p>
                 ) : (
                   columns[col.id].map((app) => (
                     <article
                       key={app.id}
-                      className="tracker-card tracker-card--clickable"
+                      className={`tracker-card tracker-card--clickable${
+                        draggingId === app.id ? ' is-dragging' : ''
+                      }`}
                       role="button"
                       tabIndex={0}
-                      onClick={() => setSelected(app)}
+                      draggable
+                      onDragStart={(e) => {
+                        dragMoved.current = false;
+                        setDraggingId(app.id);
+                        e.dataTransfer.setData('text/plain', app.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                        // Avoid opening drawer after a drag.
+                        requestAnimationFrame(() => {
+                          dragMoved.current = true;
+                        });
+                      }}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setOverColumn(null);
+                        window.setTimeout(() => {
+                          dragMoved.current = false;
+                        }, 50);
+                      }}
+                      onClick={() => {
+                        if (dragMoved.current || draggingId) return;
+                        setSelected(app);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
@@ -187,11 +349,7 @@ export function TrackerPage() {
                           {app.platform}
                         </span>
                       </div>
-                      {app.metadata?.skipReason ? (
-                        <p className="tracker-card__skip">
-                          {app.metadata.skipReason}
-                        </p>
-                      ) : null}
+                      <p className="tracker-card__drag-hint">Drag to move</p>
                     </article>
                   ))
                 )}

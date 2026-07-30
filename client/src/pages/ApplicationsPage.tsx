@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Banknote, Briefcase, ExternalLink, LayoutGrid, List, MapPin } from 'lucide-react';
 import type { Application } from '@cosmo/shared';
 import { fetchApplications } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
@@ -11,7 +12,9 @@ import { EmptyJobsIllustration } from '../components/EmptyJobsIllustration';
 import type { ShellOutletContext } from '../App';
 
 type DashFilter = 'all' | 'applied' | 'matched' | 'skipped' | 'company_site';
+type ViewMode = 'list' | 'grid';
 
+const VIEW_MODE_KEY = 'cosmo_apps_view_mode';
 const PASTELS = ['yellow', 'green', 'lilac', 'rose'] as const;
 
 function isCompanySiteJob(app: Application): boolean {
@@ -122,6 +125,16 @@ function MatchRing({ value }: { value: number }) {
   );
 }
 
+function readStoredViewMode(): ViewMode {
+  try {
+    const v = localStorage.getItem(VIEW_MODE_KEY);
+    if (v === 'grid' || v === 'list') return v;
+  } catch {
+    /* ignore */
+  }
+  return 'grid';
+}
+
 function bucketForFilter(
   filter: DashFilter
 ): 'all' | 'matched' | 'applied' | 'skipped' | 'company_site' {
@@ -138,6 +151,15 @@ export function ApplicationsPage() {
   const [filter, setFilter] = useState<DashFilter>('all');
   const [q, setQ] = useState(search);
   const [selected, setSelected] = useState<Application | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => readStoredViewMode());
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, viewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -272,6 +294,32 @@ export function ApplicationsPage() {
         <div className="dash-section__head dash-section__head--row">
           <h2 id="all-apps-heading">All applications</h2>
           <div className="dash-section__actions">
+            <div
+              className="dash-view-toggle"
+              role="group"
+              aria-label="Listing view"
+            >
+              <button
+                type="button"
+                className={`dash-view-toggle__btn${viewMode === 'list' ? ' is-active' : ''}`}
+                aria-pressed={viewMode === 'list'}
+                title="List view"
+                onClick={() => setViewMode('list')}
+              >
+                <List size={16} strokeWidth={2.2} aria-hidden />
+                <span>List</span>
+              </button>
+              <button
+                type="button"
+                className={`dash-view-toggle__btn${viewMode === 'grid' ? ' is-active' : ''}`}
+                aria-pressed={viewMode === 'grid'}
+                title="Grid view"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid size={16} strokeWidth={2.2} aria-hidden />
+                <span>Grid</span>
+              </button>
+            </div>
             <Link className="dash-btn dash-btn--ghost" to="/tracker">
               Open Tracker
             </Link>
@@ -340,52 +388,172 @@ export function ApplicationsPage() {
 
         {items.length > 0 && (
           <>
-            <div className="dash-table-wrap">
-              <table className="dash-table">
-                <thead>
-                  <tr>
-                    <th>Position</th>
-                    <th>Experience</th>
-                    <th>Location</th>
-                    <th>Status</th>
-                    <th>Applied</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((app) => (
-                    <tr
-                      key={app.id}
-                      className="dash-table__row--clickable"
-                      onClick={() => setSelected(app)}
-                    >
-                      <td>
-                        <div className="dash-position">
-                          <CompanyLogo app={app} size="sm" />
-                          <div>
-                            <strong>{app.company}</strong>
-                            <span className="dash-position__title">{app.title}</span>
-                            {app.metadata?.skipReason &&
-                            !isCompanySiteJob(app) ? (
-                              <div className="dash-skip">{app.metadata.skipReason}</div>
-                            ) : null}
-                          </div>
-                        </div>
-                      </td>
-                      <td>{app.experience || '—'}</td>
-                      <td>{app.location || '—'}</td>
-                      <td>
-                        <span className={statusClass(app)}>
-                          {sourceLabel(app)}
-                        </span>
-                      </td>
-                      <td className="dash-when">
-                        {relativeTime(app.appliedAt ?? app.createdAt)}
-                      </td>
+            {viewMode === 'list' ? (
+              <div className="dash-table-wrap">
+                <table className="dash-table">
+                  <thead>
+                    <tr>
+                      <th>Position</th>
+                      <th>Experience</th>
+                      <th>Location</th>
+                      <th>Status</th>
+                      <th>Applied</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {items.map((app) => (
+                      <tr
+                        key={app.id}
+                        className="dash-table__row--clickable"
+                        onClick={() => setSelected(app)}
+                      >
+                        <td>
+                          <div className="dash-position">
+                            <CompanyLogo app={app} size="sm" />
+                            <div>
+                              <strong>{app.company}</strong>
+                              <span className="dash-position__title">
+                                {app.title}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{app.experience || '—'}</td>
+                        <td>{app.location || '—'}</td>
+                        <td>
+                          <div className="dash-status-cell">
+                            <span
+                              className={statusClass(app)}
+                              title={
+                                app.metadata?.skipReason
+                                  ? `Click for reason: ${app.metadata.skipReason}`
+                                  : undefined
+                              }
+                            >
+                              {sourceLabel(app)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="dash-when">
+                          {relativeTime(app.appliedAt ?? app.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="dash-job-grid" role="list">
+                {items.map((app) => {
+                  const status = sourceLabel(app);
+                  return (
+                    <article
+                      key={app.id}
+                      className="dash-job-card"
+                      role="listitem"
+                      tabIndex={0}
+                      onClick={() => setSelected(app)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelected(app);
+                        }
+                      }}
+                    >
+                      <div className="dash-job-card__top">
+                        <span
+                          className={`${statusClass(app)} dash-job-card__status`}
+                          title={
+                            app.metadata?.skipReason
+                              ? `Click for reason: ${app.metadata.skipReason}`
+                              : undefined
+                          }
+                        >
+                          {status}
+                        </span>
+                        <span className="dash-job-card__when">
+                          {relativeTime(app.appliedAt ?? app.createdAt)}
+                        </span>
+                      </div>
+
+                      <h3 className="dash-job-card__title">{app.title}</h3>
+
+                      <div className="dash-job-card__company-row">
+                        <CompanyLogo app={app} size="md" />
+                        <div className="dash-job-card__company-text">
+                          <p className="dash-job-card__company">{app.company}</p>
+                          {app.platform ? (
+                            <p className="dash-job-card__platform">
+                              via {app.platform}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {(app.experience || app.location || app.salary) ? (
+                        <ul className="dash-job-card__facts" aria-label="Job details">
+                          {app.experience ? (
+                            <li>
+                              <Briefcase
+                                size={13}
+                                strokeWidth={2}
+                                aria-hidden
+                              />
+                              <span>{app.experience}</span>
+                            </li>
+                          ) : null}
+                          {app.location ? (
+                            <li>
+                              <MapPin size={13} strokeWidth={2} aria-hidden />
+                              <span>{app.location}</span>
+                            </li>
+                          ) : null}
+                          {app.salary ? (
+                            <li>
+                              <Banknote
+                                size={13}
+                                strokeWidth={2}
+                                aria-hidden
+                              />
+                              <span>{app.salary}</span>
+                            </li>
+                          ) : null}
+                        </ul>
+                      ) : null}
+
+                      <div className="dash-job-card__foot">
+                        <button
+                          type="button"
+                          className="dash-job-card__open"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(app);
+                          }}
+                        >
+                          View details
+                        </button>
+                        {app.url ? (
+                          <a
+                            className="dash-job-card__ext"
+                            href={app.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Naukri
+                            <ExternalLink
+                              size={12}
+                              strokeWidth={2.2}
+                              aria-hidden
+                            />
+                          </a>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="dash-pagination">
               <p>

@@ -27,6 +27,11 @@ import {
   setCopilotState,
 } from './copilotState';
 import { mergeJobFields } from './jobFields';
+import {
+  ensureNaukriWorkTab,
+  installTabSpamGuard,
+  setActiveWorkTabId,
+} from './singleTab';
 
 function normalizeUrl(url: string): string {
   try {
@@ -191,13 +196,16 @@ export async function processApplyQueue(
         }
 
         if (activeTabId == null) {
-          const tab = await chrome.tabs.create({
+          installTabSpamGuard();
+          const tab = await ensureNaukriWorkTab({
             url: item.url,
             active: true,
           });
-          activeTabId = tab.id;
+          activeTabId = tab.id ?? null;
+          if (activeTabId != null) setActiveWorkTabId(activeTabId);
         } else {
           await chrome.tabs.update(activeTabId, { url: item.url, active: true });
+          setActiveWorkTabId(activeTabId);
         }
         if (activeTabId == null) continue;
 

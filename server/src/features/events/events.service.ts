@@ -144,28 +144,47 @@ async function upsertApplicationFromEvent(
       : { userId, eventId: event.eventId };
 
   const richFields: Record<string, unknown> = {};
-  if (job.companyLogo) richFields.companyLogo = job.companyLogo;
-  if (job.description) richFields.description = job.description;
+  const existing = await ApplicationModel.findOne(filter).lean();
+
+  const preferLonger = (next?: string, prev?: string | null) => {
+    if (!next) return undefined;
+    if (!prev) return next;
+    return next.length >= prev.length ? next : undefined;
+  };
+  const preferList = (next?: string[], prev?: string[] | null) => {
+    if (!next?.length) return undefined;
+    if (!prev?.length || next.length >= prev.length) return next;
+    return undefined;
+  };
+
+  const logo = job.companyLogo || existing?.companyLogo;
+  if (logo) richFields.companyLogo = logo;
+
+  const description = preferLonger(job.description, existing?.description);
+  if (description) richFields.description = description;
+
   if (job.experience) richFields.experience = job.experience;
   if (job.salary) richFields.salary = job.salary;
-  if (job.skills?.length) richFields.skills = job.skills;
+  const skills = preferList(job.skills, existing?.skills);
+  if (skills) richFields.skills = skills;
   if (job.rating) richFields.rating = job.rating;
   if (job.reviews) richFields.reviews = job.reviews;
   if (job.postedAt) richFields.postedAt = job.postedAt;
   if (job.openings) richFields.openings = job.openings;
   if (job.applicants) richFields.applicants = job.applicants;
-  if (job.highlights?.length) richFields.highlights = job.highlights;
+  const highlights = preferList(job.highlights, existing?.highlights);
+  if (highlights) richFields.highlights = highlights;
   if (job.role) richFields.role = job.role;
   if (job.industry) richFields.industry = job.industry;
   if (job.department) richFields.department = job.department;
   if (job.employmentType) richFields.employmentType = job.employmentType;
   if (job.roleCategory) richFields.roleCategory = job.roleCategory;
   if (job.education) richFields.education = job.education;
-  if (job.aboutCompany) richFields.aboutCompany = job.aboutCompany;
+  const about = preferLonger(job.aboutCompany, existing?.aboutCompany);
+  if (about) richFields.aboutCompany = about;
   if (job.location) richFields.location = job.location;
   if (job.url) richFields.url = job.url;
 
-  const existing = await ApplicationModel.findOne(filter).lean();
   const mergedMetadata = {
     ...((existing?.metadata as Record<string, unknown> | undefined) ?? {}),
     ...(job.metadata ?? {}),

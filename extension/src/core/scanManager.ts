@@ -2,13 +2,19 @@ import type { JobPayload, JobPreferences } from '@cosmo/shared';
 import {
   SearchResultJob,
   buildNaukriSearchUrl,
-  matchesPreferences,
+  matchesListCandidate,
+  searchUrlHasPreferenceFilters,
 } from '../adapters/naukriAdapter';
 import { fetchPreferences } from './apiClient';
 import { getCachedPreferences } from './storageManager';
 import { logger } from './logger';
 import { enqueueApplyJobs } from './applyQueue';
 import { mergeJobFields } from './jobFields';
+import {
+  ensureNaukriWorkTab,
+  installTabSpamGuard,
+  setActiveWorkTabId,
+} from './singleTab';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,7 +90,8 @@ export async function runScan(options: {
   const searchUrl = buildNaukriSearchUrl(prefs);
   logger.info('Starting Naukri scan', { searchUrl });
 
-  const tab = await chrome.tabs.create({ url: searchUrl, active: true });
+  installTabSpamGuard();
+  const tab = await ensureNaukriWorkTab({ url: searchUrl, active: true });
   if (!tab.id) {
     return {
       ok: false,
@@ -93,6 +100,7 @@ export async function runScan(options: {
       queuedForApply: 0,
     };
   }
+  setActiveWorkTabId(tab.id);
 
   await waitForTabComplete(tab.id);
   await wait(2500);
@@ -118,12 +126,26 @@ export async function runScan(options: {
     };
   }
 
+  try {
+    const tabInfo = await chrome.tabs.get(tab.id);
+    if (!searchUrlHasPreferenceFilters(tabInfo.url || '', prefs)) {
+      await chrome.tabs.update(tab.id, { url: searchUrl, active: true });
+      await waitForTabComplete(tab.id);
+      await wait(1500);
+    }
+    await sendToTab(tab.id, { type: 'APPLY_PREFERENCE_FILTERS', prefs });
+    await wait(1800);
+    await waitForTabComplete(tab.id);
+  } catch {
+    /* filters are best-effort; URL params still apply */
+  }
+
   const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tab.id, {
     type: 'RUN_SCAN_SCRAPE',
   });
 
   const matched = (scrape.jobs ?? []).filter((job) =>
-    matchesPreferences(job, prefs)
+    matchesListCandidate(job, prefs)
   );
 
   for (const job of matched) {

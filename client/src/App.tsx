@@ -9,7 +9,6 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
-  Bell,
   Briefcase,
   CircleHelp,
   ExternalLink,
@@ -344,14 +343,6 @@ export function AppLayout() {
           <ShellClock />
 
           <div className="shell__actions">
-            <button
-              type="button"
-              className="shell__icon-btn"
-              aria-label="Notifications"
-              title="Notifications coming soon"
-            >
-              <Bell size={18} strokeWidth={1.8} className="icon-motion" aria-hidden />
-            </button>
             <NavLink
               to="/get-extension"
               className="shell__icon-btn"
