@@ -243,17 +243,30 @@ textarea {
   color: inherit;
 }
 
+.sidebar__label {
+  flex: 1;
+  min-width: 0;
+}
+
 .sidebar__badge {
   margin-left: auto;
   min-width: 1.5rem;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-raised) 12%, white);
+  color: var(--color-surface-raised);
+  border: 1px solid color-mix(in srgb, var(--color-surface-raised) 18%, white);
+  font-size: 0.72rem;
   font-weight: 700;
   text-align: center;
-  line-height: 1.5rem;
+  line-height: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar__link.active .sidebar__badge {
+  background: var(--color-surface-raised);
+  color: var(--color-text-tertiary);
+  border-color: transparent;
 }
 
 .sidebar__footer {
