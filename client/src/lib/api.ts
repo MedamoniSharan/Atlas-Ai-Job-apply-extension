@@ -215,13 +215,35 @@ export async function fetchApplications(params: ApplicationsQuery = {}) {
   }>(`/api/v1/applications?${search.toString()}`);
 }
 
+export type TrackerColumn =
+  | 'matched'
+  | 'applied'
+  | 'interview'
+  | 'offer'
+  | 'rejected'
+  | 'skipped';
+
 export async function moveApplicationTracker(
   id: string,
-  column: 'applied' | 'matched' | 'skipped'
+  column: TrackerColumn
 ) {
   return request<Application>(`/api/v1/applications/${id}/tracker`, {
     method: 'PATCH',
     body: JSON.stringify({ column }),
+  });
+}
+
+export async function moveApplicationsTrackerBulk(
+  ids: string[],
+  column: TrackerColumn
+) {
+  return request<{
+    items: Application[];
+    moved: number;
+    missing: string[];
+  }>('/api/v1/applications/tracker/bulk', {
+    method: 'PATCH',
+    body: JSON.stringify({ ids, column }),
   });
 }
 

@@ -6,6 +6,7 @@ import {
   clickInSameTab,
   applyPreferenceFiltersAsync,
   preferenceFiltersAlreadyApplied,
+  confirmPreferenceFilters,
   hasNaukriSessionCookieHint,
 } from '../adapters/naukriAdapter';
 import type { JobPreferences } from '@cosmo/shared';
@@ -204,14 +205,44 @@ async function runEasyApply(): Promise<{
   }
 
   clickInSameTab(btn);
-  await new Promise((r) => setTimeout(r, 2200));
 
-  if (naukri.detectApplicationStatus(document) === 'applied') {
+  const confirmApplied = (): boolean =>
+    naukri.detectApplicationStatus(document) === 'applied';
+
+  // Reconfirm against Naukri UI — do not assume success.
+  let confirmed = false;
+  for (let i = 0; i < 14; i++) {
+    await new Promise((r) => setTimeout(r, 400));
+    if (confirmApplied()) {
+      confirmed = true;
+      break;
+    }
+    if (naukri.detectNeedsUserQuestions(document)) break;
+    if (naukri.detectNaukriBlockPage(document)) break;
+
+    // One retry click if Apply is still the visible CTA mid-poll.
+    if (i === 5) {
+      const again = naukri.findEasyApplyButton(document);
+      if (again) {
+        const againLabel = (again.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (againLabel === 'apply' || againLabel.includes('easy apply')) {
+          clickInSameTab(again);
+        }
+      }
+    }
+  }
+
+  if (confirmApplied() || confirmed) {
     return {
       ok: true,
       alreadyApplied: naukri.isAlreadyApplied(document),
       job: naukri.readJob(document) ?? job,
     };
+  }
+
+  const blockAfter = naukri.detectNaukriBlockPage(document);
+  if (blockAfter) {
+    return { ok: false, blocked: true, reason: blockAfter };
   }
 
   const questionsAfter = naukri.detectNeedsUserQuestions(document);
@@ -240,30 +271,14 @@ async function runEasyApply(): Promise<{
     };
   }
 
-  if (naukri.detectApplicationStatus(document) === 'applied') {
-    return {
-      ok: true,
-      alreadyApplied: naukri.isAlreadyApplied(document),
-      job: naukri.readJob(document) ?? job,
-    };
-  }
-
-  const afterLabel = (btn.textContent || '').toLowerCase();
-  if (
-    /applied|applied successfully/.test(afterLabel) ||
-    btn.hasAttribute('disabled')
-  ) {
-    return {
-      ok: true,
-      alreadyApplied: naukri.isAlreadyApplied(document),
-      job: naukri.readJob(document) ?? job,
-    };
-  }
-
-  // No questionnaire detected — treat as applied for Easy Apply.
+  // Still showing Apply / no success banner — do not mark applied.
+  const stillApply = naukri.findEasyApplyButton(document);
   return {
-    ok: true,
-    alreadyApplied: naukri.isAlreadyApplied(document),
+    ok: false,
+    skipped: true,
+    reason: stillApply
+      ? 'Apply clicked but Naukri did not confirm — not marked applied'
+      : 'Apply not confirmed on Naukri',
     job: naukri.readJob(document) ?? job,
   };
 }
@@ -335,20 +350,35 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case 'APPLY_PREFERENCE_FILTERS': {
         const prefs = (message?.prefs ?? {}) as JobPreferences;
-        // 1) Open All Filters  2) tick prefs  3) settle — then bot scans.
-        let result = await applyPreferenceFiltersAsync(document, prefs, 550);
+        const focusLocation =
+          typeof message?.focusLocation === 'string'
+            ? message.focusLocation
+            : null;
+        // 1) Open All Filters  2) tick prefs  3) reconfirm — then bot scans.
+        let result = await applyPreferenceFiltersAsync(document, prefs, 550, {
+          focusLocation,
+        });
         for (let attempt = 0; attempt < 12 && !result.ready; attempt++) {
           await new Promise((r) => setTimeout(r, 800));
-          result = await applyPreferenceFiltersAsync(document, prefs, 550);
+          result = await applyPreferenceFiltersAsync(document, prefs, 550, {
+            focusLocation,
+          });
         }
 
         if (
-          preferenceFiltersAlreadyApplied(document, prefs) &&
+          preferenceFiltersAlreadyApplied(document, prefs, focusLocation) &&
           !result.applied.length
         ) {
+          const report = confirmPreferenceFilters(
+            document,
+            prefs,
+            focusLocation
+          );
           sendResponse({
             ok: true,
             alreadyApplied: true,
+            confirmed: report.ok,
+            confirmDetails: report.details,
             openedAllFilters: result.openedAllFilters ?? true,
             applied: [],
             skipped: result.skipped,
@@ -357,15 +387,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           break;
         }
 
-        if (result.ready && !result.applied.length) {
+        if (result.ready && !result.confirmed) {
           await new Promise((r) => setTimeout(r, 700));
-          result = await applyPreferenceFiltersAsync(document, prefs, 550);
+          result = await applyPreferenceFiltersAsync(document, prefs, 550, {
+            focusLocation,
+          });
         }
 
         await new Promise((r) => setTimeout(r, 1500));
+        const report = confirmPreferenceFilters(
+          document,
+          prefs,
+          focusLocation
+        );
         sendResponse({
           ...result,
-          alreadyApplied: preferenceFiltersAlreadyApplied(document, prefs),
+          alreadyApplied: report.ok,
+          confirmed: report.ok,
+          confirmDetails: report.details,
+        });
+        break;
+      }
+      case 'CONFIRM_PREFERENCE_FILTERS': {
+        const prefs = (message?.prefs ?? {}) as JobPreferences;
+        const focusLocation =
+          typeof message?.focusLocation === 'string'
+            ? message.focusLocation
+            : null;
+        const report = confirmPreferenceFilters(
+          document,
+          prefs,
+          focusLocation
+        );
+        sendResponse({
+          confirmed: report.ok,
+          details: report.details,
+          salaryOk: report.salaryOk,
+          workOk: report.workOk,
+          locationOk: report.locationOk,
         });
         break;
       }
@@ -383,6 +442,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id]'
         ).length;
         sendResponse({ ok: true, before, after });
+        break;
+      }
+      case 'PROBE_APPLY_READY': {
+        sendResponse({
+          ready: Boolean(
+            naukri.findEasyApplyButton(document) &&
+              !naukri.isCompanySiteApply(document)
+          ),
+          companySite: naukri.isCompanySiteApply(document),
+          alreadyApplied: naukri.detectApplicationStatus(document) === 'applied',
+        });
         break;
       }
       case 'RUN_EASY_APPLY': {

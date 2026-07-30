@@ -68,6 +68,8 @@ export type CopilotState = {
   /** Why we paused for login — drives confirm vs log-in copy. */
   loginPauseReason?: LoginPauseReason | null;
   keyword: string;
+  /** Unique Naukri job cards seen during list scan (matched + rejected). */
+  scanned: number;
   matched: number;
   applied: number;
   skipped: number;
@@ -102,6 +104,7 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   needsLogin: false,
   loginPauseReason: null,
   keyword: '',
+  scanned: 0,
   matched: 0,
   applied: 0,
   skipped: 0,
@@ -195,6 +198,31 @@ export async function upsertScannedJobs(
     return { scannedJobs: [...byId.values()].slice(0, MAX_SCANNED) };
   });
   return next.scannedJobs;
+}
+
+/**
+ * Count unique job cards seen on Naukri search results (whether they match prefs or not).
+ * Returns the new total scanned count.
+ */
+export async function noteJobsScanned(
+  jobs: Array<{ externalJobId?: string; url: string }>,
+  scannedKeys: Set<string>
+): Promise<number> {
+  let added = 0;
+  for (const job of jobs) {
+    const id = jobKey(job);
+    if (!id || scannedKeys.has(id)) continue;
+    scannedKeys.add(id);
+    added += 1;
+  }
+  if (added <= 0) {
+    const state = await getCopilotState();
+    return state.scanned;
+  }
+  const next = await commitCopilotState((state) => ({
+    scanned: state.scanned + added,
+  }));
+  return next.scanned;
 }
 
 export async function updateScannedJob(

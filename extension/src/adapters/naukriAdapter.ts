@@ -536,7 +536,8 @@ export function clickInSameTab(el: HTMLElement): void {
   }) as typeof win.open;
 
   try {
-    el.click();
+    // Naukri Apply often ignores bare .click() — use full pointer sequence.
+    dispatchPointerClick(el);
   } finally {
     win.open = previousOpen;
   }
@@ -658,8 +659,13 @@ export function detectCompanySiteApply(root: Document | Element): boolean {
 }
 
 /** Naukri search box keyword from job preferences (primary title, not all chips mashed). */
-export function buildSearchKeyword(prefs: JobPreferences): string {
-  const title = prefs.titles.map((t) => t.trim()).find(Boolean);
+export function buildSearchKeyword(
+  prefs: JobPreferences,
+  titleOverride?: string | null
+): string {
+  const title =
+    titleOverride?.trim() ||
+    prefs.titles.map((t) => t.trim()).find(Boolean);
   if (title) return title;
 
   const keyword = prefs.keywords
@@ -668,6 +674,140 @@ export function buildSearchKeyword(prefs: JobPreferences): string {
     .slice(0, 2)
     .join(' ');
   return keyword || 'software developer';
+}
+
+/** Ordered title list from prefs (fallback to keyword-derived title). */
+export function preferenceSearchTitles(prefs: JobPreferences): string[] {
+  const titles = prefs.titles.map((t) => t.trim()).filter(Boolean);
+  if (titles.length) return titles;
+  const kw = buildSearchKeyword(prefs);
+  return kw ? [kw] : ['software developer'];
+}
+
+/** Ordered location list (empty string = India-wide / no city slug). */
+export function preferenceSearchLocations(prefs: JobPreferences): string[] {
+  const locs = prefs.locations.map((l) => l.trim()).filter(Boolean);
+  return locs.length ? locs : [''];
+}
+
+export type NaukriSearchQuery = {
+  title: string;
+  location: string;
+  keyword: string;
+  url: string;
+  kind: 'title' | 'title_keyword' | 'keyword' | 'nationwide';
+};
+
+function pushUniqueQuery(
+  plan: NaukriSearchQuery[],
+  seen: Set<string>,
+  prefs: JobPreferences,
+  entry: Omit<NaukriSearchQuery, 'url'>
+): void {
+  const url = buildNaukriSearchUrl(prefs, {
+    title: entry.keyword,
+    location: entry.location,
+  });
+  if (seen.has(url)) return;
+  seen.add(url);
+  plan.push({ ...entry, url });
+}
+
+/**
+ * All useful search combinations from prefs, ordered for coverage:
+ * 1) Every title × every city (interleaved for variety)
+ * 2) Title + skill keyword × each city (e.g. "Software Engineer React")
+ * 3) Skill keyword alone × each city
+ * 4) Each title India-wide (no city) as a fallback
+ */
+export function buildNaukriSearchQueryPlan(
+  prefs: JobPreferences
+): NaukriSearchQuery[] {
+  const titles = preferenceSearchTitles(prefs);
+  const locations = preferenceSearchLocations(prefs);
+  const skillKeywords = prefs.keywords
+    .map((k) => k.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const plan: NaukriSearchQuery[] = [];
+  const seen = new Set<string>();
+
+  // 1) Interleaved title × location — don't burn all pages on one city first.
+  const titleLocPairs: Array<{ title: string; location: string }> = [];
+  for (let offset = 0; offset < locations.length; offset++) {
+    for (let ti = 0; ti < titles.length; ti++) {
+      const location = locations[(ti + offset) % locations.length]!;
+      const title = titles[ti]!;
+      titleLocPairs.push({ title, location });
+    }
+  }
+  // Deduplicate pairs while preserving interleaved order.
+  const seenPairs = new Set<string>();
+  for (const pair of titleLocPairs) {
+    const key = `${pair.title.toLowerCase()}::${pair.location.toLowerCase()}`;
+    if (seenPairs.has(key)) continue;
+    seenPairs.add(key);
+    pushUniqueQuery(plan, seen, prefs, {
+      title: pair.title,
+      location: pair.location,
+      keyword: pair.title,
+      kind: 'title',
+    });
+  }
+  // Safety: ensure every title×location exists even if interleave missed one.
+  for (const title of titles) {
+    for (const location of locations) {
+      pushUniqueQuery(plan, seen, prefs, {
+        title,
+        location,
+        keyword: title,
+        kind: 'title',
+      });
+    }
+  }
+
+  // 2) Title + skill combos × locations (better targeting).
+  for (const title of titles) {
+    for (const skill of skillKeywords.slice(0, 4)) {
+      const keyword = `${title} ${skill}`;
+      for (const location of locations) {
+        pushUniqueQuery(plan, seen, prefs, {
+          title,
+          location,
+          keyword,
+          kind: 'title_keyword',
+        });
+      }
+    }
+  }
+
+  // 3) Skill-only × locations.
+  for (const skill of skillKeywords) {
+    for (const location of locations) {
+      pushUniqueQuery(plan, seen, prefs, {
+        title: skill,
+        location,
+        keyword: skill,
+        kind: 'keyword',
+      });
+    }
+  }
+
+  // 4) Titles India-wide (skip if prefs already have no location).
+  const hasCity = locations.some((l) => Boolean(l));
+  if (hasCity) {
+    for (const title of titles) {
+      pushUniqueQuery(plan, seen, prefs, {
+        title,
+        location: '',
+        keyword: title,
+        kind: 'nationwide',
+      });
+    }
+  }
+
+  return plan;
 }
 
 /** Naukri ctcFilter buckets (LPA) + sidebar label text. */
@@ -724,6 +864,54 @@ export function salaryLabelVariants(label: string): string[] {
     }
   }
   return [...variants];
+}
+
+/** Naukri Location filter spellings (Bangalore/Bengaluru, Hyderabad/Secunderabad, …). */
+export function locationLabelVariants(city: string): string[] {
+  const raw = city.trim();
+  if (!raw) return [];
+  const variants = new Set<string>([raw]);
+  const lower = raw.toLowerCase();
+
+  const groups: string[][] = [
+    ['Hyderabad', 'Hyderabad/Secunderabad', 'Hyderabad Secunderabad', 'Secunderabad'],
+    ['Bangalore', 'Bengaluru', 'Bengaluru/Bangalore', 'Bangalore/Bengaluru'],
+    ['Chennai', 'Chennai/Madras', 'Madras'],
+    ['Mumbai', 'Mumbai/Bombay', 'Bombay', 'Navi Mumbai'],
+    ['Delhi', 'Delhi/NCR', 'New Delhi', 'Noida', 'Gurgaon', 'Gurugram'],
+    ['Pune'],
+    ['Kolkata', 'Calcutta'],
+    ['Ahmedabad'],
+    ['Remote'],
+  ];
+
+  for (const group of groups) {
+    if (group.some((g) => lower.includes(g.toLowerCase()) || g.toLowerCase().includes(lower))) {
+      for (const g of group) variants.add(g);
+    }
+  }
+  return [...variants];
+}
+
+/** Preferred cities to tick in Naukri Location filters (optional focus city first). */
+export function preferenceLocationLabels(
+  prefs: JobPreferences,
+  focusLocation?: string | null
+): string[] {
+  const focus = focusLocation?.trim();
+  const fromPrefs = prefs.locations.map((l) => l.trim()).filter(Boolean);
+  const ordered = focus
+    ? [focus, ...fromPrefs.filter((l) => l.toLowerCase() !== focus.toLowerCase())]
+    : fromPrefs;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const city of ordered) {
+    const key = city.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(city);
+  }
+  return out;
 }
 
 /** Naukri wfhType URL value for Cosmo workMode (`office` | `remote` | `hybrid`). */
@@ -814,9 +1002,15 @@ export function salaryMeetsMinimum(
   return range.max >= minSalaryLpa;
 }
 
-export function buildNaukriSearchUrl(prefs: JobPreferences): string {
-  const keyword = buildSearchKeyword(prefs);
-  const location = prefs.locations[0] ?? '';
+export function buildNaukriSearchUrl(
+  prefs: JobPreferences,
+  overrides?: { title?: string | null; location?: string | null }
+): string {
+  const keyword = buildSearchKeyword(prefs, overrides?.title);
+  const location =
+    overrides?.location !== undefined && overrides?.location !== null
+      ? overrides.location.trim()
+      : (prefs.locations[0] ?? '');
   const params = new URLSearchParams();
   params.set('k', keyword);
   if (location) params.set('l', location);
@@ -836,7 +1030,14 @@ export function buildNaukriSearchUrl(prefs: JobPreferences): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  return `https://www.naukri.com/${slug}-jobs?${params.toString()}`;
+  const locSlug = location
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const path = locSlug
+    ? `${slug}-jobs-in-${locSlug}`
+    : `${slug}-jobs`;
+  return `https://www.naukri.com/${path}?${params.toString()}`;
 }
 
 function ownText(el: Element): string {
@@ -907,7 +1108,7 @@ function isFilterOptionChecked(el: HTMLElement): boolean {
 function filtersSidebarVisible(doc: Document): boolean {
   if (
     doc.querySelector(
-      'input[id*="ctcFilter"], input[id*="wfhType"], [data-filter-id="salaryRange"], [data-filter-id="wfhType"]'
+      'input[id*="ctcFilter"], input[id*="wfhType"], input[id*="cityTypeGid"], [data-filter-id="salaryRange"], [data-filter-id="wfhType"], [data-filter-id="citiesGid"], [data-filter-id="cityTypeGid"], [data-filter-id="location"]'
     )
   ) {
     return true;
@@ -915,13 +1116,13 @@ function filtersSidebarVisible(doc: Document): boolean {
   const text = doc.body?.innerText || '';
   return (
     (/all filters/i.test(text) || /\bfilters\b/i.test(text)) &&
-    /salary/i.test(text) &&
-    /lakhs?/i.test(text)
+    (/salary/i.test(text) || /location/i.test(text)) &&
+    (/lakhs?/i.test(text) || /hyderabad|bengaluru|bangalore|chennai|mumbai|delhi|pune/i.test(text))
   );
 }
 
-/** Full pointer/mouse sequence — Naukri ignores bare HTMLElement.click() on hidden inputs. */
-function dispatchPointerClick(el: HTMLElement): void {
+/** Full pointer/mouse sequence — Naukri ignores bare HTMLElement.click() on many controls. */
+export function dispatchPointerClick(el: HTMLElement): void {
   const doc = el.ownerDocument;
   const view = doc.defaultView ?? window;
   const rect = el.getBoundingClientRect();
@@ -1070,15 +1271,18 @@ function expandViewMoreInSection(section: HTMLElement): void {
 }
 
 /**
- * Find Naukri filter row by label. Prefer real chk-* inputs (ctcFilter / wfhType).
+ * Find Naukri filter row by label. Prefer real chk-* inputs (ctcFilter / wfhType / cityTypeGid).
  */
 function findFilterOption(
   root: ParentNode,
   wantedLabel: string,
-  filterKind?: 'ctcFilter' | 'wfhType'
+  filterKind?: 'ctcFilter' | 'wfhType' | 'cityTypeGid'
 ): HTMLElement | null {
   const scope = root as Document | Element;
-  const variants = salaryLabelVariants(wantedLabel);
+  const variants =
+    filterKind === 'cityTypeGid'
+      ? locationLabelVariants(wantedLabel)
+      : salaryLabelVariants(wantedLabel);
   if (!variants.includes(wantedLabel)) variants.unshift(wantedLabel);
 
   const inputSelectors = filterKind
@@ -1225,21 +1429,183 @@ export type ApplyFiltersResult = {
   skipped: string[];
   ready: boolean;
   openedAllFilters?: boolean;
+  confirmed?: boolean;
+};
+
+export type FilterConfirmReport = {
+  ok: boolean;
+  salaryOk: boolean;
+  workOk: boolean;
+  locationOk: boolean;
+  details: string[];
 };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function locationSection(doc: Document): HTMLElement | null {
+  return (
+    findFilterSection(doc, /^location$/i, 'citiesGid') ||
+    findFilterSection(doc, /^location$/i, 'cityTypeGid') ||
+    findFilterSection(doc, /^location$/i, 'location') ||
+    findFilterSection(doc, /^cities?$/i, 'citiesGid')
+  );
+}
+
+function urlHasPreferredLocation(href: string, cities: string[]): boolean {
+  if (!cities.length) return true;
+  try {
+    const u = new URL(href);
+    const l = (u.searchParams.get('l') || '').toLowerCase();
+    const path = u.pathname.toLowerCase();
+    const cityParams = u.searchParams.getAll('cityTypeGid');
+    for (const city of cities) {
+      for (const variant of locationLabelVariants(city)) {
+        const v = variant.toLowerCase();
+        const slug = v.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        if (
+          l.includes(v) ||
+          path.includes(slug) ||
+          path.includes(v.replace(/\s+/g, '-'))
+        ) {
+          return true;
+        }
+      }
+    }
+    if (cityParams.length > 0) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * Reconfirm Naukri All Filters match Cosmo prefs (salary, work mode, location).
+ */
+export function confirmPreferenceFilters(
+  doc: Document,
+  prefs: JobPreferences,
+  focusLocation?: string | null
+): FilterConfirmReport {
+  const details: string[] = [];
+  const salaryLabels = salaryBucketLabelsForMin(prefs.minSalaryLpa);
+  const workLabels = workModeFilterLabels(prefs.workMode);
+  const cities = preferenceLocationLabels(prefs, focusLocation);
+
+  const salaryRoot =
+    findFilterSection(doc, /^salary$/i, 'salaryRange') ||
+    findFilterSection(doc, /^all filters$/i) ||
+    doc.body;
+  const workRoot =
+    findFilterSection(doc, /^work\s*mode$/i, 'wfhType') || doc.body;
+  const locRoot = locationSection(doc) || doc.body;
+
+  let salaryOk = !salaryLabels.length;
+  if (salaryLabels.length) {
+    let checked = 0;
+    let found = 0;
+    for (const label of salaryLabels.slice(0, 5)) {
+      const opt =
+        findFilterOption(salaryRoot, label, 'ctcFilter') ||
+        findFilterOption(doc.body, label, 'ctcFilter');
+      if (!opt) continue;
+      found += 1;
+      if (isFilterOptionChecked(opt)) {
+        checked += 1;
+        details.push(`Salary OK: ${label}`);
+      }
+    }
+    const urlOk = (() => {
+      try {
+        return (
+          new URL(doc.location?.href || '').searchParams.getAll('ctcFilter')
+            .length > 0
+        );
+      } catch {
+        return false;
+      }
+    })();
+    salaryOk = checked > 0 || (found === 0 && urlOk);
+    if (!salaryOk) {
+      details.push(
+        found === 0
+          ? 'Salary: options not found / not confirmed'
+          : 'Salary: no matching band checked'
+      );
+    }
+  }
+
+  let workOk = !workLabels.length;
+  if (workLabels.length) {
+    let opt: HTMLElement | null = null;
+    for (const candidate of workLabels) {
+      opt =
+        findFilterOption(workRoot, candidate, 'wfhType') ||
+        findFilterOption(doc.body, candidate, 'wfhType');
+      if (opt) break;
+    }
+    const want = wfhTypeForWorkMode(prefs.workMode);
+    const urlOk = (() => {
+      try {
+        return (
+          want != null &&
+          new URL(doc.location?.href || '').searchParams.get('wfhType') === want
+        );
+      } catch {
+        return false;
+      }
+    })();
+    workOk = Boolean(opt && isFilterOptionChecked(opt)) || urlOk;
+    if (workOk) details.push(`Work mode OK: ${workLabels[0]}`);
+    else details.push(`Work mode: ${workLabels[0]} not confirmed`);
+  }
+
+  let locationOk = !cities.length;
+  if (cities.length) {
+    let checked = 0;
+    let found = 0;
+    for (const city of cities.slice(0, 5)) {
+      const opt =
+        findFilterOption(locRoot, city, 'cityTypeGid') ||
+        findFilterOption(doc.body, city, 'cityTypeGid');
+      if (!opt) continue;
+      found += 1;
+      if (isFilterOptionChecked(opt)) {
+        checked += 1;
+        details.push(`Location OK: ${city}`);
+      }
+    }
+    const urlOk = urlHasPreferredLocation(doc.location?.href || '', cities);
+    locationOk = checked > 0 || urlOk;
+    if (!locationOk) {
+      details.push(
+        found === 0
+          ? 'Location: options not found / URL not scoped'
+          : 'Location: no preferred city checked'
+      );
+    }
+  }
+
+  return {
+    ok: salaryOk && workOk && locationOk,
+    salaryOk,
+    workOk,
+    locationOk,
+    details,
+  };
+}
+
 /**
  * 1) Click Naukri "All Filters"
- * 2) Tick salary + work mode from Cosmo prefs
+ * 2) Tick salary + location + work mode from Cosmo prefs
  * (No humanPace apply delay — only short DOM settle waits.)
  */
 export async function applyPreferenceFiltersAsync(
   doc: Document,
   prefs: JobPreferences,
-  settleMs = 500
+  settleMs = 500,
+  options?: { focusLocation?: string | null }
 ): Promise<ApplyFiltersResult> {
   const applied: string[] = [];
   const skipped: string[] = [];
@@ -1247,8 +1613,11 @@ export async function applyPreferenceFiltersAsync(
   const salaryLabels = salaryBucketLabelsForMin(prefs.minSalaryLpa);
   const workLabels = workModeFilterLabels(prefs.workMode);
   const workLabel = workLabels[0] ?? workModeFilterLabel(prefs.workMode);
+  const locationLabels = preferenceLocationLabels(
+    prefs,
+    options?.focusLocation
+  );
 
-  // Always open All Filters first, then tick preference checkboxes.
   let openedAllFilters = openAllFiltersPanel(doc);
   await sleep(700);
   if (!openedAllFilters) {
@@ -1257,15 +1626,16 @@ export async function applyPreferenceFiltersAsync(
   }
   openedAllFilters = openedAllFilters || filtersSidebarVisible(doc);
 
-  if (!salaryLabels.length && !workLabels.length) {
+  if (!salaryLabels.length && !workLabels.length && !locationLabels.length) {
     return {
       ok: openedAllFilters,
       applied,
       skipped: openedAllFilters
-        ? ['No salary/work-mode prefs to tick']
+        ? ['No salary/work-mode/location prefs to tick']
         : ['All Filters panel not found'],
       ready: openedAllFilters,
       openedAllFilters,
+      confirmed: true,
     };
   }
 
@@ -1273,7 +1643,8 @@ export async function applyPreferenceFiltersAsync(
     findFilterSection(doc, /^salary$/i, 'salaryRange') ||
     findFilterSection(doc, /^all filters$/i);
   const workSection = findFilterSection(doc, /^work\s*mode$/i, 'wfhType');
-  const searchRoot = salarySection || workSection || doc.body;
+  const locSection = locationSection(doc);
+  const searchRoot = salarySection || workSection || locSection || doc.body;
 
   const probeSalary =
     findFilterOption(searchRoot, '10-15 Lakhs', 'ctcFilter') ||
@@ -1285,34 +1656,43 @@ export async function applyPreferenceFiltersAsync(
     findFilterOption(searchRoot, 'Hybrid', 'wfhType') ||
     findFilterOption(searchRoot, 'Work from office', 'wfhType') ||
     doc.querySelector('input[id*="wfhType"]');
+  const probeLoc =
+    findFilterOption(
+      searchRoot,
+      locationLabels[0] || 'Hyderabad',
+      'cityTypeGid'
+    ) ||
+    findFilterOption(doc.body, 'Bengaluru', 'cityTypeGid') ||
+    doc.querySelector('input[id*="cityTypeGid"]');
 
   if (
     (salaryLabels.length && !probeSalary) ||
-    (workLabels.length && !probeWork && !probeSalary)
+    (workLabels.length && !probeWork && !probeSalary && !probeLoc) ||
+    (locationLabels.length && !probeLoc && !probeSalary)
   ) {
     return {
       ok: false,
       applied,
       skipped: [
         openedAllFilters
-          ? 'All Filters open but Salary/Work mode options not ready'
+          ? 'All Filters open but Salary/Location/Work options not ready'
           : 'All Filters panel not ready',
       ],
       ready: false,
       openedAllFilters,
+      confirmed: false,
     };
   }
 
   const salaryRoot = salarySection || doc.body;
   const workRoot = workSection || doc.body;
+  const locRoot = locSection || doc.body;
 
   if (salaryLabels.length) {
     expandViewMoreInSection(salaryRoot);
     await sleep(350);
-    // Higher bands sit behind "View more" — expand again after first pass.
     expandViewMoreInSection(salaryRoot);
     await sleep(200);
-    // Click salary bands that meet min (cap to avoid endless clicks).
     for (const label of salaryLabels.slice(0, 5)) {
       let opt =
         findFilterOption(salaryRoot, label, 'ctcFilter') ||
@@ -1334,17 +1714,48 @@ export async function applyPreferenceFiltersAsync(
       }
       try {
         clickFilterOption(opt);
-        if (!isFilterOptionChecked(opt)) {
-          clickFilterOption(opt);
-        }
-        if (isFilterOptionChecked(opt)) {
-          applied.push(`Salary: ${label}`);
-        } else {
-          skipped.push(`Salary: ${label} (click did not stick)`);
-        }
+        if (!isFilterOptionChecked(opt)) clickFilterOption(opt);
+        if (isFilterOptionChecked(opt)) applied.push(`Salary: ${label}`);
+        else skipped.push(`Salary: ${label} (click did not stick)`);
         await sleep(settleMs);
       } catch {
         skipped.push(`Salary: ${label} (click failed)`);
+      }
+    }
+  }
+
+  if (locationLabels.length) {
+    expandViewMoreInSection(locRoot);
+    await sleep(300);
+    expandViewMoreInSection(locRoot);
+    await sleep(200);
+    for (const city of locationLabels.slice(0, 5)) {
+      let opt =
+        findFilterOption(locRoot, city, 'cityTypeGid') ||
+        findFilterOption(doc.body, city, 'cityTypeGid');
+      if (!opt) {
+        expandViewMoreInSection(locRoot);
+        await sleep(250);
+        opt =
+          findFilterOption(locRoot, city, 'cityTypeGid') ||
+          findFilterOption(doc.body, city, 'cityTypeGid');
+      }
+      if (!opt) {
+        skipped.push(`Location: ${city} (not found)`);
+        continue;
+      }
+      if (isFilterOptionChecked(opt)) {
+        skipped.push(`Location: ${city} (already on)`);
+        continue;
+      }
+      try {
+        clickFilterOption(opt);
+        if (!isFilterOptionChecked(opt)) clickFilterOption(opt);
+        if (isFilterOptionChecked(opt)) applied.push(`Location: ${city}`);
+        else skipped.push(`Location: ${city} (click did not stick)`);
+        await sleep(settleMs);
+      } catch {
+        skipped.push(`Location: ${city} (click failed)`);
       }
     }
   }
@@ -1357,23 +1768,17 @@ export async function applyPreferenceFiltersAsync(
       opt =
         findFilterOption(workRoot, candidate, 'wfhType') ||
         findFilterOption(doc.body, candidate, 'wfhType');
-      if (opt) {
-        break;
-      }
+      if (opt) break;
     }
-    if (!opt) {
-      skipped.push(`Work mode: ${workLabel} (not found)`);
-    } else if (isFilterOptionChecked(opt)) {
+    if (!opt) skipped.push(`Work mode: ${workLabel} (not found)`);
+    else if (isFilterOptionChecked(opt)) {
       skipped.push(`Work mode: ${workLabel} (already on)`);
     } else {
       try {
         clickFilterOption(opt);
         if (!isFilterOptionChecked(opt)) clickFilterOption(opt);
-        if (isFilterOptionChecked(opt)) {
-          applied.push(`Work mode: ${workLabel}`);
-        } else {
-          skipped.push(`Work mode: ${workLabel} (click did not stick)`);
-        }
+        if (isFilterOptionChecked(opt)) applied.push(`Work mode: ${workLabel}`);
+        else skipped.push(`Work mode: ${workLabel} (click did not stick)`);
         await sleep(settleMs);
       } catch {
         skipped.push(`Work mode: ${workLabel} (click failed)`);
@@ -1381,32 +1786,45 @@ export async function applyPreferenceFiltersAsync(
     }
   }
 
+  const report = confirmPreferenceFilters(doc, prefs, options?.focusLocation);
   return {
     ok:
+      report.ok ||
       applied.length > 0 ||
-      skipped.some((s) => /already on/.test(s)) ||
-      (!salaryLabels.length && !workLabel),
+      skipped.some((s) => /already on/.test(s)),
     applied,
     skipped,
     ready: true,
     openedAllFilters,
+    confirmed: report.ok,
   };
 }
 
 /** Sync wrapper for tests / simple calls. */
 export function applyPreferenceFilters(
   doc: Document,
-  prefs: JobPreferences
+  prefs: JobPreferences,
+  options?: { focusLocation?: string | null }
 ): ApplyFiltersResult {
-  // Fire clicks synchronously (tests); production uses applyPreferenceFiltersAsync.
   const applied: string[] = [];
   const skipped: string[] = [];
   const salaryLabels = salaryBucketLabelsForMin(prefs.minSalaryLpa);
   const workLabels = workModeFilterLabels(prefs.workMode);
   const workLabel = workLabels[0] ?? workModeFilterLabel(prefs.workMode);
+  const locationLabels = preferenceLocationLabels(
+    prefs,
+    options?.focusLocation
+  );
   const openedAllFilters = openAllFiltersPanel(doc);
-  if (!salaryLabels.length && !workLabels.length) {
-    return { ok: true, applied, skipped, ready: true, openedAllFilters };
+  if (!salaryLabels.length && !workLabels.length && !locationLabels.length) {
+    return {
+      ok: true,
+      applied,
+      skipped,
+      ready: true,
+      openedAllFilters,
+      confirmed: true,
+    };
   }
   const salaryRoot =
     findFilterSection(doc, /^salary$/i, 'salaryRange') ||
@@ -1414,17 +1832,20 @@ export function applyPreferenceFilters(
     doc.body;
   const workRoot =
     findFilterSection(doc, /^work\s*mode$/i, 'wfhType') || doc.body;
+  const locRoot = locationSection(doc) || doc.body;
   const probe =
     findFilterOption(salaryRoot, '10-15 Lakhs', 'ctcFilter') ||
     findFilterOption(doc.body, '0-3 Lakhs', 'ctcFilter') ||
     findFilterOption(doc.body, '10-15 Lakhs') ||
-    doc.querySelector('input[id*="ctcFilter"]');
-  if (salaryLabels.length && !probe) {
+    findFilterOption(doc.body, 'Bengaluru', 'cityTypeGid') ||
+    doc.querySelector('input[id*="ctcFilter"], input[id*="cityTypeGid"]');
+  if ((salaryLabels.length || locationLabels.length) && !probe) {
     return {
       ok: false,
       applied,
       skipped: ['Filter sidebar not ready'],
       ready: false,
+      confirmed: false,
     };
   }
   expandViewMoreInSection(salaryRoot);
@@ -1443,6 +1864,22 @@ export function applyPreferenceFilters(
     clickFilterOption(opt);
     applied.push(`Salary: ${label}`);
   }
+  expandViewMoreInSection(locRoot);
+  for (const city of locationLabels.slice(0, 5)) {
+    const opt =
+      findFilterOption(locRoot, city, 'cityTypeGid') ||
+      findFilterOption(doc.body, city, 'cityTypeGid');
+    if (!opt) {
+      skipped.push(`Location: ${city} (not found)`);
+      continue;
+    }
+    if (isFilterOptionChecked(opt)) {
+      skipped.push(`Location: ${city} (already on)`);
+      continue;
+    }
+    clickFilterOption(opt);
+    applied.push(`Location: ${city}`);
+  }
   if (workLabels.length) {
     let opt: HTMLElement | null = null;
     for (const candidate of workLabels) {
@@ -1459,64 +1896,27 @@ export function applyPreferenceFilters(
       applied.push(`Work mode: ${workLabel}`);
     }
   }
+  const report = confirmPreferenceFilters(doc, prefs, options?.focusLocation);
   return {
-    ok: applied.length > 0 || skipped.some((s) => /already on/.test(s)),
+    ok:
+      report.ok ||
+      applied.length > 0 ||
+      skipped.some((s) => /already on/.test(s)),
     applied,
     skipped,
     ready: true,
+    openedAllFilters,
+    confirmed: report.ok,
   };
 }
 
-/** True when sidebar already has the preference filters selected. */
+/** True when sidebar/URL already has the preference filters selected. */
 export function preferenceFiltersAlreadyApplied(
   doc: Document,
-  prefs: JobPreferences
+  prefs: JobPreferences,
+  focusLocation?: string | null
 ): boolean {
-  const salaryLabels = salaryBucketLabelsForMin(prefs.minSalaryLpa);
-  const workLabels = workModeFilterLabels(prefs.workMode);
-  if (!salaryLabels.length && !workLabels.length) return true;
-
-  const salaryRoot =
-    findFilterSection(doc, /^salary$/i, 'salaryRange') ||
-    findFilterSection(doc, /^all filters$/i) ||
-    doc.body;
-  const workRoot =
-    findFilterSection(doc, /^work\s*mode$/i, 'wfhType') || doc.body;
-
-  let checkedSalary = 0;
-  let foundSalary = 0;
-  for (const label of salaryLabels.slice(0, 5)) {
-    const opt =
-      findFilterOption(salaryRoot, label, 'ctcFilter') ||
-      findFilterOption(doc.body, label, 'ctcFilter');
-    if (!opt) continue;
-    foundSalary += 1;
-    if (isFilterOptionChecked(opt)) checkedSalary += 1;
-  }
-
-  if (salaryLabels.length) {
-    if (
-      !foundSalary &&
-      !doc.querySelector('input[id*="ctcFilter"]') &&
-      !findFilterOption(doc.body, '10-15 Lakhs', 'ctcFilter')
-    ) {
-      return false;
-    }
-    if (foundSalary > 0 && checkedSalary === 0) return false;
-    if (foundSalary === 0) return false;
-  }
-
-  if (workLabels.length) {
-    let opt: HTMLElement | null = null;
-    for (const candidate of workLabels) {
-      opt =
-        findFilterOption(workRoot, candidate, 'wfhType') ||
-        findFilterOption(doc.body, candidate, 'wfhType');
-      if (opt) break;
-    }
-    if (!opt || !isFilterOptionChecked(opt)) return false;
-  }
-  return true;
+  return confirmPreferenceFilters(doc, prefs, focusLocation).ok;
 }
 
 /** Whether the current page URL already carries Cosmo filter query params. */
@@ -1528,12 +1928,15 @@ export function searchUrlHasPreferenceFilters(
     const u = new URL(url);
     const needsSalary = prefs.minSalaryLpa != null && prefs.minSalaryLpa > 0;
     const needsWfh = wfhTypeForWorkMode(prefs.workMode) != null;
-    if (!needsSalary && !needsWfh) return true;
+    const cities = prefs.locations.map((l) => l.trim()).filter(Boolean);
+    const needsLocation = cities.length > 0;
+    if (!needsSalary && !needsWfh && !needsLocation) return true;
     if (needsSalary && !u.searchParams.getAll('ctcFilter').length) return false;
     if (needsWfh) {
       const want = wfhTypeForWorkMode(prefs.workMode);
       if (u.searchParams.get('wfhType') !== want) return false;
     }
+    if (needsLocation && !urlHasPreferredLocation(url, cities)) return false;
     return true;
   } catch {
     return false;
@@ -1816,10 +2219,15 @@ export class NaukriAdapter implements PlatformAdapter {
     return (
       /you have already applied/.test(text) ||
       /already applied for this job/.test(text) ||
-      /already applied to this/.test(text)
+      /already applied to this/.test(text) ||
+      /you had already applied/.test(text)
     );
   }
 
+  /**
+   * Confirm Naukri shows a real apply success / already-applied state.
+   * Never guess — used before Cosmo marks a job as applied.
+   */
   detectApplicationStatus(
     doc: Document = document
   ): JobPayload['status'] | null {
@@ -1827,7 +2235,7 @@ export class NaukriAdapter implements PlatformAdapter {
     if (
       /\/myapply\/saveApply/i.test(href) ||
       /\/myapply\//i.test(href) ||
-      /appliedSuccessfully|applySuccess/i.test(href)
+      /appliedSuccessfully|applySuccess|applicationSuccess/i.test(href)
     ) {
       return 'applied';
     }
@@ -1836,16 +2244,44 @@ export class NaukriAdapter implements PlatformAdapter {
       return 'applied';
     }
 
-    const text = (doc.body?.innerText || '').toLowerCase();
+    const text = (doc.body?.innerText || '').slice(0, 12000).toLowerCase();
     if (
       /you have successfully applied/.test(text) ||
       /successfully applied to/.test(text) ||
       /application (has been )?submitted/.test(text) ||
+      /your application (has been |was )?submitted/.test(text) ||
+      /application sent successfully/.test(text) ||
+      /applied successfully/.test(text) ||
+      /you have applied (to|for)/.test(text) ||
       /you have already applied/.test(text) ||
       /already applied for this job/.test(text) ||
-      /already applied to this/.test(text)
+      /already applied to this/.test(text) ||
+      /you had already applied/.test(text)
     ) {
       return 'applied';
+    }
+
+    // Primary CTA flipped from Apply → Applied
+    const ctas = Array.from(
+      doc.querySelectorAll('button, a, [role="button"]')
+    ) as HTMLElement[];
+    for (const el of ctas) {
+      const label = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!label || label.length > 40) continue;
+      if (
+        label === 'applied' ||
+        label === 'applied successfully' ||
+        label === 'already applied' ||
+        /^applied\b/.test(label)
+      ) {
+        const cls = String(el.getAttribute('class') || '').toLowerCase();
+        if (
+          cls.includes('apply') ||
+          el.closest('[class*="jd-header"], [class*="styles_jhc"], [class*="apply"]')
+        ) {
+          return 'applied';
+        }
+      }
     }
 
     return null;
@@ -1854,25 +2290,60 @@ export class NaukriAdapter implements PlatformAdapter {
   findEasyApplyButton(doc: Document = document): HTMLElement | null {
     if (this.isCompanySiteApply(doc)) return null;
 
+    const isVisiblyHidden = (el: HTMLElement): boolean => {
+      if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') {
+        return true;
+      }
+      const style = el.ownerDocument.defaultView?.getComputedStyle(el);
+      if (!style) return false;
+      if (style.display === 'none' || style.visibility === 'hidden') return true;
+      const opacity = parseFloat(style.opacity);
+      return Number.isFinite(opacity) && opacity === 0;
+    };
+
     const buttons = Array.from(
       doc.querySelectorAll('button, a, [role="button"]')
     ) as HTMLElement[];
+    const candidates: { el: HTMLElement; score: number }[] = [];
+
     for (const btn of buttons) {
-      const label = (btn.textContent || '').trim().toLowerCase();
-      if (!label) continue;
+      if (isVisiblyHidden(btn)) continue;
+      const label = (btn.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!label || label.length > 48) continue;
       if (isCompanySiteApplyLabel(label)) continue;
-      if (/company site|external/.test(label)) continue;
-      if (
-        label === 'apply' ||
-        label.includes('easy apply') ||
-        (label.includes('apply') && !label.includes('login'))
-      ) {
-        if (btn.className.toLowerCase().includes('apply') || label.includes('apply')) {
-          return btn;
-        }
+      if (/company site|external|login|register|\bsave\b|\bshare\b/.test(label)) {
+        continue;
       }
+
+      const exact = label === 'apply' || label === 'easy apply';
+      const soft =
+        label.includes('easy apply') ||
+        (/\bapply\b/.test(label) && !/login|register/.test(label));
+      if (!exact && !soft) continue;
+
+      const cls = String(btn.getAttribute('class') || '').toLowerCase();
+      const rect = btn.getBoundingClientRect();
+      let score = 0;
+      if (exact) score += 50;
+      if (label === 'apply') score += 15;
+      if (cls.includes('apply')) score += 30;
+      if (rect.width >= 2 && rect.height >= 2) score += 20;
+      if (
+        btn.closest(
+          '[class*="jd-header"], [class*="styles_jhc"], [class*="apply-button"], [class*="styles_apply"]'
+        )
+      ) {
+        score += 25;
+      }
+      candidates.push({ el: btn, score });
     }
-    return queryFirst(naukriSelectors.easyApply, doc) as HTMLElement | null;
+
+    candidates.sort((a, b) => b.score - a.score);
+    if (candidates[0]) return candidates[0].el;
+
+    const fallback = queryFirst(naukriSelectors.easyApply, doc) as HTMLElement | null;
+    if (fallback && !isVisiblyHidden(fallback)) return fallback;
+    return null;
   }
 
   /**
@@ -2156,21 +2627,23 @@ export function preferenceSkipReason(
   }
 
   const salaryRange = parseSalaryLpaRange(job.salaryText);
-  if (requireSalary || job.salaryText?.trim()) {
-    if (!salaryRange) {
-      const raw = job.salaryText?.trim();
-      if (raw && /not\s*disclosed|undisclosed/i.test(raw)) {
-        return 'Salary not disclosed';
-      }
-      return raw ? `Salary not usable (${raw})` : 'Salary not disclosed';
-    }
+  const rawSalary = job.salaryText?.trim() || '';
+  if (salaryRange) {
+    // Usable salary always enforced (list + detail), even when disclosure is optional.
     if (
       prefs.minSalaryLpa != null &&
       prefs.minSalaryLpa > 0 &&
       salaryRange.max < prefs.minSalaryLpa
     ) {
-      return `Salary below minimum (${job.salaryText?.trim() || `${salaryRange.max} LPA`} < ${prefs.minSalaryLpa} LPA)`;
+      return `Salary below minimum (${rawSalary || `${salaryRange.max} LPA`} < ${prefs.minSalaryLpa} LPA)`;
     }
+  } else if (requireSalary) {
+    // Detail / strict gate: missing or "Not Disclosed" fails.
+    // List / apply-after-match: requireDisclosedSalary:false → allow through.
+    if (rawSalary && /not\s*disclosed|undisclosed/i.test(rawSalary)) {
+      return 'Salary not disclosed';
+    }
+    return rawSalary ? `Salary not usable (${rawSalary})` : 'Salary not disclosed';
   }
 
   const titles = prefs.titles.map((t) => t.trim()).filter(Boolean);

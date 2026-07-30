@@ -131,7 +131,7 @@ export async function listApplications(
   totalPages: number;
 }> {
   const page = Math.max(1, query.page ?? 1);
-  const limit = Math.min(100, Math.max(1, query.limit ?? 12));
+  const limit = Math.min(200, Math.max(1, query.limit ?? 12));
   const skip = (page - 1) * limit;
   const filter = buildFilter(userId, query);
 
@@ -254,10 +254,25 @@ export async function lookupAppliedJobs(
   };
 }
 
-export type TrackerColumn = 'applied' | 'matched' | 'skipped';
+export type TrackerColumn =
+  | 'matched'
+  | 'applied'
+  | 'interview'
+  | 'offer'
+  | 'rejected'
+  | 'skipped';
+
+export const TRACKER_COLUMNS = new Set<TrackerColumn>([
+  'matched',
+  'applied',
+  'interview',
+  'offer',
+  'rejected',
+  'skipped',
+]);
 
 /**
- * Move an application between Tracker Kanban columns (Applied / Matched / Skipped).
+ * Move an application between Tracker Kanban columns.
  */
 export async function moveApplicationColumn(
   userId: string,
@@ -271,27 +286,34 @@ export async function moveApplicationColumn(
     ...((doc.metadata as Record<string, unknown> | undefined) ?? {}),
   };
 
+  const clearSkip = () => {
+    metadata.skipped = false;
+    delete metadata.skipReason;
+    metadata.companySiteApply = false;
+  };
+
   if (column === 'applied') {
     doc.status = 'applied';
     if (!doc.appliedAt) doc.appliedAt = new Date();
-    metadata.skipped = false;
-    delete metadata.skipReason;
-    // Keep companySiteApply if set; clear skip-only flags.
+    clearSkip();
     if (metadata.source !== 'auto_apply' && metadata.source !== 'manual') {
       metadata.source = metadata.source ?? 'manual';
     }
   } else if (column === 'matched') {
-    if (doc.status === 'applied') {
-      doc.status = 'detected';
-    } else if (!['detected', 'viewed', 'saved', 'interview', 'offer'].includes(doc.status)) {
-      doc.status = 'detected';
-    }
-    metadata.skipped = false;
-    delete metadata.skipReason;
-    metadata.companySiteApply = false;
+    doc.status = 'detected';
+    clearSkip();
     if (metadata.source === 'auto_apply') {
       metadata.source = 'auto_scan';
     }
+  } else if (column === 'interview') {
+    doc.status = 'interview';
+    clearSkip();
+  } else if (column === 'offer') {
+    doc.status = 'offer';
+    clearSkip();
+  } else if (column === 'rejected') {
+    doc.status = 'rejected';
+    clearSkip();
   } else {
     // skipped
     if (doc.status === 'applied') {
@@ -308,4 +330,24 @@ export async function moveApplicationColumn(
   doc.markModified('metadata');
   await doc.save();
   return toApplication(doc);
+}
+
+/** Bulk-move up to 50 applications into a tracker column. */
+export async function moveApplicationsBulk(
+  userId: string,
+  ids: string[],
+  column: TrackerColumn
+): Promise<{ items: Application[]; moved: number; missing: string[] }> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(
+    0,
+    50
+  );
+  const items: Application[] = [];
+  const missing: string[] = [];
+  for (const id of unique) {
+    const updated = await moveApplicationColumn(userId, id, column);
+    if (updated) items.push(updated);
+    else missing.push(id);
+  }
+  return { items, moved: items.length, missing };
 }

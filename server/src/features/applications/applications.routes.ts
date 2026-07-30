@@ -44,7 +44,7 @@ applicationsRouter.get(
   requireAuth,
   asyncHandler(async (req: AuthedRequest, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 12));
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 12));
     const q = typeof req.query.q === 'string' ? req.query.q : undefined;
 
     const bucketRaw =
@@ -82,6 +82,38 @@ applicationsRouter.get(
 );
 
 applicationsRouter.patch(
+  '/tracker/bulk',
+  requireAuth,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = req.body as { ids?: unknown; column?: unknown };
+    const columnRaw = typeof body.column === 'string' ? body.column : '';
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === 'string')
+      : [];
+    if (!applicationsService.TRACKER_COLUMNS.has(columnRaw as applicationsService.TrackerColumn)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid column',
+      });
+      return;
+    }
+    if (!ids.length) {
+      res.status(400).json({
+        success: false,
+        message: 'Provide at least one application id',
+      });
+      return;
+    }
+    const result = await applicationsService.moveApplicationsBulk(
+      req.user!.sub,
+      ids,
+      columnRaw as applicationsService.TrackerColumn
+    );
+    res.json(ok(result));
+  })
+);
+
+applicationsRouter.patch(
   '/:id/tracker',
   requireAuth,
   asyncHandler(async (req: AuthedRequest, res) => {
@@ -90,8 +122,12 @@ applicationsRouter.patch(
       typeof (req.body as { column?: unknown })?.column === 'string'
         ? (req.body as { column: string }).column
         : '';
-    const allowed = new Set(['applied', 'matched', 'skipped']);
-    if (!id || !allowed.has(columnRaw)) {
+    if (
+      !id ||
+      !applicationsService.TRACKER_COLUMNS.has(
+        columnRaw as applicationsService.TrackerColumn
+      )
+    ) {
       res.status(400).json({
         success: false,
         message: 'Invalid application id or column',

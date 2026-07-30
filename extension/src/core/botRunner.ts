@@ -2,6 +2,7 @@ import type { JobPayload, JobPreferences } from '@cosmo/shared';
 import {
   NaukriAdapter,
   SearchResultJob,
+  buildNaukriSearchQueryPlan,
   buildNaukriSearchUrl,
   buildSearchKeyword,
   matchesListCandidate,
@@ -23,6 +24,7 @@ import {
   setCopilotState,
   updateScannedJob,
   upsertScannedJobs,
+  noteJobsScanned,
 } from './copilotState';
 import { mergeJobFields, jobDetailRichness } from './jobFields';
 import {
@@ -91,29 +93,32 @@ async function applyNaukriPreferenceFilters(
   prefs: JobPreferences,
   stealth: boolean,
   searchUrl: string,
-  options?: { forceNavigate?: boolean }
+  options?: { forceNavigate?: boolean; focusLocation?: string | null }
 ): Promise<boolean> {
   const forceNavigate = options?.forceNavigate !== false;
-  const needsFilters =
-    (prefs.minSalaryLpa != null && prefs.minSalaryLpa > 0) ||
-    (prefs.workMode !== 'any' && prefs.workMode != null);
+  const focusLocation = options?.focusLocation ?? null;
+  const needsSalary = prefs.minSalaryLpa != null && prefs.minSalaryLpa > 0;
+  const needsWork = prefs.workMode !== 'any' && prefs.workMode != null;
+  const needsLocation = prefs.locations.some((l) => Boolean(l?.trim()));
+  const needsFilters = needsSalary || needsWork || needsLocation;
 
   if (!needsFilters) {
     await appendCopilotLog(
-      'No salary/work-mode in preferences — keyword search only. Set min salary / work mode in Cosmo prefs to filter Naukri.',
+      'No salary/location/work-mode in preferences — keyword search only.',
       'warn'
     );
     return true;
   }
 
   await appendCopilotLog(
-    `Applying Naukri filters first (no apply slowdown) — salary≥${prefs.minSalaryLpa ?? 'any'} LPA, work=${prefs.workMode}`,
+    `Applying Naukri All Filters — salary≥${prefs.minSalaryLpa ?? 'any'} LPA, location=${
+      focusLocation || prefs.locations.filter(Boolean).join('/') || 'any'
+    }, work=${prefs.workMode}`,
     'info'
   );
 
   if (forceNavigate) {
     await appendCopilotLog(`Filter search URL: ${searchUrl}`, 'info');
-    // Always open the filtered URL once so ctcFilter / wfhType are present.
     await chrome.tabs.update(tabId, {
       url: searchUrl,
       active: !stealth,
@@ -122,7 +127,6 @@ async function applyNaukriPreferenceFilters(
     await wait(2500);
     if (!(await ensureNaukriLoggedIn(tabId))) return false;
 
-    // If Naukri SPA stripped filter params, force the URL again.
     for (let i = 0; i < 2; i++) {
       const tab = await chrome.tabs.get(tabId);
       if (searchUrlHasPreferenceFilters(tab.url || '', prefs)) break;
@@ -140,42 +144,64 @@ async function applyNaukriPreferenceFilters(
   }
 
   await appendCopilotLog(
-    'Opening Naukri All Filters, then applying salary/work-mode…',
+    'Opening Naukri All Filters, then applying salary/location/work-mode…',
     'info'
   );
 
-  // Click All Filters sidebar carefully until confirmed (or exhausted).
   let confirmed = false;
+  let lastDetails: string[] = [];
   for (let attempt = 0; attempt < 5; attempt++) {
     if (!(await waitWhilePaused())) return false;
     try {
       const result = await sendToTab<{
         ok?: boolean;
         alreadyApplied?: boolean;
+        confirmed?: boolean;
         ready?: boolean;
         openedAllFilters?: boolean;
         applied?: string[];
         skipped?: string[];
-      }>(tabId, { type: 'APPLY_PREFERENCE_FILTERS', prefs }, 10);
+        confirmDetails?: string[];
+      }>(
+        tabId,
+        { type: 'APPLY_PREFERENCE_FILTERS', prefs, focusLocation },
+        10
+      );
 
       if (result.openedAllFilters) {
         await appendCopilotLog('All Filters panel is open', 'success');
       }
 
-      if (result.alreadyApplied || (result.applied?.length ?? 0) > 0) {
-        confirmed = true;
+      lastDetails = result.confirmDetails ?? [];
+
+      if (
+        result.confirmed ||
+        result.alreadyApplied ||
+        (result.applied?.length ?? 0) > 0
+      ) {
+        if (result.confirmed || result.alreadyApplied) {
+          confirmed = true;
+        }
         if (result.alreadyApplied && !result.applied?.length) {
           await appendCopilotLog(
             'Naukri All Filters already match preferences',
             'success'
           );
-        } else {
+        } else if (result.applied?.length) {
           await appendCopilotLog(
-            `All Filters applied: ${(result.applied ?? []).join(', ')}`,
+            `All Filters applied: ${result.applied.join(', ')}`,
             'success'
           );
         }
-        break;
+        if (result.confirmed || result.alreadyApplied) {
+          await appendCopilotLog(
+            `Filters reconfirmed${
+              lastDetails.length ? `: ${lastDetails.join('; ')}` : ''
+            }`,
+            'success'
+          );
+          break;
+        }
       }
 
       await appendCopilotLog(
@@ -194,21 +220,46 @@ async function applyNaukriPreferenceFilters(
     }
   }
 
+  // Final live reconfirm on the page.
+  if (!confirmed) {
+    try {
+      const verify = await sendToTab<{
+        confirmed?: boolean;
+        details?: string[];
+      }>(
+        tabId,
+        { type: 'CONFIRM_PREFERENCE_FILTERS', prefs, focusLocation },
+        4
+      );
+      confirmed = Boolean(verify.confirmed);
+      lastDetails = verify.details ?? lastDetails;
+      if (confirmed) {
+        await appendCopilotLog(
+          `Filters reconfirmed: ${(lastDetails || []).join('; ') || 'ok'}`,
+          'success'
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const tabAfter = await chrome.tabs.get(tabId);
   const urlOk = searchUrlHasPreferenceFilters(tabAfter.url || '', prefs);
   if (!confirmed && !urlOk) {
     await appendCopilotLog(
-      'Could not confirm Naukri filters — check Cosmo min salary / work mode prefs.',
+      `Could not confirm Naukri filters (salary/location/work). ${lastDetails.join('; ')}`,
       'error'
     );
-  } else if (!confirmed && urlOk) {
+    return false;
+  }
+  if (!confirmed && urlOk) {
     await appendCopilotLog(
-      'URL filters are active (sidebar clicks incomplete)',
+      'URL filters active — sidebar ticks incomplete, continuing with URL filters',
       'warn'
     );
   }
 
-  // Short settle so filtered results render — not humanPace apply delay.
   await wait(2000);
   await waitForTabComplete(tabId);
   return true;
@@ -350,7 +401,8 @@ async function checkBlockOnTab(tabId: number): Promise<boolean> {
 async function goBackToList(
   tabId: number,
   searchUrl: string,
-  stealth: boolean
+  stealth: boolean,
+  options?: { maxNavMs?: number }
 ): Promise<void> {
   const mode = paceModeFromStealth(stealth);
   await chrome.tabs.update(tabId, {
@@ -358,7 +410,11 @@ async function goBackToList(
     active: !stealth,
   });
   await waitForTabComplete(tabId);
-  await pacedWait(mode, 'nav', { jobTitle: 'search list' });
+  await pacedWait(mode, 'nav', {
+    jobTitle: 'search list',
+    maxMs: options?.maxNavMs,
+    label: options?.maxNavMs != null ? 'Back to list' : undefined,
+  });
 }
 
 type EasyApplyResult = {
@@ -373,6 +429,51 @@ type EasyApplyResult = {
 
 async function tryEasyApply(tabId: number): Promise<EasyApplyResult> {
   return sendToTab<EasyApplyResult>(tabId, { type: 'RUN_EASY_APPLY' });
+}
+
+/** Second check on the live tab before Cosmo records an apply. */
+async function reconfirmAppliedOnTab(tabId: number): Promise<{
+  applied: boolean;
+  needsQuestions: boolean;
+}> {
+  try {
+    const res = await sendToTab<{
+      applied?: boolean;
+      needsQuestions?: boolean;
+    }>(tabId, { type: 'CHECK_APPLY_STATUS' }, 4);
+    return {
+      applied: Boolean(res.applied),
+      needsQuestions: Boolean(res.needsQuestions),
+    };
+  } catch {
+    return { applied: false, needsQuestions: false };
+  }
+}
+
+async function probeApplyReady(tabId: number): Promise<boolean> {
+  try {
+    const res = await sendToTab<{ ready?: boolean }>(
+      tabId,
+      { type: 'PROBE_APPLY_READY' },
+      3
+    );
+    return Boolean(res.ready);
+  } catch {
+    return false;
+  }
+}
+
+/** Poll until Easy Apply is visible, or timeout — avoid sitting on "Loading page" forever. */
+async function waitForApplyReady(
+  tabId: number,
+  timeoutMs = 4000
+): Promise<boolean> {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    if (await probeApplyReady(tabId)) return true;
+    await wait(350);
+  }
+  return probeApplyReady(tabId);
 }
 
 async function markApplied(
@@ -500,16 +601,38 @@ async function applyOneJob(
     active: !state.runInBackground,
   });
   await waitForTabComplete(tabId);
-  if (!(await pacedWait(mode, 'nav', { jobTitle: job.title }))) return 'stop';
+
+  // Poll for Apply — do NOT show a fake multi-second "slowdown" while waiting.
+  await setCopilotState({
+    paceLabel: 'Opening job',
+    paceRemainingMs: null,
+  });
+  const applyReadyEarly = await waitForApplyReady(tabId, 3500);
+
+  // If Apply is already visible, only a tiny settle — full humanPace was
+  // blocking the click and looking like a skip.
+  if (
+    !(await pacedWait(mode, 'nav', {
+      jobTitle: job.title,
+      maxMs: applyReadyEarly ? 400 : undefined,
+      label: applyReadyEarly
+        ? 'Apply ready — clicking soon'
+        : 'Loading page',
+    }))
+  ) {
+    return 'stop';
+  }
 
   if (await checkBlockOnTab(tabId)) return 'stop';
   if (!(await waitWhilePaused())) return 'stop';
   if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
 
-  // Collect full JD fields while on the detail page (retry until rich).
+  // Collect JD fields. When Apply is ready, keep this short so pace doesn't
+  // starve the click.
   let detailJob: Partial<JobPayload> | undefined;
   let companySiteApply = Boolean(job.companySiteApply);
-  for (let attempt = 0; attempt < 4; attempt++) {
+  const detailAttempts = applyReadyEarly ? 2 : 4;
+  for (let attempt = 0; attempt < detailAttempts; attempt++) {
     try {
       const detail = await sendToTab<{
         job?: Partial<JobPayload> | null;
@@ -521,7 +644,7 @@ async function applyOneJob(
     } catch {
       /* page may still be loading */
     }
-    await wait(700 + attempt * 400);
+    await wait(applyReadyEarly ? 300 : 700 + attempt * 400);
   }
   const enriched = mergeJobFields(detailJob, job, {
     status: 'detected',
@@ -543,24 +666,31 @@ async function applyOneJob(
     skills: enriched.skills || job.skills,
     description: enriched.description || job.description,
   };
-  if (!matchesPreferences(detailCandidate, prefs)) {
+  // Already list-matched — don't skip solely for "salary not disclosed" on JD.
+  // Still skip if disclosed salary/exp clearly fails prefs.
+  if (
+    !matchesPreferences(detailCandidate, prefs, {
+      requireDisclosedSalary: false,
+    })
+  ) {
     const reason =
-      preferenceSkipReason(detailCandidate, prefs) ||
-      'Did not match job preferences';
+      preferenceSkipReason(detailCandidate, prefs, {
+        requireDisclosedSalary: false,
+      }) || 'Did not match job preferences';
     await markSkipped(handlers, enriched, id, reason);
-    await goBackToList(tabId, searchUrl, stealth);
+    await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
     return 'continue';
   }
 
   if (companySiteApply) {
     await markCompanySite(handlers, enriched, id);
-    await goBackToList(tabId, searchUrl, stealth);
+    await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
     return 'continue';
   }
 
   if (!prefs.autoApplyEnabled) {
     await markSkipped(handlers, enriched, id, 'Auto-apply is off');
-    await goBackToList(tabId, searchUrl, stealth);
+    await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
     return 'continue';
   }
 
@@ -574,7 +704,7 @@ async function applyOneJob(
       }`,
       'warn'
     );
-    await goBackToList(tabId, searchUrl, stealth);
+    await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
     return 'stop';
   }
 
@@ -588,20 +718,117 @@ async function applyOneJob(
       blockReason === 'month' ? 'plan_limit' : 'rate_limit'
     );
     await appendCopilotLog(msg, 'warn');
-    await goBackToList(tabId, searchUrl, stealth);
+    await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
     return 'limit';
   }
 
-  if (!(await pacedWait(mode, 'dwell', { jobTitle: job.title }))) return 'stop';
+  const applyReady = applyReadyEarly || (await probeApplyReady(tabId));
+  if (
+    !(await pacedWait(mode, 'dwell', {
+      jobTitle: job.title,
+      // Apply on screen → click almost immediately; don't burn 3–8s dwell.
+      maxMs: applyReady ? 350 : undefined,
+      label: applyReady ? 'About to apply' : 'Reading job details',
+    }))
+  ) {
+    return 'stop';
+  }
 
   if (await checkBlockOnTab(tabId)) return 'stop';
   if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
+
+  // If Apply vanished during detail scrape, wait briefly once more.
+  if (!applyReady && !(await waitForApplyReady(tabId, 2500))) {
+    await appendCopilotLog(
+      `Apply button not found yet for "${job.title}" — trying Easy Apply anyway`,
+      'warn'
+    );
+  }
+
+  await setCopilotState({
+    paceLabel: 'Clicking Apply',
+    paceRemainingMs: null,
+    currentTitle: job.title,
+  });
+  await appendCopilotLog(`Clicking Apply: ${job.title}`);
 
   let result = await tryEasyApply(tabId);
   if (result.blocked) {
     await handleBlockedPage(result.reason || 'verification page');
     return 'stop';
   }
+
+  // Reconfirm on the live page — never trust a hopeful Easy Apply result alone.
+  if (result.ok && !result.needsUserInput) {
+    await setCopilotState({
+      paceLabel: 'Confirming apply',
+      paceRemainingMs: null,
+    });
+    await wait(700);
+    let confirm = await reconfirmAppliedOnTab(tabId);
+    if (confirm.needsQuestions) {
+      result = {
+        ...result,
+        ok: false,
+        needsUserInput: true,
+        reason: 'Naukri is asking apply questions',
+      };
+    } else if (!confirm.applied) {
+      // Don't skip immediately — Naukri sometimes lags; retry click once.
+      await appendCopilotLog(
+        `Apply not confirmed yet for "${job.title}" — retrying click`,
+        'warn'
+      );
+      await wait(500);
+      const retry = await tryEasyApply(tabId);
+      if (retry.blocked) {
+        await handleBlockedPage(retry.reason || 'verification page');
+        return 'stop';
+      }
+      if (retry.needsUserInput) {
+        result = {
+          ...retry,
+          ok: false,
+          needsUserInput: true,
+          reason: retry.reason || 'Naukri is asking apply questions',
+        };
+      } else if (retry.ok) {
+        await wait(700);
+        confirm = await reconfirmAppliedOnTab(tabId);
+        if (confirm.needsQuestions) {
+          result = {
+            ...retry,
+            ok: false,
+            needsUserInput: true,
+            reason: 'Naukri is asking apply questions',
+          };
+        } else if (confirm.applied) {
+          result = retry;
+          await appendCopilotLog(
+            `Confirmed applied on Naukri: ${job.title}`,
+            'success'
+          );
+        } else {
+          result = {
+            ...retry,
+            ok: false,
+            skipped: true,
+            reason: 'Apply not confirmed on Naukri',
+          };
+        }
+      } else {
+        result = {
+          ...retry,
+          ok: false,
+          skipped: true,
+          reason: retry.reason || 'Apply not confirmed on Naukri',
+        };
+      }
+    } else {
+      await appendCopilotLog(`Confirmed applied on Naukri: ${job.title}`, 'success');
+    }
+  }
+
   const base = mergeJobFields(result.job, enriched, {
     url: job.url,
     status: 'detected',
@@ -627,7 +854,7 @@ async function applyOneJob(
       ) {
         return 'stop';
       }
-      await goBackToList(tabId, searchUrl, stealth);
+      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 900 });
       return 'continue';
     }
 
@@ -736,7 +963,7 @@ async function applyOneJob(
   if (!(await pacedWait(mode, 'betweenJobs', { jobTitle: job.title }))) {
     return 'stop';
   }
-  await goBackToList(tabId, searchUrl, stealth);
+  await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 900 });
   if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
   return 'continue';
 }
@@ -780,6 +1007,8 @@ type SessionCtx = {
   stealth: boolean;
   prefs: JobPreferences;
   seenKeys: Set<string>;
+  /** All unique job cards seen on SRP (matched or not). */
+  scannedKeys: Set<string>;
   /** Matched jobs waiting until we reach SCAN_BATCH_SIZE before apply. */
   pendingBatch: SearchResultJob[];
 };
@@ -843,11 +1072,12 @@ async function collectPreferenceMatches(opts: {
   stealth: boolean;
   prefs: JobPreferences;
   seenKeys: Set<string>;
+  scannedKeys: Set<string>;
   logPrefix?: string;
   /** Existing queue to append into (toward SCAN_BATCH_SIZE). */
   into?: SearchResultJob[];
 }): Promise<SearchResultJob[]> {
-  const { tabId, searchUrl, stealth, prefs, seenKeys } = opts;
+  const { tabId, searchUrl, stealth, prefs, seenKeys, scannedKeys } = opts;
   const prefix = opts.logPrefix ?? 'Scan';
   const mode = paceModeFromStealth(stealth);
   const batch = opts.into ?? [];
@@ -891,9 +1121,10 @@ async function collectPreferenceMatches(opts: {
     const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tabId, {
       type: 'RUN_SCAN_SCRAPE',
     });
-    const visible = (scrape.jobs ?? []).filter((job) =>
-      matchesListCandidate(job, prefs)
-    );
+    const allJobs = scrape.jobs ?? [];
+    const scannedTotal = await noteJobsScanned(allJobs, scannedKeys);
+
+    const visible = allJobs.filter((job) => matchesListCandidate(job, prefs));
 
     const appliedSet = await fetchAppliedSet(visible);
     let addedThisRound = 0;
@@ -938,7 +1169,7 @@ async function collectPreferenceMatches(opts: {
     }
 
     await appendCopilotLog(
-      `${prefix} round ${round + 1}: +${addedThisRound} → ${batch.length}/${SCAN_BATCH_SIZE} matched`,
+      `${prefix} round ${round + 1}: scanned ${scannedTotal} · +${addedThisRound} match → ${batch.length}/${SCAN_BATCH_SIZE}`,
       addedThisRound ? 'success' : 'warn'
     );
 
@@ -965,6 +1196,7 @@ async function collectUntilMatchedBatch(opts: {
   stealth: boolean;
   prefs: JobPreferences;
   seenKeys: Set<string>;
+  scannedKeys: Set<string>;
   pending?: SearchResultJob[];
   logPrefix?: string;
 }): Promise<SearchResultJob[]> {
@@ -1002,6 +1234,7 @@ async function collectUntilMatchedBatch(opts: {
       stealth: opts.stealth,
       prefs: opts.prefs,
       seenKeys: opts.seenKeys,
+      scannedKeys: opts.scannedKeys,
       into: batch,
       logPrefix: `${prefix} p${page + 1}`,
     });
@@ -1026,14 +1259,15 @@ async function collectUntilMatchedBatch(opts: {
   }
 
   const ready = batch.slice(0, SCAN_BATCH_SIZE);
+  const scannedTotal = (await getCopilotState()).scanned;
   if (ready.length >= SCAN_BATCH_SIZE) {
     await appendCopilotLog(
-      `Matched batch ready — ${ready.length}/${SCAN_BATCH_SIZE}. Starting applies…`,
+      `Matched batch ready — scanned ${scannedTotal} jobs, matched ${ready.length}/${SCAN_BATCH_SIZE}. Starting applies…`,
       'success'
     );
   } else {
     await appendCopilotLog(
-      `Only ${ready.length}/${SCAN_BATCH_SIZE} matched after auto page scan — will NOT apply under ${SCAN_BATCH_SIZE}.`,
+      `Only ${ready.length}/${SCAN_BATCH_SIZE} matched after scanning ${scannedTotal} jobs — will NOT apply under ${SCAN_BATCH_SIZE}.`,
       'warn'
     );
   }
@@ -1166,6 +1400,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
       needsLogin: false,
       loginPauseReason: null,
       keyword,
+      scanned: 0,
       matched: 0,
       applied: 0,
       skipped: 0,
@@ -1195,7 +1430,9 @@ export async function runBot(handlers: BotHandlers): Promise<{
     );
     await broadcastCopilotToNaukriTabs({ type: 'COPILOT_EXPAND' });
 
-    const searchUrl = buildNaukriSearchUrl(prefs);
+    const searchPlan = buildNaukriSearchQueryPlan(prefs);
+    const firstQuery = searchPlan[0]!;
+    let searchUrl = firstQuery.url;
     installTabSpamGuard();
     const tab = await ensureNaukriWorkTab({
       url: searchUrl,
@@ -1225,26 +1462,70 @@ export async function runBot(handlers: BotHandlers): Promise<{
       return { ok: false, message: 'Not logged into Naukri.' };
     }
 
-    // Phase 0: apply Naukri filters thoroughly (no apply slowdown).
-    if (!(await applyNaukriPreferenceFilters(tab.id, prefs, stealth, searchUrl))) {
-      return { ok: false, message: 'Stopped while applying Naukri filters.' };
-    }
-
     const seenKeys = new Set<string>();
+    const scannedKeys = new Set<string>();
     let hitLimit = false;
+    let batch: SearchResultJob[] = [];
 
-    // Phase 1: scan until 30 matched (auto next-page). Phase 2 only if full batch.
+    // Phase 1: for each title × location, scan until 30 matched.
     await appendCopilotLog(
-      `Filters ready — scanning until ${SCAN_BATCH_SIZE} matched jobs (no apply before that)…`,
-      'success'
+      `Will try up to ${searchPlan.length} search combinations (titles × cities × skills) until ${SCAN_BATCH_SIZE} matches…`,
+      'info'
     );
-    const batch = await collectUntilMatchedBatch({
-      tabId: tab.id,
-      searchUrl,
-      stealth,
-      prefs,
-      seenKeys,
-    });
+
+    for (let qi = 0; qi < searchPlan.length && batch.length < SCAN_BATCH_SIZE; qi++) {
+      const query = searchPlan[qi]!;
+      searchUrl = query.url;
+      await setCopilotState({ keyword: query.keyword });
+      await appendCopilotLog(
+        `Search ${qi + 1}/${searchPlan.length} [${query.kind}]: "${query.keyword}"${
+          query.location ? ` in ${query.location}` : ' (India-wide)'
+        } (${batch.length}/${SCAN_BATCH_SIZE} so far)`,
+        'success'
+      );
+
+      if (qi > 0) {
+        await chrome.tabs.update(tab.id, { url: searchUrl, active: !stealth });
+        await waitForTabComplete(tab.id);
+        await wait(1500);
+        if (!(await ensureNaukriLoggedIn(tab.id))) break;
+      }
+
+      if (
+        !(await applyNaukriPreferenceFilters(tab.id, prefs, stealth, searchUrl, {
+          focusLocation: query.location || null,
+        }))
+      ) {
+        return { ok: false, message: 'Stopped while applying Naukri filters.' };
+      }
+
+      const before = batch.length;
+      batch = await collectUntilMatchedBatch({
+        tabId: tab.id,
+        searchUrl,
+        stealth,
+        prefs,
+        seenKeys,
+        scannedKeys,
+        pending: batch,
+        logPrefix: `Scan “${query.keyword}”`,
+      });
+
+      if (batch.length >= SCAN_BATCH_SIZE) break;
+      if (batch.length === before) {
+        await appendCopilotLog(
+          `No new matches for "${query.keyword}"${
+            query.location ? ` / ${query.location}` : ''
+          } — trying next title/location…`,
+          'warn'
+        );
+      } else {
+        await appendCopilotLog(
+          `Still ${batch.length}/${SCAN_BATCH_SIZE} — switching to next title/location…`,
+          'info'
+        );
+      }
+    }
 
     // Phase 2: apply only when we have a full 30-match batch.
     if (batch.length >= SCAN_BATCH_SIZE) {
@@ -1262,7 +1543,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
     } else {
       await raiseCopilotToast(
         `Only ${batch.length}/${SCAN_BATCH_SIZE} matches`,
-        `Auto-scanned pages — apply starts only at ${SCAN_BATCH_SIZE} matched jobs.`
+        `Tried ${searchPlan.length} title/location search(es). Apply starts only at ${SCAN_BATCH_SIZE}.`
       );
     }
 
@@ -1273,8 +1554,8 @@ export async function runBot(handlers: BotHandlers): Promise<{
       !hitLimit;
     await appendCopilotLog(
       allApplied
-        ? `All ${SCAN_BATCH_SIZE} matched jobs applied — matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`
-        : `Done — matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`,
+        ? `All ${SCAN_BATCH_SIZE} matched jobs applied — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`
+        : `Done — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`,
       'success'
     );
 
@@ -1300,6 +1581,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
         stealth,
         prefs,
         seenKeys,
+        scannedKeys,
         pendingBatch: batch.length >= SCAN_BATCH_SIZE ? [] : batch,
       };
       await setCopilotState({
@@ -1422,6 +1704,7 @@ export async function continueNextPage(): Promise<{
     await appendCopilotLog('Next page loaded — scanning jobs', 'success');
 
     const seenKeys = ctx.seenKeys;
+    const scannedKeys = ctx.scannedKeys ?? new Set<string>();
     let hitLimit = false;
     const prefs = ctx.prefs;
     const handlers = ctx.handlers;
@@ -1444,6 +1727,7 @@ export async function continueNextPage(): Promise<{
       stealth,
       prefs,
       seenKeys,
+      scannedKeys,
       pending: ctx.pendingBatch ?? [],
       logPrefix: 'Next-page scan',
     });
@@ -1474,8 +1758,8 @@ export async function continueNextPage(): Promise<{
       !hitLimit;
     await appendCopilotLog(
       allApplied
-        ? `All ${SCAN_BATCH_SIZE} matched jobs applied — matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`
-        : `Done — matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`,
+        ? `All ${SCAN_BATCH_SIZE} matched jobs applied — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`
+        : `Done — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`,
       'success'
     );
     await raiseCopilotToast(
@@ -1493,6 +1777,7 @@ export async function continueNextPage(): Promise<{
       stealth,
       prefs,
       seenKeys,
+      scannedKeys,
       pendingBatch: batch.length >= SCAN_BATCH_SIZE ? [] : batch,
     };
     await setCopilotState({

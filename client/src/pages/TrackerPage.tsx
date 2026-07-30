@@ -1,108 +1,39 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Application } from '@cosmo/shared';
-import { fetchApplications, moveApplicationTracker } from '../lib/api';
+import {
+  fetchApplications,
+  moveApplicationTracker,
+  moveApplicationsTrackerBulk,
+} from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 import { ApplicationDetailDrawer } from '../components/ApplicationDetailDrawer';
 import { CosmosLoader } from '../components/CosmosLogo';
+import { TrackerBoard } from '../components/tracker/TrackerBoard';
+import { TrackerSettings } from '../components/tracker/TrackerSettings';
+import { TrackerToolbar } from '../components/tracker/TrackerToolbar';
+import {
+  applyColumnLocally,
+  columnFor,
+  columnsForPrefs,
+  matchesTrackerFilters,
+  readBoardPrefs,
+  writeBoardPrefs,
+  type BoardPrefs,
+  type ColumnId,
+  type SwimlaneMode,
+} from '../components/tracker/trackerColumns';
 
-type ColumnId = 'applied' | 'matched' | 'skipped';
+type TrackerListData = {
+  items: Application[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
 
-const COLUMNS: { id: ColumnId; title: string; hint: string }[] = [
-  { id: 'applied', title: 'Applied', hint: 'Applied successfully' },
-  { id: 'matched', title: 'Matched', hint: 'Matched from scan' },
-  { id: 'skipped', title: 'Skipped', hint: 'Not applied' },
-];
-
-function columnFor(app: Application): ColumnId {
-  if (app.metadata?.skipped) return 'skipped';
-  if (app.status === 'applied' || app.metadata?.source === 'auto_apply') {
-    return 'applied';
-  }
-  return 'matched';
-}
-
-/** Optimistic local shape after a tracker move. */
-function applyColumnLocally(app: Application, column: ColumnId): Application {
-  const metadata = { ...(app.metadata ?? {}) };
-  if (column === 'applied') {
-    return {
-      ...app,
-      status: 'applied',
-      appliedAt: app.appliedAt ?? new Date().toISOString(),
-      metadata: {
-        ...metadata,
-        skipped: false,
-        skipReason: undefined,
-      },
-    };
-  }
-  if (column === 'matched') {
-    return {
-      ...app,
-      status: app.status === 'applied' ? 'detected' : app.status,
-      metadata: {
-        ...metadata,
-        skipped: false,
-        skipReason: undefined,
-        companySiteApply: false,
-        source:
-          metadata.source === 'auto_apply' ? 'auto_scan' : metadata.source,
-      },
-    };
-  }
-  return {
-    ...app,
-    status: app.status === 'applied' ? 'detected' : app.status,
-    metadata: {
-      ...metadata,
-      skipped: true,
-      skipReason: metadata.skipReason || 'Moved to Skipped',
-      companySiteApply: false,
-    },
-  };
-}
-
-function companyInitials(company: string): string {
-  const parts = company.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
-}
-
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diff = Math.max(0, now - then);
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 14) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-function TrackerLogo({ app }: { app: Application }) {
-  if (app.companyLogo) {
-    return (
-      <img
-        className="tracker-card__logo"
-        src={app.companyLogo}
-        alt=""
-        loading="lazy"
-        referrerPolicy="no-referrer"
-      />
-    );
-  }
-  return (
-    <div className="tracker-card__logo tracker-card__logo--fallback" aria-hidden>
-      {companyInitials(app.company)}
-    </div>
-  );
-}
+const QUERY_KEY = ['applications', 'tracker'] as const;
 
 export function TrackerPage() {
   const queryClient = useQueryClient();
@@ -110,18 +41,42 @@ export function TrackerPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<ColumnId | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
-  const dragMoved = useRef(false);
-
-  const queryKey = ['applications', 'tracker'] as const;
+  const [prefs, setPrefs] = useState<BoardPrefs>(() => readBoardPrefs());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [platform, setPlatform] = useState('all');
+  const [salaryFilter, setSalaryFilter] = useState<
+    'all' | 'disclosed' | 'undisclosed'
+  >('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const lastSelectedId = useRef<string | null>(null);
+  const suppressClickRef = useRef(false);
 
   const { data, isLoading, error } = useQuery({
-    queryKey,
+    queryKey: QUERY_KEY,
     queryFn: async () => {
-      const res = await fetchApplications({ page: 1, limit: 100 });
+      const res = await fetchApplications({ page: 1, limit: 200 });
       if (!res.success) throw new Error(res.message);
       return res.data;
     },
   });
+
+  const updatePrefs = useCallback((next: BoardPrefs) => {
+    setPrefs(next);
+    writeBoardPrefs(next);
+  }, []);
+
+  const patchItems = useCallback(
+    (updater: (items: Application[]) => Application[]) => {
+      const prev = queryClient.getQueryData<TrackerListData>(QUERY_KEY);
+      if (!prev) return;
+      queryClient.setQueryData(QUERY_KEY, {
+        ...prev,
+        items: updater(prev.items),
+      });
+    },
+    [queryClient]
+  );
 
   const moveMutation = useMutation({
     mutationFn: async ({
@@ -137,44 +92,67 @@ export function TrackerPage() {
     },
     onMutate: async ({ id, column }) => {
       setMoveError(null);
-      await queryClient.cancelQueries({ queryKey });
-      const prev = queryClient.getQueryData<{
-        items: Application[];
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-      }>(queryKey);
-      if (prev) {
-        queryClient.setQueryData(queryKey, {
-          ...prev,
-          items: prev.items.map((app) =>
-            app.id === id ? applyColumnLocally(app, column) : app
-          ),
-        });
-      }
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const prev = queryClient.getQueryData<TrackerListData>(QUERY_KEY);
+      patchItems((items) =>
+        items.map((app) =>
+          app.id === id ? applyColumnLocally(app, column) : app
+        )
+      );
       return { prev };
     },
     onError: (err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(queryKey, ctx.prev);
+      if (ctx?.prev) queryClient.setQueryData(QUERY_KEY, ctx.prev);
       setMoveError(err instanceof Error ? err.message : 'Could not move card');
     },
     onSuccess: (updated) => {
-      const prev = queryClient.getQueryData<{
-        items: Application[];
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-      }>(queryKey);
-      if (prev && updated) {
-        queryClient.setQueryData(queryKey, {
-          ...prev,
-          items: prev.items.map((app) =>
-            app.id === updated.id ? updated : app
-          ),
-        });
+      if (updated) {
+        patchItems((items) =>
+          items.map((app) => (app.id === updated.id ? updated : app))
+        );
       }
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
+    },
+  });
+
+  const bulkMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      column,
+    }: {
+      ids: string[];
+      column: ColumnId;
+    }) => {
+      const res = await moveApplicationsTrackerBulk(ids, column);
+      if (!res.success) throw new Error(res.message || 'Bulk move failed');
+      return res.data;
+    },
+    onMutate: async ({ ids, column }) => {
+      setMoveError(null);
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const prev = queryClient.getQueryData<TrackerListData>(QUERY_KEY);
+      const idSet = new Set(ids);
+      patchItems((items) =>
+        items.map((app) =>
+          idSet.has(app.id) ? applyColumnLocally(app, column) : app
+        )
+      );
+      return { prev };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(QUERY_KEY, ctx.prev);
+      setMoveError(
+        err instanceof Error ? err.message : 'Could not bulk-move cards'
+      );
+    },
+    onSuccess: (result) => {
+      if (result?.items?.length) {
+        const byId = new Map(result.items.map((a) => [a.id, a]));
+        patchItems((items) =>
+          items.map((app) => byId.get(app.id) ?? app)
+        );
+      }
+      setSelectedIds(new Set());
       void queryClient.invalidateQueries({ queryKey: ['applications'] });
     },
   });
@@ -185,46 +163,93 @@ export function TrackerPage() {
 
   useApplicationSocket(onUpdate);
 
-  const columns = useMemo(() => {
-    const map: Record<ColumnId, Application[]> = {
-      applied: [],
-      matched: [],
-      skipped: [],
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedIds(new Set());
     };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const columns = useMemo(() => columnsForPrefs(prefs), [prefs]);
+
+  const platforms = useMemo(() => {
+    const set = new Set<string>();
     for (const app of data?.items ?? []) {
-      map[columnFor(app)].push(app);
+      if (app.platform) set.add(app.platform);
     }
-    return map;
+    return [...set].sort();
   }, [data?.items]);
+
+  const filteredItems = useMemo(() => {
+    return (data?.items ?? []).filter((app) =>
+      matchesTrackerFilters(app, { q, platform, salaryFilter })
+    );
+  }, [data?.items, q, platform, salaryFilter]);
 
   const total = data?.items.length ?? 0;
 
-  function handleDrop(column: ColumnId) {
-    const id = draggingId;
-    setOverColumn(null);
-    setDraggingId(null);
-    if (!id) return;
+  function moveOne(id: string, column: ColumnId) {
     const app = data?.items.find((a) => a.id === id);
     if (!app) return;
     if (columnFor(app) === column) return;
     moveMutation.mutate({ id, column });
   }
 
+  function handleDrop(column: ColumnId) {
+    const id = draggingId;
+    setOverColumn(null);
+    setDraggingId(null);
+    if (!id) return;
+    moveOne(id, column);
+  }
+
+  function toggleSelect(id: string, shiftKey: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && lastSelectedId.current) {
+        const order = filteredItems.map((a) => a.id);
+        const a = order.indexOf(lastSelectedId.current);
+        const b = order.indexOf(id);
+        if (a >= 0 && b >= 0) {
+          const [lo, hi] = a < b ? [a, b] : [b, a];
+          for (let i = lo; i <= hi; i++) next.add(order[i]!);
+          return next;
+        }
+      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      lastSelectedId.current = id;
+      return next;
+    });
+  }
+
   return (
     <div className="dash tracker">
-      <div className="tracker__toolbar">
-        <div>
-          <p className="tracker__sub">
-            Kanban view of your Naukri applications
-            {total ? ` · ${total} total` : ''}
-            {' · '}
-            Drag cards between columns
-          </p>
-        </div>
-        <Link className="dash-btn dash-btn--ghost" to="/dashboard">
-          Open Dashboard
-        </Link>
-      </div>
+      <TrackerToolbar
+        total={total}
+        filteredCount={filteredItems.length}
+        q={q}
+        platform={platform}
+        salaryFilter={salaryFilter}
+        platforms={platforms}
+        prefs={prefs}
+        selectedCount={selectedIds.size}
+        columns={columns}
+        onSearch={setQ}
+        onPlatform={setPlatform}
+        onSalaryFilter={setSalaryFilter}
+        onSwimlane={(swimlane: SwimlaneMode) =>
+          updatePrefs({ ...prefs, swimlane })
+        }
+        onOpenSettings={() => setSettingsOpen(true)}
+        onBulkMove={(column) => {
+          const ids = [...selectedIds];
+          if (!ids.length) return;
+          bulkMutation.mutate({ ids, column });
+        }}
+        onClearSelection={() => setSelectedIds(new Set())}
+      />
 
       {moveError ? <p className="error">{moveError}</p> : null}
 
@@ -245,8 +270,7 @@ export function TrackerPage() {
           <div>
             <h3>No applications yet</h3>
             <p>
-              Start the Naukri co-pilot to fill Applied, Matched, and Skipped
-              columns.
+              Start the Naukri co-pilot to fill your Tracker board columns.
             </p>
           </div>
           <Link className="dash-btn dash-btn--primary" to="/dashboard">
@@ -255,109 +279,58 @@ export function TrackerPage() {
         </div>
       )}
 
-      {total > 0 && (
-        <div className="tracker-board" role="list">
-          {COLUMNS.map((col) => (
-            <section
-              key={col.id}
-              className={`tracker-col tracker-col--${col.id}${
-                overColumn === col.id ? ' is-drop-target' : ''
-              }${draggingId ? ' is-dragging-active' : ''}`}
-              aria-label={col.title}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                setOverColumn(col.id);
-              }}
-              onDragLeave={(e) => {
-                if (
-                  e.currentTarget.contains(e.relatedTarget as Node | null)
-                ) {
-                  return;
-                }
-                setOverColumn((cur) => (cur === col.id ? null : cur));
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(col.id);
-              }}
-            >
-              <header className="tracker-col__head">
-                <div>
-                  <h2>{col.title}</h2>
-                  <p>{col.hint}</p>
-                </div>
-                <span className="tracker-col__count">
-                  {columns[col.id].length}
-                </span>
-              </header>
-              <div className="tracker-col__list">
-                {columns[col.id].length === 0 ? (
-                  <p className="tracker-col__empty">
-                    {draggingId ? 'Drop here' : 'No cards'}
-                  </p>
-                ) : (
-                  columns[col.id].map((app) => (
-                    <article
-                      key={app.id}
-                      className={`tracker-card tracker-card--clickable${
-                        draggingId === app.id ? ' is-dragging' : ''
-                      }`}
-                      role="button"
-                      tabIndex={0}
-                      draggable
-                      onDragStart={(e) => {
-                        dragMoved.current = false;
-                        setDraggingId(app.id);
-                        e.dataTransfer.setData('text/plain', app.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                        // Avoid opening drawer after a drag.
-                        requestAnimationFrame(() => {
-                          dragMoved.current = true;
-                        });
-                      }}
-                      onDragEnd={() => {
-                        setDraggingId(null);
-                        setOverColumn(null);
-                        window.setTimeout(() => {
-                          dragMoved.current = false;
-                        }, 50);
-                      }}
-                      onClick={() => {
-                        if (dragMoved.current || draggingId) return;
-                        setSelected(app);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelected(app);
-                        }
-                      }}
-                    >
-                      <div className="tracker-card__top">
-                        <TrackerLogo app={app} />
-                        <time dateTime={app.appliedAt ?? app.createdAt}>
-                          {relativeTime(app.appliedAt ?? app.createdAt)}
-                        </time>
-                      </div>
-                      <h3 className="tracker-card__company">{app.company}</h3>
-                      <p className="tracker-card__title">{app.title}</p>
-                      <div className="tracker-card__meta">
-                        {app.location ? <span>{app.location}</span> : null}
-                        {app.experience ? <span>{app.experience}</span> : null}
-                        <span className="tracker-card__platform">
-                          {app.platform}
-                        </span>
-                      </div>
-                      <p className="tracker-card__drag-hint">Drag to move</p>
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-          ))}
+      {total > 0 && filteredItems.length === 0 && (
+        <div className="dash-callout">
+          <div>
+            <h3>No matching cards</h3>
+            <p>Try clearing search or filters.</p>
+          </div>
         </div>
       )}
+
+      {filteredItems.length > 0 && (
+        <TrackerBoard
+          columns={columns}
+          items={filteredItems}
+          prefs={prefs}
+          selectedIds={selectedIds}
+          draggingId={draggingId}
+          overColumn={overColumn}
+          columnFor={columnFor}
+          onToggleSelect={toggleSelect}
+          onOpen={setSelected}
+          onMove={moveOne}
+          onDragStart={(id, e) => {
+            suppressClickRef.current = false;
+            setDraggingId(id);
+            e.dataTransfer.setData('text/plain', id);
+            e.dataTransfer.effectAllowed = 'move';
+            requestAnimationFrame(() => {
+              suppressClickRef.current = true;
+            });
+          }}
+          onDragEnd={() => {
+            setDraggingId(null);
+            setOverColumn(null);
+            window.setTimeout(() => {
+              suppressClickRef.current = false;
+            }, 50);
+          }}
+          onDragOverColumn={setOverColumn}
+          onDragLeaveColumn={(col) =>
+            setOverColumn((cur) => (cur === col ? null : cur))
+          }
+          onDropColumn={handleDrop}
+          suppressClickRef={suppressClickRef}
+        />
+      )}
+
+      <TrackerSettings
+        open={settingsOpen}
+        prefs={prefs}
+        onChange={updatePrefs}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       <ApplicationDetailDrawer
         app={selected}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NaukriAdapter,
   naukriSelectors,
+  buildNaukriSearchQueryPlan,
   buildNaukriSearchUrl,
   matchesPreferences,
   hasNaukriSessionCookieHint,
@@ -109,6 +110,36 @@ describe('NaukriAdapter', () => {
     `;
     expect(adapter.detectApplicationStatus(document)).toBe('applied');
     expect(adapter.detectNeedsUserQuestions(document)).toBeNull();
+  });
+
+  it('confirms applied when the JD CTA shows Applied', () => {
+    const adapter = new NaukriAdapter();
+    Object.defineProperty(document, 'location', {
+      value: { href: 'https://www.naukri.com/job-listings-123' },
+      configurable: true,
+    });
+    document.body.innerHTML = `
+      <div class="jd-header">
+        <h1 class="jd-header-title">Software Engineer</h1>
+        <button type="button" class="styles_apply-button__uJI3A">Applied</button>
+      </div>
+    `;
+    expect(adapter.detectApplicationStatus(document)).toBe('applied');
+  });
+
+  it('does not treat a plain Apply button as applied', () => {
+    const adapter = new NaukriAdapter();
+    Object.defineProperty(document, 'location', {
+      value: { href: 'https://www.naukri.com/job-listings-456' },
+      configurable: true,
+    });
+    document.body.innerHTML = `
+      <div class="jd-header">
+        <h1 class="jd-header-title">Software Engineer</h1>
+        <button type="button" class="styles_apply-button__uJI3A">Apply</button>
+      </div>
+    `;
+    expect(adapter.detectApplicationStatus(document)).toBeNull();
   });
 
   it('treats Login/Register header as logged out', () => {
@@ -262,6 +293,21 @@ describe('NaukriAdapter', () => {
     expect(jobs[0]?.title).toBe('Easy Apply Role');
   });
 
+  it('finds the visible Easy Apply button on job detail pages', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <div class="jd-header">
+        <h1 class="jd-header-title">Software Engineer</h1>
+        <div class="jd-header-comp-name"><a>Acme</a></div>
+        <button type="button" class="styles_apply-button__uJI3A">Apply</button>
+        <button type="button">Save</button>
+      </div>
+    `;
+    const btn = adapter.findEasyApplyButton(document);
+    expect(btn).not.toBeNull();
+    expect(btn?.textContent?.trim()).toBe('Apply');
+  });
+
   it('detects company-site apply on job detail pages', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `
@@ -286,6 +332,38 @@ describe('preference matching helpers', () => {
     expect(url).toContain('k=Software+Engineer');
     expect(url).not.toContain('React');
     expect(url).toContain('Bengaluru');
+    expect(url).toContain('software-engineer-jobs-in-bengaluru');
+  });
+
+  it('plans all title × city combinations plus skill and nationwide fallbacks', () => {
+    const plan = buildNaukriSearchQueryPlan({
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Software Engineer', 'Full Stack Developer', 'UI Design'],
+      keywords: ['React', 'Node'],
+      locations: ['Hyderabad', 'Bangalore'],
+    });
+    // At least every title × city (3×2=6), plus combos/skills/nationwide.
+    expect(plan.length).toBeGreaterThanOrEqual(6);
+    const titleCity = plan.filter((p) => p.kind === 'title');
+    expect(titleCity.length).toBeGreaterThanOrEqual(6);
+    expect(
+      titleCity.some(
+        (p) =>
+          p.title === 'Full Stack Developer' && p.location === 'Hyderabad'
+      )
+    ).toBe(true);
+    expect(
+      titleCity.some(
+        (p) => p.title === 'UI Design' && p.location === 'Bangalore'
+      )
+    ).toBe(true);
+    expect(plan.some((p) => p.kind === 'title_keyword')).toBe(true);
+    expect(plan.some((p) => p.kind === 'keyword')).toBe(true);
+    expect(plan.some((p) => p.kind === 'nationwide' && !p.location)).toBe(
+      true
+    );
+    // URLs unique
+    expect(new Set(plan.map((p) => p.url)).size).toBe(plan.length);
   });
 
   it('falls back to keywords when titles are empty', () => {
@@ -393,7 +471,7 @@ describe('preference matching helpers', () => {
     expect(result.ready).toBe(false);
   });
 
-  it('clicks All Filters salary and work mode checkboxes from prefs', () => {
+  it('clicks All Filters salary, location, and work mode checkboxes from prefs', () => {
     document.body.innerHTML = `
       <aside>
         <button type="button">All Filters</button>
@@ -419,6 +497,32 @@ describe('preference matching helpers', () => {
               <label class="styles_chkLbl__x" for="chk-Hybrid-wfhType-">
                 <i class="ni-icon-unchecked"></i>
                 <span class="styles_filterLabel__x" title="Hybrid">Hybrid</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="styles_filterContainer__x">
+          <div class="styles_filterHeading__x"><span>Location</span></div>
+          <div class="styles_filterOptns__x" data-filter-id="citiesGid">
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Hyderabad/Secunderabad-cityTypeGid-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Hyderabad/Secunderabad-cityTypeGid-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Hyderabad/Secunderabad">Hyderabad/Secunderabad</span>
+              </label>
+            </div>
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Bengaluru-cityTypeGid-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Bengaluru-cityTypeGid-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Bengaluru">Bengaluru</span>
+              </label>
+            </div>
+            <div class="styles_chckBoxCont__x">
+              <input class="styles_inputCheckbox__x" id="chk-Chennai-cityTypeGid-" type="checkbox" style="display:none" />
+              <label class="styles_chkLbl__x" for="chk-Chennai-cityTypeGid-">
+                <i class="ni-icon-unchecked"></i>
+                <span class="styles_filterLabel__x" title="Chennai">Chennai</span>
               </label>
             </div>
           </div>
@@ -465,18 +569,30 @@ describe('preference matching helpers', () => {
       </aside>
     `;
 
+    Object.defineProperty(document, 'location', {
+      value: {
+        href: 'https://www.naukri.com/software-engineer-jobs-in-hyderabad?k=Software+Engineer&l=Hyderabad&ctcFilter=10to15&wfhType=2',
+      },
+      configurable: true,
+    });
+
     const prefs = {
       ...DEFAULT_JOB_PREFERENCES,
       minSalaryLpa: 10,
       workMode: 'remote' as const,
+      locations: ['Hyderabad', 'Bangalore', 'Chennai'],
     };
 
     expect(preferenceFiltersAlreadyApplied(document, prefs)).toBe(false);
-    const result = applyPreferenceFilters(document, prefs);
+    const result = applyPreferenceFilters(document, prefs, {
+      focusLocation: 'Hyderabad',
+    });
     expect(result.ok).toBe(true);
     expect(result.ready).toBe(true);
+    expect(result.confirmed).toBe(true);
     expect(result.applied.some((a) => a.includes('10-15 Lakhs'))).toBe(true);
     expect(result.applied.some((a) => a.includes('Remote'))).toBe(true);
+    expect(result.applied.some((a) => /Hyderabad/i.test(a))).toBe(true);
     expect(result.applied.some((a) => /Engineering/i.test(a))).toBe(false);
 
     expect(
@@ -489,11 +605,56 @@ describe('preference matching helpers', () => {
     expect(
       (
         document.getElementById(
+          'chk-Hyderabad/Secunderabad-cityTypeGid-'
+        ) as HTMLInputElement
+      ).checked
+    ).toBe(true);
+    expect(
+      (
+        document.getElementById(
           'chk-Engineering - Software & QA-functionAreaIdGid-'
         ) as HTMLInputElement
       ).checked
     ).toBe(false);
+    expect(preferenceFiltersAlreadyApplied(document, prefs, 'Hyderabad')).toBe(
+      true
+    );
+  });
+
+  it('reconfirms location via search URL when sidebar city is missing', () => {
+    document.body.innerHTML = `
+      <aside>
+        <button type="button">All Filters</button>
+        <div class="styles_filterOptns__x" data-filter-id="salaryRange">
+          <div class="styles_chckBoxCont__x">
+            <input id="chk-10-15 Lakhs-ctcFilter-" type="checkbox" checked style="display:none" />
+            <label for="chk-10-15 Lakhs-ctcFilter-">
+              <i class="ni-icon-checked"></i>
+              <span title="10-15 Lakhs">10-15 Lakhs</span>
+            </label>
+          </div>
+        </div>
+      </aside>
+    `;
+    Object.defineProperty(document, 'location', {
+      value: {
+        href: 'https://www.naukri.com/software-engineer-jobs-in-chennai?k=Software+Engineer&l=Chennai&ctcFilter=10to15',
+      },
+      configurable: true,
+    });
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      minSalaryLpa: 10,
+      workMode: 'any' as const,
+      locations: ['Chennai'],
+    };
     expect(preferenceFiltersAlreadyApplied(document, prefs)).toBe(true);
+    expect(
+      searchUrlHasPreferenceFilters(
+        'https://www.naukri.com/software-engineer-jobs-in-chennai?k=Software+Engineer&l=Chennai&ctcFilter=10to15',
+        prefs
+      )
+    ).toBe(true);
   });
 
   it('strictly enforces disclosed salary then title/keywords', () => {

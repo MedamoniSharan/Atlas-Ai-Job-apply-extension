@@ -41,16 +41,24 @@ async function clearPaceUi(): Promise<void> {
 
 /**
  * Human-paced wait with live countdown in the co-pilot panel + activity log.
+ * Pass maxMs to cap the delay (e.g. when Easy Apply is already visible).
  */
 export async function pacedWait(
   mode: PaceMode,
   phase: PacePhase,
-  options?: { jobTitle?: string; silent?: boolean }
+  options?: { jobTitle?: string; silent?: boolean; maxMs?: number; label?: string }
 ): Promise<boolean> {
-  const ms = paceDelayMs(mode, phase);
-  const label = PHASE_LABELS[phase];
+  const raw = paceDelayMs(mode, phase);
+  const ms =
+    options?.maxMs != null ? Math.min(raw, Math.max(0, options.maxMs)) : raw;
+  const label = options?.label || PHASE_LABELS[phase];
   const secs = Math.max(1, Math.round(ms / 1000));
   const jobBit = options?.jobTitle ? ` — ${options.jobTitle}` : '';
+
+  if (ms <= 0) {
+    await clearPaceUi();
+    return true;
+  }
 
   if (!options?.silent) {
     await setCopilotState({

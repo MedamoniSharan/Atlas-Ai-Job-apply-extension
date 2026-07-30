@@ -30,7 +30,7 @@ function statusLabel(
     case 'pending':
       return 'Queued';
     case 'applying':
-      return 'Opening';
+      return 'Applying';
     case 'applied':
       return 'Applied';
     case 'already_applied':
@@ -370,7 +370,7 @@ export function mountCopilotPanel() {
       }
       #${ROOT_ID} .cosmo-stats {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 6px;
         padding: 0 12px 8px;
       }
@@ -897,6 +897,10 @@ export function mountCopilotPanel() {
       </div>
       <div class="cosmo-stats" id="cosmo-stats" aria-label="Session stats">
         <div class="stat">
+          <span class="stat-n" id="stat-scanned">0</span>
+          <span class="stat-l">Scanned</span>
+        </div>
+        <div class="stat">
           <span class="stat-n" id="stat-matched">0</span>
           <span class="stat-l">Matched</span>
         </div>
@@ -992,6 +996,7 @@ export function mountCopilotPanel() {
 
   const jobsEl = root.querySelector('#cosmo-jobs') as HTMLElement;
   const jobsCountEl = root.querySelector('#cosmo-jobs-count') as HTMLElement;
+  const scannedEl = root.querySelector('#stat-scanned') as HTMLElement;
   const matchedEl = root.querySelector('#stat-matched') as HTMLElement;
   const appliedEl = root.querySelector('#stat-applied') as HTMLElement;
   const skippedEl = root.querySelector('#stat-skipped') as HTMLElement;
@@ -1209,7 +1214,7 @@ export function mountCopilotPanel() {
       el.innerHTML = `
         <div class="cosmo-toast-icon" aria-hidden="true">⏱</div>
         <div class="cosmo-toast-copy">
-          <p class="cosmo-toast-title">Slowing down</p>
+          <p class="cosmo-toast-title" data-pace-title></p>
           <p class="cosmo-toast-msg" data-pace-msg></p>
         </div>
         <span class="cosmo-toast-countdown" data-pace-cd></span>
@@ -1217,9 +1222,11 @@ export function mountCopilotPanel() {
       toastHost.prepend(el);
       paceToastEl = el;
     }
+    const titleEl = paceToastEl.querySelector('[data-pace-title]') as HTMLElement;
     const msgEl = paceToastEl.querySelector('[data-pace-msg]') as HTMLElement;
     const cdEl = paceToastEl.querySelector('[data-pace-cd]') as HTMLElement;
-    msgEl.textContent = jobTitle ? `${label} · ${jobTitle}` : label;
+    titleEl.textContent = label;
+    msgEl.textContent = jobTitle || 'Cosmo is pacing like a human';
     cdEl.textContent = countdown;
   }
 
@@ -1342,8 +1349,10 @@ export function mountCopilotPanel() {
     });
   }
 
-  function renderJobs(jobs: ScannedJobItem[]) {
-    jobsCountEl.textContent = String(jobs.length);
+  function renderJobs(jobs: ScannedJobItem[], scannedTotal?: number) {
+    const matched = jobs.length;
+    const scanned = scannedTotal ?? matched;
+    jobsCountEl.textContent = `${scanned} scanned · ${matched} matched`;
     if (!jobs.length) {
       jobsEl.innerHTML =
         '<div class="cosmo-empty">Matched jobs will appear here as Cosmo scans the list.</div>';
@@ -1393,7 +1402,7 @@ export function mountCopilotPanel() {
       const id = el.getAttribute('data-job-id') || '';
       const toggle = () => {
         selectedJobId = selectedJobId === id ? null : id;
-        renderJobs(jobs);
+        renderJobs(jobs, scanned);
         const openEl = jobsEl.querySelector(
           `.job-row.is-open`
         ) as HTMLElement | null;
@@ -1416,6 +1425,7 @@ export function mountCopilotPanel() {
   }
 
   function render(state: CopilotState) {
+    scannedEl.textContent = String(state.scanned || 0);
     matchedEl.textContent = String(state.matched || 0);
     appliedEl.textContent = String(state.applied || 0);
     skippedEl.textContent = String(state.skipped || 0);
@@ -1431,10 +1441,12 @@ export function mountCopilotPanel() {
       statusLabelEl.textContent = `Break — resumes in ${formatBreakCountdown(
         state.sessionBreakRemainingMs ?? 0
       )}`;
-    } else if (state.paceLabel && (state.paceRemainingMs ?? 0) > 0) {
-      statusLabelEl.textContent = `${state.paceLabel} — ${formatBreakCountdown(
-        state.paceRemainingMs ?? 0
-      )}`;
+    } else if (state.paceLabel) {
+      const remaining = state.paceRemainingMs ?? 0;
+      statusLabelEl.textContent =
+        remaining > 0
+          ? `${state.paceLabel} — ${formatBreakCountdown(remaining)}`
+          : state.paceLabel;
     } else if (state.paused) {
       statusLabelEl.textContent = state.needsLogin
         ? state.loginPauseReason === 'uncertain'
@@ -1529,7 +1541,7 @@ export function mountCopilotPanel() {
       );
     stopBtn.disabled = !state.running;
 
-    renderJobs(state.scannedJobs ?? []);
+    renderJobs(state.scannedJobs ?? [], state.scanned || 0);
     safetyEl.classList.toggle('is-active', Boolean(state.running));
 
     if (state.sessionComplete) {
