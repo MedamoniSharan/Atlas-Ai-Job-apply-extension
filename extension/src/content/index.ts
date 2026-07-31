@@ -57,6 +57,19 @@ function emitJob(adapter = resolveAdapter(window.location.href)) {
   });
 }
 
+/** Filter chips and "apply filters" controls also contain the word apply. */
+const APPLY_BUTTON_TEXT = /^(easy apply|apply now|apply|submit application)$/;
+const NOT_AN_APPLY_ACTION = /filter|save|sort|search|clear|refine/;
+
+function looksLikeApplyButton(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  if (el.closest('[data-filter-id], input[type="checkbox"]')) return false;
+  const label = (el.textContent ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!label || label.length > 30) return false;
+  if (NOT_AN_APPLY_ACTION.test(label)) return false;
+  return APPLY_BUTTON_TEXT.test(label);
+}
+
 function bindApplyClickCapture() {
   if (applyClickBound) return;
   applyClickBound = true;
@@ -69,12 +82,13 @@ function bindApplyClickCapture() {
       const applyBtn = target.closest(
         'button, a, [role="button"]'
       ) as HTMLElement | null;
-      const label = applyBtn?.textContent?.toLowerCase() ?? '';
-      if (!label.includes('apply')) return;
+      if (!looksLikeApplyButton(applyBtn)) return;
 
       setTimeout(() => {
         const current = resolveAdapter(window.location.href);
         if (!current) return;
+        // Only record once the page itself confirms the application landed.
+        if (current.detectApplicationStatus(document) !== 'applied') return;
         const job = current.readJob(document);
         if (!job?.title || !job.company) return;
         const payload: JobPayload = {
@@ -92,7 +106,7 @@ function bindApplyClickCapture() {
           type: 'APPLICATION_RECORDED',
           payload,
         });
-      }, 1500);
+      }, 2500);
     },
     true
   );

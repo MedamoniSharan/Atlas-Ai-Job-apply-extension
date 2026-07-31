@@ -1,10 +1,12 @@
 import {
+  APPLY_CAP_CODES,
   getEffectivePlan,
   getPlanAppliesLimit,
   getPlanAppliesPerDay,
   getPlanAppliesPerHour,
   jobPayloadSchema,
   type EventEnvelope,
+  type SyncEventsResult,
 } from '@cosmo/shared';
 import { ActivityModel } from './activity.model';
 import { ApplicationModel, IApplication } from '../applications/application.model';
@@ -106,15 +108,57 @@ async function assertApplyCaps(userId: string): Promise<void> {
   }
 }
 
+type UpsertOutcome =
+  | { kind: 'ignored' }
+  | { kind: 'invalid' }
+  | { kind: 'upserted'; application: ReturnType<typeof toApplication> };
+
+export function isAppliedRecord(
+  status?: string | null,
+  metadata?: Record<string, unknown>
+): boolean {
+  return status === 'applied' || metadata?.source === 'auto_apply';
+}
+
+/**
+ * A later scan re-detects jobs we already applied to; never demote them back
+ * out of the Applied bucket.
+ */
+export function resolveApplicationStatus(
+  eventType: EventEnvelope['type'],
+  jobStatus: string,
+  existingIsApplied: boolean
+): string {
+  const incoming =
+    eventType === 'ApplicationRecorded' && jobStatus === 'detected'
+      ? 'applied'
+      : jobStatus;
+  return existingIsApplied && incoming !== 'applied' ? 'applied' : incoming;
+}
+
+/** Keeps an applied job labelled auto_apply so the applied bucket still matches it. */
+export function mergeApplicationMetadata(
+  existingMetadata: Record<string, unknown>,
+  incomingMetadata: Record<string, unknown> | undefined,
+  existingIsApplied: boolean
+): Record<string, unknown> {
+  const merged = { ...existingMetadata, ...(incomingMetadata ?? {}) };
+  if (existingIsApplied && existingMetadata.source === 'auto_apply') {
+    merged.source = 'auto_apply';
+    merged.skipped = false;
+  }
+  return merged;
+}
+
 async function upsertApplicationFromEvent(
   userId: string,
   event: EventEnvelope
-) {
+): Promise<UpsertOutcome> {
   if (
     event.type !== 'ApplicationRecorded' &&
     event.type !== 'JobDetected'
   ) {
-    return null;
+    return { kind: 'ignored' };
   }
 
   const parsed = jobPayloadSchema.safeParse(event.payload);
@@ -123,20 +167,10 @@ async function upsertApplicationFromEvent(
       eventId: event.eventId,
       issues: parsed.error.issues,
     });
-    return null;
+    return { kind: 'invalid' };
   }
 
   const job = parsed.data;
-  const status =
-    event.type === 'ApplicationRecorded'
-      ? job.status === 'detected'
-        ? 'applied'
-        : job.status
-      : job.status;
-
-  if (countsAsApply(event, status)) {
-    await assertApplyCaps(userId);
-  }
 
   const filter =
     job.externalJobId && job.externalJobId.length > 0
@@ -145,6 +179,19 @@ async function upsertApplicationFromEvent(
 
   const richFields: Record<string, unknown> = {};
   const existing = await ApplicationModel.findOne(filter).lean();
+
+  const existingMetadata =
+    (existing?.metadata as Record<string, unknown> | undefined) ?? {};
+  const existingIsApplied = isAppliedRecord(existing?.status, existingMetadata);
+  const status = resolveApplicationStatus(
+    event.type,
+    job.status,
+    existingIsApplied
+  );
+
+  if (!existingIsApplied && countsAsApply(event, status)) {
+    await assertApplyCaps(userId);
+  }
 
   const preferLonger = (next?: string, prev?: string | null) => {
     if (!next) return undefined;
@@ -185,10 +232,17 @@ async function upsertApplicationFromEvent(
   if (job.location) richFields.location = job.location;
   if (job.url) richFields.url = job.url;
 
-  const mergedMetadata = {
-    ...((existing?.metadata as Record<string, unknown> | undefined) ?? {}),
-    ...(job.metadata ?? {}),
-  };
+  const mergedMetadata = mergeApplicationMetadata(
+    existingMetadata,
+    job.metadata,
+    existingIsApplied
+  );
+
+  const appliedAt = job.appliedAt
+    ? new Date(job.appliedAt)
+    : status === 'applied' && !existing?.appliedAt
+      ? new Date(event.timestamp)
+      : undefined;
 
   const doc = await ApplicationModel.findOneAndUpdate(
     filter,
@@ -199,7 +253,7 @@ async function upsertApplicationFromEvent(
         title: job.title,
         company: job.company,
         status,
-        appliedAt: job.appliedAt ? new Date(job.appliedAt) : undefined,
+        ...(appliedAt ? { appliedAt } : {}),
         metadata: Object.keys(mergedMetadata).length ? mergedMetadata : undefined,
         ...richFields,
       },
@@ -211,7 +265,7 @@ async function upsertApplicationFromEvent(
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  return toApplication(doc);
+  return { kind: 'upserted', application: toApplication(doc) };
 }
 
 async function handleExtensionConnected(
@@ -229,40 +283,91 @@ async function handleExtensionConnected(
   });
 }
 
+async function recordActivity(
+  userId: string,
+  event: EventEnvelope,
+  syncStatus: 'synced' | 'failed'
+): Promise<void> {
+  await ActivityModel.findOneAndUpdate(
+    { userId, eventId: event.eventId },
+    {
+      $set: {
+        type: event.type,
+        payload: event.payload,
+        syncStatus,
+      },
+      $setOnInsert: {
+        eventId: event.eventId,
+        userId,
+      },
+    },
+    { upsert: true, new: true }
+  );
+}
+
 export async function syncEvents(
   userId: string,
   body: { events: EventEnvelope[] }
-): Promise<{ processed: number; applications: ReturnType<typeof toApplication>[] }> {
+): Promise<
+  SyncEventsResult & { applications: ReturnType<typeof toApplication>[] }
+> {
   const applications: ReturnType<typeof toApplication>[] = [];
+  const syncedEventIds: string[] = [];
+  const failedEventIds: string[] = [];
+  const invalidEventIds: string[] = [];
+  let capError: { code: string; message: string } | null = null;
 
   for (const event of body.events) {
-    await ActivityModel.findOneAndUpdate(
-      { userId, eventId: event.eventId },
-      {
-        $set: {
-          type: event.type,
-          payload: event.payload,
-          syncStatus: 'synced',
-        },
-        $setOnInsert: {
-          eventId: event.eventId,
-          userId,
-        },
-      },
-      { upsert: true, new: true }
-    );
-
-    if (event.type === 'ExtensionConnected') {
-      await handleExtensionConnected(userId, event);
+    // Once a cap is hit, further applies cannot be stored — leave them queued
+    // rather than reporting them as accepted.
+    if (capError && event.type === 'ApplicationRecorded') {
+      failedEventIds.push(event.eventId);
+      await recordActivity(userId, event, 'failed');
+      continue;
     }
 
-    const app = await upsertApplicationFromEvent(userId, event);
-    if (app) {
-      applications.push(app);
-      const io = getIo();
-      io?.to(`user:${userId}`).emit('application.updated', app);
+    try {
+      if (event.type === 'ExtensionConnected') {
+        await handleExtensionConnected(userId, event);
+      }
+
+      const outcome = await upsertApplicationFromEvent(userId, event);
+      if (outcome.kind === 'upserted') {
+        applications.push(outcome.application);
+        getIo()?.to(`user:${userId}`).emit('application.updated', outcome.application);
+      } else if (outcome.kind === 'invalid') {
+        invalidEventIds.push(event.eventId);
+      }
+
+      syncedEventIds.push(event.eventId);
+      await recordActivity(userId, event, 'synced');
+    } catch (error) {
+      failedEventIds.push(event.eventId);
+      await recordActivity(userId, event, 'failed');
+
+      const code = error instanceof AppError ? error.code : undefined;
+      if (code && (APPLY_CAP_CODES as readonly string[]).includes(code)) {
+        capError = {
+          code,
+          message: (error as AppError).message,
+        };
+        continue;
+      }
+
+      logger.error('Failed to sync event', {
+        eventId: event.eventId,
+        type: event.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
-  return { processed: body.events.length, applications };
+  return {
+    processed: syncedEventIds.length,
+    syncedEventIds,
+    failedEventIds,
+    invalidEventIds,
+    capError,
+    applications,
+  };
 }

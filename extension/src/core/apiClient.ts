@@ -4,6 +4,7 @@ import type {
   EventEnvelope,
   JobPreferences,
   SyncEventsRequest,
+  SyncEventsResult,
 } from '@cosmo/shared';
 import {
   getAuthState,
@@ -124,11 +125,14 @@ export async function refreshAccessToken(): Promise<boolean> {
   }
 }
 
+/** Per-event fields are absent when talking to a server older than this build. */
+type SyncEventsBody = Partial<SyncEventsResult> & { processed: number };
+
 export async function syncEvents(
   events: EventEnvelope[]
-): Promise<ApiResponse<{ processed: number }>> {
+): Promise<ApiResponse<SyncEventsBody>> {
   const body: SyncEventsRequest = { events };
-  return request<{ processed: number }>('/api/v1/events/sync', {
+  return request<SyncEventsBody>('/api/v1/events/sync', {
     method: 'POST',
     body: JSON.stringify(body),
   });

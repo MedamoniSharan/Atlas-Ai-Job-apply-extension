@@ -79,3 +79,24 @@ export const syncEventsRequestSchema = z.object({
 });
 
 export type SyncEventsRequest = z.infer<typeof syncEventsRequestSchema>;
+
+export const APPLY_CAP_CODES = [
+  'APPLY_HOUR_CAP',
+  'APPLY_DAY_CAP',
+  'APPLY_PLAN_CAP',
+] as const;
+
+export type ApplyCapCode = (typeof APPLY_CAP_CODES)[number];
+
+/**
+ * Per-event outcome so the extension only drops events the server actually
+ * stored. Anything in `failedEventIds` must stay queued and be retried.
+ */
+export type SyncEventsResult = {
+  processed: number;
+  syncedEventIds: string[];
+  failedEventIds: string[];
+  /** Permanently unusable payloads — retrying cannot fix these. */
+  invalidEventIds: string[];
+  capError: { code: string; message: string } | null;
+};
