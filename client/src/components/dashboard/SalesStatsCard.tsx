@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { useHoverProgress } from '../../hooks/useHoverProgress';
-
-const periods = ['Last 28 Days', 'Last Month', 'Last Year'] as const;
+import {
+  DASH_PERIODS,
+  type DashPeriod,
+} from '../../lib/dashboardPeriod';
 
 const RING_R = 42;
 const RING_C = 2 * Math.PI * RING_R;
@@ -81,18 +83,21 @@ function ApplyRing({ value }: { value: number }) {
 }
 
 export interface SalesStatsCardProps {
+  period: DashPeriod;
+  onPeriodChange: (period: DashPeriod) => void;
   conversionPct: number;
   totalJobs: number;
   appliedCount: number;
 }
 
 export function SalesStatsCard({
+  period,
+  onPeriodChange,
   conversionPct,
   totalJobs,
   appliedCount,
 }: SalesStatsCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [period, setPeriod] = useState<(typeof periods)[number]>(periods[0]);
 
   return (
     <article className="dash-widget dash-sales">
@@ -101,6 +106,7 @@ export function SalesStatsCard({
           <h2 className="dash-sales__title">Apply stats</h2>
           <p className="dash-sales__subtitle">
             {totalJobs.toLocaleString()} jobs · {appliedCount.toLocaleString()} applied
+            <span className="dash-sales__period"> · {period}</span>
           </p>
         </div>
         <div className="dash-sales__menu-wrap">
@@ -115,13 +121,13 @@ export function SalesStatsCard({
           </button>
           {menuOpen && (
             <ul className="dash-sales__menu" aria-label="Apply stats periods">
-              {periods.map((item) => (
+              {DASH_PERIODS.map((item) => (
                 <li key={item}>
                   <button
                     type="button"
                     className="dash-sales__menu-link"
                     onClick={() => {
-                      setPeriod(item);
+                      onPeriodChange(item);
                       setMenuOpen(false);
                     }}
                   >

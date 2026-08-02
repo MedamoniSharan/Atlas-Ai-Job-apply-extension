@@ -1,11 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, Gauge, Target } from 'lucide-react';
 import { useHoverProgress } from '../../hooks/useHoverProgress';
+import {
+  DASH_PERIODS,
+  type DashPeriod,
+} from '../../lib/dashboardPeriod';
 
-const PERIODS = ['This month', 'Last month', 'This year'] as const;
 const ARC_LENGTH = 100;
 
 export interface GrowthRadialCardProps {
+  period: DashPeriod;
+  onPeriodChange: (period: DashPeriod) => void;
   usagePct: number;
   applyRate: number;
   usage: number;
@@ -15,6 +20,8 @@ export interface GrowthRadialCardProps {
 }
 
 export function GrowthRadialCard({
+  period,
+  onPeriodChange,
   usagePct,
   applyRate,
   usage,
@@ -22,7 +29,6 @@ export function GrowthRadialCard({
   appliedCount,
   jobsCount,
 }: GrowthRadialCardProps) {
-  const [period, setPeriod] = useState<(typeof PERIODS)[number]>(PERIODS[0]);
   const [isOpen, setIsOpen] = useState(false);
   const maskId = useId();
   const { percent, durationMs, hovered, setReplay, bind } = useHoverProgress(usagePct);
@@ -83,12 +89,12 @@ export function GrowthRadialCard({
           </button>
           {isOpen && (
             <ul className="dash-growth__menu" role="listbox" aria-label="Available periods">
-              {PERIODS.map((item) => (
+              {DASH_PERIODS.map((item) => (
                 <li key={item} role="option" aria-selected={period === item}>
                   <button
                     type="button"
                     onClick={() => {
-                      setPeriod(item);
+                      onPeriodChange(item);
                       setIsOpen(false);
                     }}
                   >

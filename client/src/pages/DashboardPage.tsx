@@ -1,7 +1,12 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Target, Search } from 'lucide-react';
 import { fetchApplications, fetchBillingMe, fetchScanStats } from '../lib/api';
+import {
+  DASH_PERIODS,
+  dashPeriodRange,
+  type DashPeriod,
+} from '../lib/dashboardPeriod';
 import { useApplicationSocket } from '../lib/socket';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import {
@@ -33,14 +38,24 @@ export function DashboardPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { data: onboarding } = useOnboardingStatus();
+  const [statsPeriod, setStatsPeriod] = useState<DashPeriod>(DASH_PERIODS[0]);
+  const periodRange = useMemo(
+    () => dashPeriodRange(statsPeriod),
+    [statsPeriod],
+  );
+  const periodQuery = {
+    from: periodRange.from,
+    to: periodRange.to,
+  };
 
   const { data: matchData } = useQuery({
-    queryKey: ['applications', 'top-matches'],
+    queryKey: ['applications', 'top-matches', statsPeriod, periodRange.from],
     queryFn: async () => {
       const res = await fetchApplications({
         page: 1,
         limit: 8,
         bucket: 'matched',
+        ...periodQuery,
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -49,12 +64,13 @@ export function DashboardPage() {
   });
 
   const { data: appliedStats } = useQuery({
-    queryKey: ['applications', 'applied-count'],
+    queryKey: ['applications', 'applied-count', statsPeriod, periodRange.from],
     queryFn: async () => {
       const res = await fetchApplications({
         page: 1,
         limit: 1,
         bucket: 'applied',
+        ...periodQuery,
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -63,12 +79,13 @@ export function DashboardPage() {
   });
 
   const { data: skippedStats } = useQuery({
-    queryKey: ['applications', 'skipped-count'],
+    queryKey: ['applications', 'skipped-count', statsPeriod, periodRange.from],
     queryFn: async () => {
       const res = await fetchApplications({
         page: 1,
         limit: 1,
         bucket: 'skipped',
+        ...periodQuery,
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -77,12 +94,18 @@ export function DashboardPage() {
   });
 
   const { data: companySiteStats } = useQuery({
-    queryKey: ['applications', 'company-site-count'],
+    queryKey: [
+      'applications',
+      'company-site-count',
+      statsPeriod,
+      periodRange.from,
+    ],
     queryFn: async () => {
       const res = await fetchApplications({
         page: 1,
         limit: 1,
         bucket: 'company_site',
+        ...periodQuery,
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -91,7 +114,57 @@ export function DashboardPage() {
   });
 
   const { data: allStats } = useQuery({
-    queryKey: ['applications', 'all-count'],
+    queryKey: ['applications', 'all-count', statsPeriod, periodRange.from],
+    queryFn: async () => {
+      const res = await fetchApplications({
+        page: 1,
+        limit: 1,
+        bucket: 'all',
+        ...periodQuery,
+      });
+      if (!res.success) throw new Error(res.message);
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: recentApps } = useQuery({
+    queryKey: ['applications', 'recent-activity', statsPeriod, periodRange.from],
+    queryFn: async () => {
+      const res = await fetchApplications({
+        page: 1,
+        limit: 6,
+        bucket: 'all',
+        ...periodQuery,
+      });
+      if (!res.success) throw new Error(res.message);
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: autoApplyStats } = useQuery({
+    queryKey: [
+      'applications',
+      'auto-apply-count',
+      statsPeriod,
+      periodRange.from,
+    ],
+    queryFn: async () => {
+      const res = await fetchApplications({
+        page: 1,
+        limit: 1,
+        source: 'auto_apply',
+        ...periodQuery,
+      });
+      if (!res.success) throw new Error(res.message);
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: lifetimeAll } = useQuery({
+    queryKey: ['applications', 'lifetime-all'],
     queryFn: async () => {
       const res = await fetchApplications({ page: 1, limit: 1, bucket: 'all' });
       if (!res.success) throw new Error(res.message);
@@ -100,23 +173,13 @@ export function DashboardPage() {
     staleTime: 30_000,
   });
 
-  const { data: recentApps } = useQuery({
-    queryKey: ['applications', 'recent-activity'],
-    queryFn: async () => {
-      const res = await fetchApplications({ page: 1, limit: 6, bucket: 'all' });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: autoApplyStats } = useQuery({
-    queryKey: ['applications', 'auto-apply-count'],
+  const { data: lifetimeApplied } = useQuery({
+    queryKey: ['applications', 'lifetime-applied'],
     queryFn: async () => {
       const res = await fetchApplications({
         page: 1,
         limit: 1,
-        source: 'auto_apply',
+        bucket: 'applied',
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -159,6 +222,8 @@ export function DashboardPage() {
   const skippedCount = skippedStats?.total ?? 0;
   const companySiteCount = companySiteStats?.total ?? 0;
   const autoApplyCount = autoApplyStats?.total ?? 0;
+  const lifetimeJobsCount = lifetimeAll?.total ?? 0;
+  const lifetimeAppliedCount = lifetimeApplied?.total ?? 0;
   const scannedTotal = scanStats?.totals.scanned ?? 0;
   const scannedWindow = scanStats?.window.scanned ?? 0;
   const scanMatchedTotal = scanStats?.totals.matched ?? 0;
@@ -218,14 +283,9 @@ export function DashboardPage() {
     return subEnd ? 'Active until this date' : 'Active plan';
   })();
 
-  const matchRate =
-    jobsCount > 0 ? Math.min(100, Math.round((matchedCount / jobsCount) * 100)) : 0;
   const applyRate =
     jobsCount > 0 ? Math.min(100, Math.round((appliedCount / jobsCount) * 100)) : 0;
-  const conversionPct =
-    matchedCount > 0
-      ? Math.min(100, Math.round((appliedCount / matchedCount) * 100))
-      : applyRate;
+  const conversionPct = applyRate;
 
   const timelineItems = useMemo(
     () => appsToTimeline(recentApps?.items ?? []),
@@ -419,6 +479,8 @@ export function DashboardPage() {
 
           <div className="dash-board__mid">
             <GrowthRadialCard
+              period={statsPeriod}
+              onPeriodChange={setStatsPeriod}
               usagePct={usagePct}
               applyRate={applyRate}
               usage={usage}
@@ -427,6 +489,8 @@ export function DashboardPage() {
               jobsCount={jobsCount}
             />
             <SalesStatsCard
+              period={statsPeriod}
+              onPeriodChange={setStatsPeriod}
               conversionPct={conversionPct}
               totalJobs={jobsCount}
               appliedCount={appliedCount}
@@ -491,9 +555,8 @@ export function DashboardPage() {
           </article>
 
           <ProfileReportCard
-            matchRate={matchRate}
-            jobsCount={jobsCount}
-            appliedCount={appliedCount}
+            jobsCount={lifetimeJobsCount}
+            appliedCount={lifetimeAppliedCount}
           />
         </aside>
       </div>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowUp, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /** Manual Naukri apply typically takes ~5 minutes per job. */
@@ -20,10 +20,10 @@ const chartPath =
   'M 0 61 C 15 61 27 10 42 10 C 57 10 69 49 84 49 C 99 49 111 18 126 18 C 141 18 153 32 168 32 C 183 32 195 6 210 6';
 
 export interface ProfileReportCardProps {
-  matchRate: number;
+  /** Lifetime jobs tracked in Cosmo. */
   jobsCount: number;
+  /** Lifetime applies. */
   appliedCount?: number;
-  yearLabel?: string;
 }
 
 function formatTimeSaved(totalMinutes: number): string {
@@ -45,10 +45,8 @@ export function estimateTimeSavedMinutes(
 }
 
 export function ProfileReportCard({
-  matchRate,
   jobsCount,
   appliedCount = 0,
-  yearLabel = `YEAR ${new Date().getFullYear()}`,
 }: ProfileReportCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -68,20 +66,25 @@ export function ProfileReportCard({
       <header className="dash-report__header">
         <div className="dash-report__heading">
           <div className="dash-report__title-row">
-            <h2 id="profile-report-title">Match report</h2>
-            <span className="dash-report__badge">{yearLabel}</span>
+            <h2 id="profile-report-title">Lifetime</h2>
+            <span className="dash-report__badge">ALL TIME</span>
           </div>
-          <div className="dash-report__values">
-            <p className="dash-report__growth">
-              <ArrowUp aria-hidden size={18} strokeWidth={2.5} />
-              <span>{matchRate}%</span>
-            </p>
-            <p className="dash-report__total">{jobsCount.toLocaleString()} jobs</p>
-            <p className="dash-report__saved">
-              <strong>{timeSaved.label}</strong>
-              <span> saved with Cosmo</span>
-            </p>
-          </div>
+          <ul className="dash-report__stats" aria-label="Lifetime totals">
+            <li>
+              <small>Jobs</small>
+              <strong>{jobsCount.toLocaleString()}</strong>
+            </li>
+            <li>
+              <small>Applied</small>
+              <strong>{appliedCount.toLocaleString()}</strong>
+            </li>
+            <li>
+              <small>Time saved</small>
+              <strong className="dash-report__stats-saved">
+                {timeSaved.label}
+              </strong>
+            </li>
+          </ul>
         </div>
         <div className="dash-report__actions">
           <button
@@ -113,17 +116,18 @@ export function ProfileReportCard({
           )}
         </div>
       </header>
-      <figure className="dash-report__chart" aria-label="Match report trend chart">
+      <figure className="dash-report__chart" aria-label="Lifetime activity chart">
         <svg
           viewBox="0 0 210 70"
           role="img"
           aria-labelledby="dash-report-chart-title dash-report-chart-desc"
           preserveAspectRatio="none"
         >
-          <title id="dash-report-chart-title">Match report trend</title>
+          <title id="dash-report-chart-title">Lifetime activity</title>
           <desc id="dash-report-chart-desc">
-            Estimated time saved from Cosmo matching and applying. {timeSaved.label}{' '}
-            based on {appliedCount} applies and {jobsCount} tracked jobs.
+            Estimated time saved from Cosmo matching and applying.{' '}
+            {timeSaved.label} based on {appliedCount} applies and {jobsCount}{' '}
+            tracked jobs.
           </desc>
           <path className="dash-report__shadow" d={chartPath} />
           <path className="dash-report__line" d={chartPath} />

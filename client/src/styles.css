@@ -941,6 +941,10 @@ textarea {
   color: var(--color-text-secondary);
 }
 
+.dash-sales__period {
+  color: var(--color-text-on-muted);
+}
+
 .dash-sales__menu-wrap {
   position: relative;
 }
@@ -1464,6 +1468,42 @@ textarea {
 
 .dash-report__values {
   margin-top: 10px;
+}
+
+.dash-report__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-report__stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dash-report__stats small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.dash-report__stats strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text-on-muted);
+  line-height: 1.2;
+}
+
+.dash-report__stats-saved {
+  color: #1b7a4a !important;
 }
 
 .dash-report__growth {
