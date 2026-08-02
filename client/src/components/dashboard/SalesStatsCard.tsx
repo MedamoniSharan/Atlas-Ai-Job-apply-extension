@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { useHoverProgress } from '../../hooks/useHoverProgress';
 import {
@@ -7,28 +7,49 @@ import {
 } from '../../lib/dashboardPeriod';
 
 const ARC_LENGTH = 100;
-/** Semicircle path center and radius (viewBox 220×150). */
-const CX = 110;
-const CY = 118;
-const R = 78;
+const CX = 140;
+const CY = 132;
+const R = 98;
+/** Gauge sweep: ~7 o'clock → 5 o'clock through the top. */
+const START_DEG = 200;
+const END_DEG = -20;
+const SWEEP = START_DEG - END_DEG; // 220°
 
-function needleAngle(pct: number): number {
-  // 180° (left) → 0° (right) across the semicircle.
-  const clamped = Math.max(0, Math.min(100, pct));
-  return 180 - (clamped / 100) * 180;
+function polar(deg: number, radius: number) {
+  const rad = (deg * Math.PI) / 180;
+  return {
+    x: CX + radius * Math.cos(rad),
+    y: CY - radius * Math.sin(rad),
+  };
 }
+
+function arcPath(radius: number) {
+  const s = polar(START_DEG, radius);
+  const e = polar(END_DEG, radius);
+  return `M ${s.x} ${s.y} A ${radius} ${radius} 0 1 1 ${e.x} ${e.y}`;
+}
+
+const TICKS = [0, 20, 40, 60, 80, 100] as const;
 
 function MatchSpeedometer({ value }: { value: number }) {
   const maskId = useId();
+  const glowId = useId();
   const { percent, durationMs, hovered, setReplay, bind } = useHoverProgress(value);
   const revealRef = useRef<SVGPathElement>(null);
   const target = Math.max(0, Math.min(100, value));
   const targetOffset = ARC_LENGTH - target;
-  const angle = needleAngle(percent);
-  const rad = (angle * Math.PI) / 180;
-  const needleLen = R - 14;
-  const nx = CX + needleLen * Math.cos(rad);
-  const ny = CY - needleLen * Math.sin(rad);
+
+  const ticks = useMemo(
+    () =>
+      TICKS.map((mark) => {
+        const deg = START_DEG - (mark / 100) * SWEEP;
+        const outer = polar(deg, R + 2);
+        const inner = polar(deg, R - 14);
+        const label = polar(deg, R - 26);
+        return { mark, outer, inner, label };
+      }),
+    [],
+  );
 
   useEffect(() => {
     setReplay(() => {
@@ -70,54 +91,90 @@ function MatchSpeedometer({ value }: { value: number }) {
     >
       <svg
         className="dash-sales__gauge-svg"
-        viewBox="0 0 220 150"
+        viewBox="0 0 280 168"
         aria-hidden
       >
         <defs>
+          <linearGradient id={glowId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#39ff14" stopOpacity="0.35" />
+            <stop offset="45%" stopColor="#7cff4a" stopOpacity="0.85" />
+            <stop offset="78%" stopColor="#b8ff4a" stopOpacity="1" />
+            <stop offset="100%" stopColor="#e8ff8a" stopOpacity="1" />
+          </linearGradient>
+          <filter id={`${glowId}-blur`} x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
           <mask
             id={maskId}
             maskUnits="userSpaceOnUse"
             x="0"
             y="0"
-            width="220"
-            height="150"
+            width="280"
+            height="168"
           >
             <path
               ref={revealRef}
-              d={`M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`}
+              d={arcPath(R)}
               pathLength={ARC_LENGTH}
               fill="none"
               stroke="#fff"
-              strokeWidth="16"
-              strokeLinecap="butt"
+              strokeWidth="20"
+              strokeLinecap="round"
               strokeDasharray={ARC_LENGTH}
               strokeDashoffset={targetOffset}
             />
           </mask>
         </defs>
+
+        {/* Segmented track */}
+        <path className="dash-sales__gauge-track" d={arcPath(R)} />
+
+        {/* Soft under-glow for filled portion */}
         <path
-          className="dash-sales__gauge-track"
-          d={`M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`}
-          pathLength={ARC_LENGTH}
-        />
-        <path
-          className="dash-sales__gauge-progress"
-          d={`M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`}
+          className="dash-sales__gauge-glow"
+          d={arcPath(R)}
+          stroke={`url(#${glowId})`}
           mask={`url(#${maskId})`}
         />
-        <line
-          className="dash-sales__gauge-needle"
-          x1={CX}
-          y1={CY}
-          x2={nx}
-          y2={ny}
+
+        {/* Solid fill */}
+        <path
+          className="dash-sales__gauge-progress"
+          d={arcPath(R)}
+          stroke={`url(#${glowId})`}
+          mask={`url(#${maskId})`}
+          filter={`url(#${glowId}-blur)`}
         />
-        <circle className="dash-sales__gauge-hub" cx={CX} cy={CY} r="3.5" />
-        <text x={CX} y={CY - 38} className="dash-sales__gauge-value">
-          {percent}%
+
+        {ticks.map(({ mark, outer, inner, label }) => (
+          <g key={mark}>
+            <line
+              className="dash-sales__gauge-tick"
+              x1={inner.x}
+              y1={inner.y}
+              x2={outer.x}
+              y2={outer.y}
+            />
+            <text
+              className="dash-sales__gauge-tick-label"
+              x={label.x}
+              y={label.y}
+              dy="0.35em"
+            >
+              {mark}
+            </text>
+          </g>
+        ))}
+
+        <text x={CX} y={CY - 8} className="dash-sales__gauge-value">
+          {percent}
         </text>
-        <text x={CX} y={CY - 18} className="dash-sales__gauge-label">
-          Matched
+        <text x={CX} y={CY + 14} className="dash-sales__gauge-label">
+          match %
         </text>
       </svg>
     </div>
@@ -142,16 +199,16 @@ export function SalesStatsCard({
     scannedCount > 0
       ? Math.min(100, Math.round((matchedCount / scannedCount) * 100))
       : 0;
+  const unmatched = Math.max(0, scannedCount - matchedCount);
 
   return (
     <article className="dash-widget dash-sales">
       <header className="dash-sales__header">
         <div>
+          <p className="dash-sales__eyebrow">How matched?</p>
           <h2 className="dash-sales__title">Match stats</h2>
           <p className="dash-sales__subtitle">
-            {scannedCount.toLocaleString()} scanned ·{' '}
-            {matchedCount.toLocaleString()} matched
-            <span className="dash-sales__period"> · {period}</span>
+            <span className="dash-sales__period">{period}</span>
           </p>
         </div>
         <div className="dash-sales__menu-wrap">
@@ -184,20 +241,32 @@ export function SalesStatsCard({
           )}
         </div>
       </header>
+
       <section className="dash-sales__chart" aria-label={`${period} match speedometer`}>
         <MatchSpeedometer value={matchRate} />
       </section>
+
+      <div className="dash-sales__wave" aria-hidden>
+        <svg viewBox="0 0 280 24" preserveAspectRatio="none">
+          <path d="M0 14 C 40 14, 70 14, 100 14 C 130 4, 150 4, 180 14 C 210 14, 240 14, 280 14" />
+        </svg>
+      </div>
+
       <footer className="dash-sales__body">
-        <div className="dash-sales__legend">
-          <span className="dash-sales__legend-item">
-            <span className="dash-sales__dot" aria-hidden />
-            Matched
-          </span>
-          <span className="dash-sales__legend-item">
-            <span className="dash-sales__dot dash-sales__dot--muted" aria-hidden />
-            Not matched
-          </span>
-        </div>
+        <ul className="dash-sales__metrics" aria-label="Scan match breakdown">
+          <li>
+            <strong>{scannedCount.toLocaleString()}</strong>
+            <span>Scanned</span>
+          </li>
+          <li>
+            <strong>{matchedCount.toLocaleString()}</strong>
+            <span>Matched</span>
+          </li>
+          <li>
+            <strong>{unmatched.toLocaleString()}</strong>
+            <span>Not matched</span>
+          </li>
+        </ul>
       </footer>
     </article>
   );

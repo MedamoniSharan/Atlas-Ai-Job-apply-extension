@@ -918,21 +918,38 @@ textarea {
   line-height: 20px;
 }
 
-/* Apply / sales ring */
+/* Match / sales speedometer — dark premium */
 .dash-sales {
   display: flex;
   flex-direction: column;
   min-height: 420px;
+  background:
+    radial-gradient(120% 80% at 50% 18%, rgba(57, 255, 20, 0.1), transparent 55%),
+    linear-gradient(165deg, #14171c 0%, #0a0c0f 55%, #070809 100%);
+  border-color: rgba(57, 255, 20, 0.12);
+  box-shadow:
+    0 18px 40px rgba(8, 10, 12, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #f3f6f2;
 }
 
 .dash-sales__header {
   min-height: 72px;
-  padding: 20px 22px;
+  padding: 18px 22px 8px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  color: var(--color-text-on-muted);
+  color: #f3f6f2;
+}
+
+.dash-sales__eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(184, 255, 74, 0.72);
 }
 
 .dash-sales__title {
@@ -940,16 +957,17 @@ textarea {
   font-size: 1.05rem;
   line-height: 1.4;
   font-weight: 600;
+  color: #f7faf5;
 }
 
 .dash-sales__subtitle {
   margin: 4px 0 0;
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: rgba(220, 230, 220, 0.55);
 }
 
 .dash-sales__period {
-  color: var(--color-text-on-muted);
+  color: rgba(232, 255, 138, 0.85);
 }
 
 .dash-sales__menu-wrap {
@@ -965,15 +983,15 @@ textarea {
   padding: 0;
   border: 0;
   border-radius: 8px;
-  color: #9aa19c;
+  color: rgba(220, 230, 220, 0.55);
   background: transparent;
   cursor: pointer;
 }
 
 .dash-sales__menu-button:hover,
 .dash-sales__menu-button:focus-visible {
-  color: var(--color-text-on-muted);
-  background: #f1f3f2;
+  color: #e8ff8a;
+  background: rgba(57, 255, 20, 0.08);
   outline: none;
 }
 
@@ -986,9 +1004,9 @@ textarea {
   padding: 8px 0;
   margin: 0;
   border-radius: 8px;
-  background: #fff;
-  border: 1px solid var(--color-border-muted);
-  box-shadow: 0 4px 12px rgba(21, 54, 43, 0.12);
+  background: #15181d;
+  border: 1px solid rgba(57, 255, 20, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   list-style: none;
 }
 
@@ -997,7 +1015,7 @@ textarea {
   width: 100%;
   padding: 8px 16px;
   border: 0;
-  color: var(--color-text-on-muted);
+  color: rgba(243, 246, 242, 0.88);
   background: transparent;
   text-align: left;
   font: inherit;
@@ -1007,7 +1025,8 @@ textarea {
 
 .dash-sales__menu-link:hover,
 .dash-sales__menu-link:focus-visible {
-  background: #f3f5f4;
+  background: rgba(57, 255, 20, 0.1);
+  color: #e8ff8a;
   outline: none;
 }
 
@@ -1015,11 +1034,11 @@ textarea {
   flex: 1;
   display: grid;
   place-items: center;
-  padding: 8px 24px 0;
+  padding: 0 12px;
 }
 
 .dash-sales__gauge {
-  width: min(280px, 78vw);
+  width: min(300px, 86vw);
   outline: none;
   cursor: default;
 }
@@ -1031,80 +1050,121 @@ textarea {
   overflow: visible;
 }
 
-.dash-sales__gauge-track,
+.dash-sales__gauge-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-dasharray: 2.2 5.5;
+}
+
+.dash-sales__gauge-glow {
+  fill: none;
+  stroke-width: 24;
+  stroke-linecap: round;
+  opacity: 0.45;
+  filter: blur(4px);
+}
+
 .dash-sales__gauge-progress {
   fill: none;
-  stroke-width: 12;
+  stroke-width: 11;
   stroke-linecap: round;
 }
 
-.dash-sales__gauge-track {
-  stroke: #eef1ef;
-}
-
-.dash-sales__gauge-progress {
-  stroke: #4a7d63;
-}
-
-.dash-sales__gauge-needle {
-  stroke: #6b756f;
-  stroke-width: 1.75;
+.dash-sales__gauge-tick {
+  stroke: rgba(184, 255, 74, 0.35);
+  stroke-width: 1.25;
   stroke-linecap: round;
 }
 
-.dash-sales__gauge-hub {
-  fill: #6b756f;
+.dash-sales__gauge-tick-label {
+  fill: rgba(220, 230, 220, 0.45);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-anchor: middle;
 }
 
 .dash-sales__gauge-value {
-  fill: var(--color-text-on-muted);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  fill: #f7fff0;
+  font-size: 42px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
   text-anchor: middle;
+  filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.35));
 }
 
 .dash-sales__gauge-label {
-  fill: var(--color-text-secondary);
-  font-size: 12px;
+  fill: rgba(184, 255, 74, 0.7);
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   text-anchor: middle;
+}
+
+.dash-sales__wave {
+  height: 20px;
+  margin: 0 22px;
+  color: #7cff4a;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 6px rgba(57, 255, 20, 0.45));
+}
+
+.dash-sales__wave svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dash-sales__wave path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 
 .dash-sales__body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 20px 22px 24px;
+  padding: 8px 18px 22px;
 }
 
-.dash-sales__legend {
+.dash-sales__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+.dash-sales__metrics li {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  font-size: 13px;
-  line-height: 1.3;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.dash-sales__legend-item {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
+.dash-sales__metrics strong {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #f7fff0;
+  line-height: 1.2;
+  text-shadow: 0 0 12px rgba(57, 255, 20, 0.25);
 }
 
-.dash-sales__dot {
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: #2f6b52;
-}
-
-.dash-sales__dot--muted {
-  background: #e9edf0;
+.dash-sales__metrics span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(184, 255, 74, 0.55);
 }
 
 /* Side mini stats */
