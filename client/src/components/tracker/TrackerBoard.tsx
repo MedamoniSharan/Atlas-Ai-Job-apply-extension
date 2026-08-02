@@ -68,7 +68,7 @@ export function TrackerBoard({
     return [...keys].sort((a, b) => a.localeCompare(b));
   }, [items, prefs.swimlane]);
 
-  const colTemplate = `minmax(220px, 1fr) `.repeat(columns.length).trim();
+  const colTemplate = `minmax(0, 1fr) `.repeat(columns.length).trim();
 
   return (
     <div

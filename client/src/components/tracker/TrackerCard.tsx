@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type MutableRefObject } from 'react';
 import type { Application } from '@cosmo/shared';
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import type { ColumnId } from './trackerColumns';
 import {
   ALL_COLUMNS,
@@ -86,97 +86,67 @@ export function TrackerCard({
       }}
       role="button"
       tabIndex={0}
+      title={`${app.company} — ${app.title}`}
     >
-      <div className="tracker-card__top">
-        <label
-          className="tracker-card__check"
+      <label
+        className="tracker-card__check"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) =>
+            onToggleSelect(app.id, (e.nativeEvent as MouseEvent).shiftKey)
+          }
           onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={(e) =>
-              onToggleSelect(app.id, (e.nativeEvent as MouseEvent).shiftKey)
-            }
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Select ${app.title}`}
-          />
-        </label>
-        <TrackerLogo app={app} />
-        <span className={`tracker-card__status tracker-card__status--${col}`}>
-          {ALL_COLUMNS.find((c) => c.id === col)?.title ?? col}
-        </span>
-        <time dateTime={app.appliedAt ?? app.createdAt}>
-          {relativeTime(app.appliedAt ?? app.createdAt)}
-        </time>
+          aria-label={`Select ${app.title}`}
+        />
+      </label>
+
+      <TrackerLogo app={app} />
+
+      <div className="tracker-card__heading">
+        <h3 className="tracker-card__company">{app.company}</h3>
+        <p className="tracker-card__title">{app.title}</p>
       </div>
 
-      <h3 className="tracker-card__company">{app.company}</h3>
-      <p className="tracker-card__title">{app.title}</p>
-
-      <div className="tracker-card__meta">
-        {app.experience ? <span>{app.experience}</span> : null}
-        {app.location ? <span>{app.location}</span> : null}
-        {app.salary ? <span>{app.salary}</span> : null}
-        <span className="tracker-card__platform">{app.platform}</span>
-      </div>
-
-      {col === 'skipped' && app.metadata?.skipReason ? (
-        <p className="tracker-card__skip">{app.metadata.skipReason}</p>
-      ) : null}
+      <time dateTime={app.appliedAt ?? app.createdAt}>
+        {relativeTime(app.appliedAt ?? app.createdAt)}
+      </time>
 
       <div
-        className="tracker-card__actions"
+        className="tracker-card__menu"
+        ref={menuRef}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
           type="button"
-          className="tracker-card__action"
-          onClick={() => onOpen(app)}
+          className="tracker-card__menu-btn"
+          aria-label="Move to"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
         >
-          Details
+          <MoreHorizontal size={14} strokeWidth={2.2} aria-hidden />
         </button>
-        {app.url ? (
-          <a
-            className="tracker-card__action tracker-card__action--link"
-            href={app.url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Naukri
-            <ExternalLink size={11} strokeWidth={2.2} aria-hidden />
-          </a>
+        {menuOpen ? (
+          <div className="tracker-card__menu-pop" role="menu">
+            {ALL_COLUMNS.filter((c) => c.id !== col).map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onMove(app.id, c.id);
+                }}
+              >
+                Move to {c.title}
+              </button>
+            ))}
+          </div>
         ) : null}
-        <div className="tracker-card__menu" ref={menuRef}>
-          <button
-            type="button"
-            className="tracker-card__action tracker-card__action--icon"
-            aria-label="Move to"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <MoreHorizontal size={14} strokeWidth={2.2} aria-hidden />
-          </button>
-          {menuOpen ? (
-            <div className="tracker-card__menu-pop" role="menu">
-              {ALL_COLUMNS.filter((c) => c.id !== col).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onMove(app.id, c.id);
-                  }}
-                >
-                  Move to {c.title}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
       </div>
     </article>
   );

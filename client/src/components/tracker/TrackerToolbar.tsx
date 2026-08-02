@@ -41,36 +41,23 @@ export function TrackerToolbar({
 }: TrackerToolbarProps) {
   return (
     <div className="tracker-toolbar">
-      <div className="tracker__toolbar">
-        <div>
-          <p className="tracker__sub">
-            {prefs.mode === 'advanced' ? 'Advanced' : 'Simple'} board
-            {total ? ` · ${filteredCount}/${total}` : ''}
-            {' · '}
-            Drag cards or use bulk move
-          </p>
-        </div>
-        <div className="tracker-toolbar__right">
-          <button
-            type="button"
-            className="dash-btn dash-btn--ghost"
-            onClick={onOpenSettings}
-            aria-label="Board settings"
-          >
-            <Settings2 size={15} strokeWidth={2.2} aria-hidden />
-            Settings
-          </button>
-          <Link className="dash-btn dash-btn--ghost" to="/dashboard">
-            Open Dashboard
-          </Link>
-        </div>
-      </div>
-
       <div className="tracker-filters">
+        <p className="tracker__sub">
+          {prefs.mode === 'advanced' ? 'Advanced' : 'Simple'}
+          {total ? (
+            <>
+              {' '}
+              <span className="sidebar__badge tracker__count" aria-label={`${filteredCount} of ${total}`}>
+                {filteredCount === total ? filteredCount : `${filteredCount}/${total}`}
+              </span>
+            </>
+          ) : null}
+        </p>
+
         <input
           className="tracker-filters__search"
           type="search"
-          placeholder="Search title, company, location…"
+          placeholder="Search…"
           value={q}
           onChange={(e) => onSearch(e.target.value)}
           aria-label="Search applications"
@@ -90,43 +77,31 @@ export function TrackerToolbar({
           ))}
         </select>
 
-        <div className="tracker-filters__chips" role="group" aria-label="Salary filter">
-          {(
-            [
-              ['all', 'All salary'],
-              ['disclosed', 'Disclosed'],
-              ['undisclosed', 'Not disclosed'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`dash-pill${salaryFilter === id ? ' is-active' : ''}`}
-              onClick={() => onSalaryFilter(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <select
+          className="tracker-filters__select"
+          value={salaryFilter}
+          onChange={(e) =>
+            onSalaryFilter(
+              e.target.value as 'all' | 'disclosed' | 'undisclosed'
+            )
+          }
+          aria-label="Salary filter"
+        >
+          <option value="all">All salary</option>
+          <option value="disclosed">Disclosed</option>
+          <option value="undisclosed">Not disclosed</option>
+        </select>
 
-        <div className="tracker-filters__chips" role="group" aria-label="Swimlanes">
-          {(
-            [
-              ['none', 'No swimlanes'],
-              ['company', 'By company'],
-              ['location', 'By location'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`dash-pill${prefs.swimlane === id ? ' is-active' : ''}`}
-              onClick={() => onSwimlane(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <select
+          className="tracker-filters__select"
+          value={prefs.swimlane}
+          onChange={(e) => onSwimlane(e.target.value as SwimlaneMode)}
+          aria-label="Swimlanes"
+        >
+          <option value="none">No swimlanes</option>
+          <option value="company">By company</option>
+          <option value="location">By location</option>
+        </select>
 
         {(q || platform !== 'all' || salaryFilter !== 'all') && (
           <button
@@ -138,9 +113,24 @@ export function TrackerToolbar({
               onSalaryFilter('all');
             }}
           >
-            Clear filters
+            Clear
           </button>
         )}
+
+        <div className="tracker-toolbar__right">
+          <button
+            type="button"
+            className="dash-btn dash-btn--ghost tracker-toolbar__icon"
+            onClick={onOpenSettings}
+            aria-label="Board settings"
+            title="Board settings"
+          >
+            <Settings2 size={15} strokeWidth={2.2} aria-hidden />
+          </button>
+          <Link className="dash-btn dash-btn--ghost" to="/dashboard">
+            Dashboard
+          </Link>
+        </div>
       </div>
 
       {selectedCount > 0 ? (
