@@ -244,8 +244,9 @@ if (watch) {
     writeZipFromDirectory(dist, firefoxZip);
   }
 
-  // Leave dist matching the requested primary target for load-unpacked / about:debugging.
-  writeManifest(firefox ? 'firefox' : 'chromium');
+  // Always leave Chromium manifest in dist/ for chrome://extensions load-unpacked.
+  // Firefox packages are already zipped above; load those for about:debugging.
+  writeManifest('chromium');
 
   const targets = [path.relative(root, clientPublicZip)];
   if (firefox || release) {
@@ -253,7 +254,7 @@ if (watch) {
   }
   console.log(
     release || firefox
-      ? `Release extension built to dist/ + ${targets.join(' + ')} (API: ${apiOrigins.join(', ')}; web: ${webOrigins.join(', ')}; gecko: ${geckoId}; dist manifest: ${firefox ? 'firefox' : 'chromium'})`
+      ? `Release extension built to dist/ + ${targets.join(' + ')} (API: ${apiOrigins.join(', ')}; web: ${webOrigins.join(', ')}; gecko: ${geckoId}; dist manifest: chromium)`
       : `Extension built to dist/ + ${targets.join(' + ')} (dist manifest: chromium)`
   );
 }

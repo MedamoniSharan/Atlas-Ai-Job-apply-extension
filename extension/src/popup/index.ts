@@ -105,9 +105,32 @@ function parseList(value: string): string[] {
 }
 
 function send<T>(message: unknown): Promise<T> {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage(message, (response) => resolve(response as T));
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(response as T);
+      });
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
   });
+}
+
+function showStatusError(message: string) {
+  authStateEl.textContent = 'Not signed in';
+  authStateEl.classList.remove('is-ok');
+  authStateEl.classList.add('is-bad');
+  healthStateEl.textContent = 'Extension offline';
+  healthStateEl.classList.remove('is-ok');
+  healthStateEl.classList.add('is-bad');
+  scanStateEl.textContent = message;
+  loginPanel.classList.remove('hidden');
+  authedSection.classList.add('hidden');
 }
 
 function fillPrefsForm(prefs: JobPreferences) {
@@ -166,7 +189,7 @@ function readPrefsForm(): JobPreferences {
 }
 
 async function refreshUi() {
-  const status = await send<{
+  let status: {
     auth: {
       accessToken: string | null;
       apiBaseUrl: string;
@@ -179,7 +202,21 @@ async function refreshUi() {
     };
     preferences?: JobPreferences;
     copilot?: CopilotState;
-  }>({ type: 'GET_STATUS' });
+  };
+
+  try {
+    status = await send({ type: 'GET_STATUS' });
+    if (!status?.auth || !status?.health) {
+      throw new Error('No status from background — reload the extension.');
+    }
+  } catch (error) {
+    showStatusError(
+      error instanceof Error
+        ? error.message
+        : 'Could not reach extension background. Reload Cosmo from chrome://extensions.'
+    );
+    return;
+  }
 
   const signedIn = Boolean(status.auth.accessToken);
   authStateEl.textContent = signedIn ? 'Signed in' : 'Not signed in';
@@ -246,11 +283,15 @@ async function refreshUi() {
       formError.textContent = '';
       showToast('Signed in', 'Google session synced to Cosmo.');
     }
-    const prefsRes = await send<{ success: boolean; data: JobPreferences }>({
-      type: 'GET_PREFERENCES',
-    });
-    const prefs = prefsRes?.data ?? status.preferences;
-    if (prefs) fillPrefsForm(prefs);
+    try {
+      const prefsRes = await send<{ success: boolean; data: JobPreferences }>({
+        type: 'GET_PREFERENCES',
+      });
+      const prefs = prefsRes?.data ?? status.preferences;
+      if (prefs) fillPrefsForm(prefs);
+    } catch {
+      if (status.preferences) fillPrefsForm(status.preferences);
+    }
   }
 }
 
