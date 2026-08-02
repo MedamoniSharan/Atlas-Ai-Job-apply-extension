@@ -203,6 +203,7 @@ async function refreshUi() {
       const rem = sec % 60;
       scanStateEl.textContent = `Co-pilot break — resumes in ${min}:${String(rem).padStart(2, '0')}`;
     } else if (
+      status.copilot.runPhase === 'apply' &&
       status.copilot.paceLabel &&
       (status.copilot.paceRemainingMs ?? 0) > 0
     ) {
@@ -212,9 +213,15 @@ async function refreshUi() {
       );
       scanStateEl.textContent = `${status.copilot.paceLabel} — ${sec}s`;
     } else {
+      const phase =
+        status.copilot.runPhase === 'apply'
+          ? 'applying'
+          : status.copilot.runPhase === 'scan'
+            ? 'scanning'
+            : 'running';
       scanStateEl.textContent = status.copilot.paused
         ? `Co-pilot paused · matched ${status.copilot.matched}, applied ${status.copilot.applied}`
-        : `Co-pilot running · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
+        : `Co-pilot ${phase} · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
     }
   } else if (waitingForGoogle && !signedIn) {
     scanStateEl.textContent = 'Waiting for Google sign-in…';

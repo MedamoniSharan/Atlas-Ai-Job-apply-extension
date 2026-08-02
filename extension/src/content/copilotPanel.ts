@@ -1025,7 +1025,7 @@ export function mountCopilotPanel() {
   const loginTitle = root.querySelector('#cosmo-login-title') as HTMLElement;
   const minimizeBtn = root.querySelector('#cosmo-minimize') as HTMLButtonElement;
   let pauseIconMode: 'pause' | 'play' | 'idle' | null = null;
-  let startIconMode: 'idle' | 'running' | 'paused' | null = null;
+  let startIconMode: 'idle' | 'running' | 'paused' | 'scanning' | null = null;
   let selectedJobId: string | null = null;
   const runningMp4 = chrome.runtime.getURL('assets/running.mp4');
 
@@ -1441,7 +1441,7 @@ export function mountCopilotPanel() {
       statusLabelEl.textContent = `Break — resumes in ${formatBreakCountdown(
         state.sessionBreakRemainingMs ?? 0
       )}`;
-    } else if (state.paceLabel) {
+    } else if (state.paceLabel && state.runPhase === 'apply') {
       const remaining = state.paceRemainingMs ?? 0;
       statusLabelEl.textContent =
         remaining > 0
@@ -1453,14 +1453,18 @@ export function mountCopilotPanel() {
           ? 'Paused — confirm login'
           : 'Paused — login needed'
         : 'Paused';
+    } else if (state.running && state.runPhase === 'apply') {
+      statusLabelEl.textContent = 'Applying…';
     } else if (state.running) {
-      statusLabelEl.textContent = 'Browsing Naukri…';
+      statusLabelEl.textContent = 'Scanning jobs…';
     } else {
       statusLabelEl.textContent = 'Idle — press Start';
     }
 
     const pacing =
-      Boolean(state.paceLabel) && (state.paceRemainingMs ?? 0) > 0;
+      state.runPhase === 'apply' &&
+      Boolean(state.paceLabel) &&
+      (state.paceRemainingMs ?? 0) > 0;
     if (pacing) {
       showPaceToast(
         state.paceLabel || 'Slowing down',
@@ -1480,14 +1484,18 @@ export function mountCopilotPanel() {
     }
 
     const isActivelyRunning = Boolean(state.running && !state.paused);
+    const showHumanFace = isActivelyRunning && state.runPhase === 'apply';
 
     startBtn.style.display = '';
     startBtn.classList.toggle('is-running', isActivelyRunning);
-    const nextStartMode: 'idle' | 'running' | 'paused' = isActivelyRunning
-      ? 'running'
-      : state.running
-        ? 'paused'
-        : 'idle';
+    const nextStartMode: 'idle' | 'running' | 'paused' | 'scanning' =
+      showHumanFace
+        ? 'running'
+        : isActivelyRunning
+          ? 'scanning'
+          : state.running
+            ? 'paused'
+            : 'idle';
     if (startIconMode !== nextStartMode) {
       startIconMode = nextStartMode;
       if (nextStartMode === 'running') {
@@ -1500,6 +1508,8 @@ export function mountCopilotPanel() {
           video.playsInline = true;
           void video.play().catch(() => undefined);
         }
+      } else if (nextStartMode === 'scanning') {
+        startBtn.textContent = 'Scanning…';
       } else {
         startBtn.textContent = nextStartMode === 'paused' ? 'Paused' : 'Start';
       }

@@ -198,9 +198,19 @@ export function DashboardPage() {
   });
 
   const { data: scanStats } = useQuery({
-    queryKey: ['scan-sessions', 'stats'],
+    queryKey: [
+      'scan-sessions',
+      'stats',
+      statsPeriod,
+      periodRange.from,
+      periodRange.to,
+    ],
     queryFn: async () => {
-      const res = await fetchScanStats({ days: 30, limit: 10 });
+      const res = await fetchScanStats({
+        limit: 10,
+        from: periodRange.from,
+        to: periodRange.to,
+      });
       if (!res.success) throw new Error(res.message);
       return res.data;
     },
@@ -228,10 +238,12 @@ export function DashboardPage() {
   const scannedWindow = scanStats?.window.scanned ?? 0;
   const scanMatchedTotal = scanStats?.totals.matched ?? 0;
   const scanAppliedTotal = scanStats?.totals.applied ?? 0;
+  const scanAppliedWindow = scanStats?.window.applied ?? 0;
   const scanSkippedTotal = scanStats?.totals.skipped ?? 0;
   const scanSessionsTotal = scanStats?.totals.sessions ?? 0;
   const usage = billing?.appliesUsed ?? 0;
   const usageLimit = billing?.appliesLimit ?? 0;
+  const creditsLeft = Math.max(0, usageLimit - usage);
   const usagePct =
     usageLimit > 0 ? Math.min(100, Math.round((usage / usageLimit) * 100)) : 0;
   const planKey = billing?.plan ?? user?.plan ?? 'free';
@@ -284,7 +296,9 @@ export function DashboardPage() {
   })();
 
   const applyRate =
-    jobsCount > 0 ? Math.min(100, Math.round((appliedCount / jobsCount) * 100)) : 0;
+    scannedWindow > 0
+      ? Math.min(100, Math.round((scanAppliedWindow / scannedWindow) * 100))
+      : 0;
   const conversionPct = applyRate;
 
   const timelineItems = useMemo(
@@ -482,18 +496,19 @@ export function DashboardPage() {
               period={statsPeriod}
               onPeriodChange={setStatsPeriod}
               usagePct={usagePct}
-              applyRate={applyRate}
               usage={usage}
               usageLimit={usageLimit}
-              appliedCount={appliedCount}
-              jobsCount={jobsCount}
+              creditsLeft={creditsLeft}
+              applyRate={applyRate}
+              appliedCount={scanAppliedWindow}
+              scannedCount={scannedWindow}
             />
             <SalesStatsCard
               period={statsPeriod}
               onPeriodChange={setStatsPeriod}
               conversionPct={conversionPct}
-              totalJobs={jobsCount}
-              appliedCount={appliedCount}
+              totalJobs={scannedWindow}
+              appliedCount={scanAppliedWindow}
             />
           </div>
         </div>
@@ -515,7 +530,7 @@ export function DashboardPage() {
             <span className="dash-stat-card__label">Scanned</span>
             <strong className="dash-stat-card__value">{scannedTotal}</strong>
             <em className="dash-stat-card__meta">
-              {scannedWindow} in last 30 days
+              {scannedWindow.toLocaleString()} {statsPeriod.toLowerCase()}
             </em>
           </article>
 

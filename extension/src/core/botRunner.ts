@@ -430,7 +430,7 @@ async function goBackToList(
   tabId: number,
   searchUrl: string,
   stealth: boolean,
-  options?: { maxNavMs?: number }
+  options?: { maxNavMs?: number; humanPace?: boolean }
 ): Promise<void> {
   const mode = paceModeFromStealth(stealth);
   await chrome.tabs.update(tabId, {
@@ -438,11 +438,16 @@ async function goBackToList(
     active: !stealth,
   });
   await waitForTabComplete(tabId);
-  await pacedWait(mode, 'nav', {
-    jobTitle: 'search list',
-    maxMs: options?.maxNavMs,
-    label: options?.maxNavMs != null ? 'Back to list' : undefined,
-  });
+  // Human pacing only when applying — scan just needs a short DOM settle.
+  if (options?.humanPace) {
+    await pacedWait(mode, 'nav', {
+      jobTitle: 'search list',
+      maxMs: options?.maxNavMs,
+      label: options?.maxNavMs != null ? 'Back to list' : undefined,
+    });
+    return;
+  }
+  await wait(options?.maxNavMs ?? 500);
 }
 
 type EasyApplyResult = {
@@ -1107,9 +1112,9 @@ async function collectPreferenceMatches(opts: {
 }): Promise<SearchResultJob[]> {
   const { tabId, searchUrl, stealth, prefs, seenKeys, scannedKeys } = opts;
   const prefix = opts.logPrefix ?? 'Scan';
-  const mode = paceModeFromStealth(stealth);
   const batch = opts.into ?? [];
 
+  await setCopilotState({ runPhase: 'scan', paceLabel: null, paceRemainingMs: null });
   await appendCopilotLog(
     `${prefix}: collecting matched jobs (${batch.length}/${SCAN_BATCH_SIZE}) — no apply until ${SCAN_BATCH_SIZE}…`,
     'info'
@@ -1143,7 +1148,8 @@ async function collectPreferenceMatches(opts: {
       await sendToTab(tabId, { type: 'SCROLL_SEARCH_RESULTS' }).catch(
         () => undefined
       );
-      await pacedWait(mode, 'scroll', { jobTitle: 'job list' });
+      // Fast scan — no humanPace slowdown while browsing the list.
+      await wait(450);
     }
 
     const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tabId, {
@@ -1326,6 +1332,7 @@ async function applyCollectedJobs(opts: {
     `Applying ${jobs.length} matched job(s) one by one (slowdown on)…`,
     'success'
   );
+  await setCopilotState({ runPhase: 'apply' });
 
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i]!;
@@ -1362,6 +1369,7 @@ export async function stopBot(): Promise<void> {
     sessionBreakRemainingMs: null,
     paceLabel: null,
     paceRemainingMs: null,
+    runPhase: 'idle',
     sessionComplete: null,
   });
   await appendCopilotLog('Co-pilot stopped', 'warn');
@@ -1454,12 +1462,14 @@ export async function runBot(handlers: BotHandlers): Promise<{
       sessionComplete: null,
       currentTitle: '',
       scannedJobs: [],
+      runPhase: 'scan',
+      paceLabel: null,
+      paceRemainingMs: null,
       runInBackground: existing.runInBackground,
     });
     await beginScanSession();
 
     const stealth = (await getCopilotState()).runInBackground;
-    const mode = paceModeFromStealth(stealth);
     await appendCopilotLog(
       stealth
         ? 'Stealth ON (background tabs) — higher account risk'
@@ -1481,15 +1491,14 @@ export async function runBot(handlers: BotHandlers): Promise<{
     });
     if (!tab.id) {
       await appendCopilotLog('Could not open Naukri tab', 'error');
-      await setCopilotState({ running: false });
+      await setCopilotState({ running: false, runPhase: 'idle' });
       return { ok: false, message: 'No tab.' };
     }
     setActiveWorkTabId(tab.id);
 
     await waitForTabComplete(tab.id);
-    if (!(await pacedWait(mode, 'nav', { jobTitle: 'search list' }))) {
-      return { ok: true, message: 'Stopped.' };
-    }
+    // Fast settle after opening search — human pacing starts only at apply.
+    await wait(700);
 
     if (await checkBlockOnTab(tab.id)) {
       return { ok: false, message: 'Naukri block detected.' };
@@ -1509,6 +1518,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
     let batch: SearchResultJob[] = [];
 
     // Phase 1: for each title × location, scan until 30 matched.
+    await setCopilotState({ runPhase: 'scan' });
     await appendCopilotLog(
       `Will try up to ${searchPlan.length} search combinations (titles × cities × skills) until ${SCAN_BATCH_SIZE} matches…`,
       'info'
@@ -1631,6 +1641,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
         currentTitle: '',
         paceLabel: null,
         paceRemainingMs: null,
+        runPhase: 'idle',
         sessionComplete: {
           applied: finalState.applied,
           matched: finalState.matched,
@@ -1647,6 +1658,9 @@ export async function runBot(handlers: BotHandlers): Promise<{
         paused: false,
         currentTitle: '',
         sessionComplete: null,
+        runPhase: 'idle',
+        paceLabel: null,
+        paceRemainingMs: null,
       });
     }
     await reportScanSession('completed');
@@ -1660,7 +1674,13 @@ export async function runBot(handlers: BotHandlers): Promise<{
       'error'
     );
     await reportScanSession('failed');
-    await setCopilotState({ running: false, paused: false });
+    await setCopilotState({
+      running: false,
+      paused: false,
+      runPhase: 'idle',
+      paceLabel: null,
+      paceRemainingMs: null,
+    });
     return { ok: false, message: 'Co-pilot failed.' };
   } finally {
     // Early returns (login fail, stop mid-run, etc.) never hit the summary
@@ -1717,14 +1737,8 @@ export async function continueNextPage(): Promise<{
       await beginScanSession();
     }
 
-    const mode = paceModeFromStealth(ctx.stealth);
-    await appendCopilotLog(
-      'Taking a short read pause before the next page…',
-      'info'
-    );
-    if (!(await pacedWait(mode, 'read', { jobTitle: 'next page' }))) {
-      return { ok: true, message: 'Stopped.' };
-    }
+    await setCopilotState({ runPhase: 'scan', paceLabel: null, paceRemainingMs: null });
+    await appendCopilotLog('Opening next search page (fast scan)…', 'info');
 
     // Ensure we are on the search list.
     await goBackToList(ctx.tabId, ctx.searchUrl, ctx.stealth);
@@ -1746,15 +1760,13 @@ export async function continueNextPage(): Promise<{
       await setCopilotState({
         running: false,
         sessionComplete: null,
+        runPhase: 'idle',
       });
       lastSession = null;
       return { ok: false, message: next.reason || 'No next page.' };
     }
 
-    if (!(await pacedWait(mode, 'nav', { jobTitle: 'next page' }))) {
-      return { ok: true, message: 'Stopped.' };
-    }
-
+    await wait(600);
     await appendCopilotLog('Next page loaded — scanning jobs', 'success');
 
     const seenKeys = ctx.seenKeys;
@@ -1840,6 +1852,7 @@ export async function continueNextPage(): Promise<{
       currentTitle: '',
       paceLabel: null,
       paceRemainingMs: null,
+      runPhase: 'idle',
       sessionComplete: {
         applied: finalState.applied,
         matched: finalState.matched,
@@ -1856,7 +1869,12 @@ export async function continueNextPage(): Promise<{
       error: error instanceof Error ? error.message : String(error),
     });
     await reportScanSession('failed');
-    await setCopilotState({ running: false });
+    await setCopilotState({
+      running: false,
+      runPhase: 'idle',
+      paceLabel: null,
+      paceRemainingMs: null,
+    });
     return { ok: false, message: 'Could not open next page.' };
   } finally {
     const leftover = await getCopilotState();

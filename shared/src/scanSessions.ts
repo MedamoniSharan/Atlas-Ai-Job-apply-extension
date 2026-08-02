@@ -32,8 +32,12 @@ export const scanSessionUpsertSchema = z.object({
 export type ScanSessionUpsert = z.infer<typeof scanSessionUpsertSchema>;
 
 export const scanStatsQuerySchema = z.object({
-  days: z.coerce.number().int().min(1).max(365).default(30),
+  days: z.coerce.number().int().min(1).max(366).default(30),
   limit: z.coerce.number().int().min(1).max(50).default(10),
+  /** Inclusive ISO lower bound. When set with `to`, overrides rolling `days`. */
+  from: z.string().datetime().optional(),
+  /** Exclusive ISO upper bound. */
+  to: z.string().datetime().optional(),
 });
 
 export type ScanStatsQuery = z.infer<typeof scanStatsQuerySchema>;
@@ -64,6 +68,8 @@ export type ScanStats = {
   /** Same counters limited to the requested window. */
   window: {
     days: number;
+    from?: string;
+    to?: string;
     sessions: number;
     scanned: number;
     matched: number;

@@ -114,13 +114,38 @@ export async function getScanStats(
   query: ScanStatsQuery
 ): Promise<ScanStats> {
   const uid = new Types.ObjectId(userId);
-  const since = new Date(Date.now() - query.days * 86_400_000);
+
+  const fromDate = query.from ? new Date(query.from) : null;
+  const toDate = query.to ? new Date(query.to) : null;
+  const useRange =
+    fromDate != null &&
+    toDate != null &&
+    !Number.isNaN(fromDate.getTime()) &&
+    !Number.isNaN(toDate.getTime()) &&
+    fromDate.getTime() < toDate.getTime();
+
+  const since = useRange
+    ? fromDate
+    : new Date(Date.now() - query.days * 86_400_000);
+  const until = useRange ? toDate : null;
+  const windowMatch: Record<string, unknown> = {
+    userId: uid,
+    startedAt: until
+      ? { $gte: since, $lt: until }
+      : { $gte: since },
+  };
+  const days = useRange
+    ? Math.max(
+        1,
+        Math.ceil((until!.getTime() - since.getTime()) / 86_400_000)
+      )
+    : query.days;
 
   const [totals, window, series, recent] = await Promise.all([
     sumCounters({ userId: uid }),
-    sumCounters({ userId: uid, startedAt: { $gte: since } }),
+    sumCounters(windowMatch),
     ScanSessionModel.aggregate<ScanStats['series'][number]>([
-      { $match: { userId: uid, startedAt: { $gte: since } } },
+      { $match: windowMatch },
       {
         $group: {
           _id: {
@@ -145,7 +170,13 @@ export async function getScanStats(
 
   return {
     totals,
-    window: { days: query.days, ...window },
+    window: {
+      days,
+      ...(useRange
+        ? { from: since.toISOString(), to: until!.toISOString() }
+        : {}),
+      ...window,
+    },
     series,
     recent: items,
     lastScanAt: items[0]?.startedAt ?? null,

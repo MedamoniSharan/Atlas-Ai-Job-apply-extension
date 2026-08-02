@@ -11,23 +11,27 @@ const ARC_LENGTH = 100;
 export interface GrowthRadialCardProps {
   period: DashPeriod;
   onPeriodChange: (period: DashPeriod) => void;
+  /** Plan credits used / limit (billing month). */
   usagePct: number;
-  applyRate: number;
   usage: number;
   usageLimit: number;
+  creditsLeft: number;
+  /** Applied ÷ scanned for the selected period. */
+  applyRate: number;
   appliedCount: number;
-  jobsCount: number;
+  scannedCount: number;
 }
 
 export function GrowthRadialCard({
   period,
   onPeriodChange,
   usagePct,
-  applyRate,
   usage,
   usageLimit,
+  creditsLeft,
+  applyRate,
   appliedCount,
-  jobsCount,
+  scannedCount,
 }: GrowthRadialCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const maskId = useId();
@@ -109,7 +113,7 @@ export function GrowthRadialCard({
 
       <section
         className="dash-growth__radial"
-        aria-label="Usage chart"
+        aria-label="Credit usage chart"
         tabIndex={0}
         {...bind}
       >
@@ -119,9 +123,10 @@ export function GrowthRadialCard({
             role="img"
             aria-labelledby="growth-card-title growth-chart-description"
           >
-            <title id="growth-card-title">Apply usage</title>
+            <title id="growth-card-title">Apply credit usage</title>
             <desc id="growth-chart-description">
-              A radial progress chart showing {usagePct} percent of monthly applies used.
+              {usagePct} percent of monthly apply credits used. {creditsLeft} credits
+              left of {usageLimit}.
             </desc>
             <defs>
               <mask
@@ -167,15 +172,15 @@ export function GrowthRadialCard({
 
       <p className="dash-growth__company">{applyRate}% apply rate</p>
 
-      <section className="dash-growth__stats" aria-label="Usage and pipeline">
+      <section className="dash-growth__stats" aria-label="Credits and apply rate">
         <div className="dash-growth__stat">
           <div className="dash-growth__icon dash-growth__icon--primary" aria-hidden>
             <Gauge size={18} strokeWidth={2.4} />
           </div>
           <div className="dash-growth__copy">
-            <small>Applies used</small>
+            <small>Credits left</small>
             <strong>
-              {usage}
+              {creditsLeft}
               {usageLimit > 0 ? ` / ${usageLimit}` : ''}
             </strong>
           </div>
@@ -185,13 +190,18 @@ export function GrowthRadialCard({
             <Target size={18} strokeWidth={2.3} />
           </div>
           <div className="dash-growth__copy">
-            <small>Pipeline</small>
+            <small>Applied / scanned</small>
             <strong>
-              {appliedCount} / {jobsCount}
+              {appliedCount} / {scannedCount}
             </strong>
           </div>
         </div>
       </section>
+      {usageLimit > 0 && (
+        <p className="dash-growth__credits-meta">
+          {usage} used this billing month
+        </p>
+      )}
     </article>
   );
 }

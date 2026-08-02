@@ -379,10 +379,14 @@ export async function fetchBillingMe() {
   }>('/api/v1/billing/me');
 }
 
-export async function fetchScanStats(params: { days?: number; limit?: number } = {}) {
+export async function fetchScanStats(
+  params: { days?: number; limit?: number; from?: string; to?: string } = {}
+) {
   const search = new URLSearchParams();
   search.set('days', String(params.days ?? 30));
   search.set('limit', String(params.limit ?? 10));
+  if (params.from) search.set('from', params.from);
+  if (params.to) search.set('to', params.to);
   return request<ScanStats>(`/api/v1/scan-sessions/stats?${search.toString()}`);
 }
 

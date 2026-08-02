@@ -105,7 +105,8 @@ export function SalesStatsCard({
         <div>
           <h2 className="dash-sales__title">Apply stats</h2>
           <p className="dash-sales__subtitle">
-            {totalJobs.toLocaleString()} jobs · {appliedCount.toLocaleString()} applied
+            {totalJobs.toLocaleString()} scanned · {appliedCount.toLocaleString()}{' '}
+            applied
             <span className="dash-sales__period"> · {period}</span>
           </p>
         </div>
@@ -146,11 +147,11 @@ export function SalesStatsCard({
         <div className="dash-sales__legend">
           <span className="dash-sales__legend-item">
             <span className="dash-sales__dot" aria-hidden />
-            Conversion ratio
+            Apply rate
           </span>
           <span className="dash-sales__legend-item">
             <span className="dash-sales__dot dash-sales__dot--muted" aria-hidden />
-            Remaining pipeline
+            Not applied
           </span>
         </div>
       </footer>

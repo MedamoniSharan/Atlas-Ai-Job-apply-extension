@@ -88,6 +88,11 @@ export type CopilotState = {
   /** Human-pace wait shown to the user (e.g. "Reading JD"). */
   paceLabel?: string | null;
   paceRemainingMs?: number | null;
+  /**
+   * Current co-pilot phase. Human-face / slowdown UI is for `apply` only —
+   * scanning stays fast with no pace toast.
+   */
+  runPhase?: 'idle' | 'scan' | 'apply';
   /** Shown when a browse session finishes — next page vs close. */
   sessionComplete?: SessionCompletePrompt | null;
   currentTitle?: string;
@@ -126,6 +131,7 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   sessionBreakRemainingMs: null,
   paceLabel: null,
   paceRemainingMs: null,
+  runPhase: 'idle',
   sessionComplete: null,
   alert: null,
   toast: null,
