@@ -1,6 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MoreVertical } from 'lucide-react';
-import { useHoverProgress } from '../../hooks/useHoverProgress';
 import {
   DASH_PERIODS,
   type DashPeriod,
@@ -10,10 +9,11 @@ const ARC_LENGTH = 100;
 const CX = 140;
 const CY = 132;
 const R = 98;
-/** Gauge sweep: ~7 o'clock → 5 o'clock through the top. */
 const START_DEG = 200;
 const END_DEG = -20;
-const SWEEP = START_DEG - END_DEG; // 220°
+const SWEEP = START_DEG - END_DEG;
+const FILL_MS = 2200;
+const MONO = '#2f6b52';
 
 function polar(deg: number, radius: number) {
   const rad = (deg * Math.PI) / 180;
@@ -29,15 +29,26 @@ function arcPath(radius: number) {
   return `M ${s.x} ${s.y} A ${radius} ${radius} 0 1 1 ${e.x} ${e.y}`;
 }
 
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function easeInQuart(t: number): number {
+  return t * t * t * t;
+}
+
 const TICKS = [0, 20, 40, 60, 80, 100] as const;
 
 function MatchSpeedometer({ value }: { value: number }) {
   const maskId = useId();
-  const glowId = useId();
-  const { percent, durationMs, hovered, setReplay, bind } = useHoverProgress(value);
-  const revealRef = useRef<SVGPathElement>(null);
   const target = Math.max(0, Math.min(100, value));
-  const targetOffset = ARC_LENGTH - target;
+  const [fill, setFill] = useState(0);
+  const rafRef = useRef(0);
+  const targetRef = useRef(target);
+  targetRef.current = target;
 
   const ticks = useMemo(
     () =>
@@ -51,35 +62,34 @@ function MatchSpeedometer({ value }: { value: number }) {
     [],
   );
 
-  useEffect(() => {
-    setReplay(() => {
-      const el = revealRef.current;
-      if (!el) return;
-
-      if (
-        typeof window !== 'undefined' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      ) {
-        el.style.transition = 'none';
-        el.style.strokeDashoffset = String(targetOffset);
-        return;
+  const runFill = (to: number) => {
+    cancelAnimationFrame(rafRef.current);
+    if (prefersReducedMotion() || to <= 0) {
+      setFill(to);
+      return;
+    }
+    setFill(0);
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / FILL_MS);
+      setFill(to * easeInQuart(t));
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setFill(to);
       }
-
-      el.style.transition = 'none';
-      el.style.strokeDashoffset = String(ARC_LENGTH);
-      void el.getBoundingClientRect();
-      el.style.transition = `stroke-dashoffset ${durationMs}ms cubic-bezier(0.45, 0, 0.2, 1)`;
-      el.style.strokeDashoffset = String(targetOffset);
-    });
-    return () => setReplay(null);
-  }, [durationMs, setReplay, targetOffset]);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
 
   useEffect(() => {
-    const el = revealRef.current;
-    if (!el || hovered) return;
-    el.style.transition = 'none';
-    el.style.strokeDashoffset = String(targetOffset);
-  }, [hovered, targetOffset]);
+    runFill(target);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [target]);
+
+  const percent = Math.round(fill);
+  const tip = polar(START_DEG - (fill / 100) * SWEEP, R);
+  const maskOffset = ARC_LENGTH - fill;
 
   return (
     <div
@@ -87,7 +97,8 @@ function MatchSpeedometer({ value }: { value: number }) {
       role="img"
       tabIndex={0}
       aria-label={`Match rate ${value}%`}
-      {...bind}
+      onMouseEnter={() => runFill(targetRef.current)}
+      onFocus={() => runFill(targetRef.current)}
     >
       <svg
         className="dash-sales__gauge-svg"
@@ -95,19 +106,6 @@ function MatchSpeedometer({ value }: { value: number }) {
         aria-hidden
       >
         <defs>
-          <linearGradient id={glowId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#39ff14" stopOpacity="0.35" />
-            <stop offset="45%" stopColor="#7cff4a" stopOpacity="0.85" />
-            <stop offset="78%" stopColor="#b8ff4a" stopOpacity="1" />
-            <stop offset="100%" stopColor="#e8ff8a" stopOpacity="1" />
-          </linearGradient>
-          <filter id={`${glowId}-blur`} x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
           <mask
             id={maskId}
             maskUnits="userSpaceOnUse"
@@ -117,7 +115,6 @@ function MatchSpeedometer({ value }: { value: number }) {
             height="168"
           >
             <path
-              ref={revealRef}
               d={arcPath(R)}
               pathLength={ARC_LENGTH}
               fill="none"
@@ -125,30 +122,27 @@ function MatchSpeedometer({ value }: { value: number }) {
               strokeWidth="20"
               strokeLinecap="round"
               strokeDasharray={ARC_LENGTH}
-              strokeDashoffset={targetOffset}
+              strokeDashoffset={maskOffset}
             />
           </mask>
         </defs>
 
-        {/* Segmented track */}
         <path className="dash-sales__gauge-track" d={arcPath(R)} />
-
-        {/* Soft under-glow for filled portion */}
-        <path
-          className="dash-sales__gauge-glow"
-          d={arcPath(R)}
-          stroke={`url(#${glowId})`}
-          mask={`url(#${maskId})`}
-        />
-
-        {/* Solid fill */}
         <path
           className="dash-sales__gauge-progress"
           d={arcPath(R)}
-          stroke={`url(#${glowId})`}
           mask={`url(#${maskId})`}
-          filter={`url(#${glowId}-blur)`}
         />
+
+        {fill > 0.5 && (
+          <circle
+            className="dash-sales__gauge-tip"
+            cx={tip.x}
+            cy={tip.y}
+            r="4"
+            fill={MONO}
+          />
+        )}
 
         {ticks.map(({ mark, outer, inner, label }) => (
           <g key={mark}>
@@ -158,6 +152,9 @@ function MatchSpeedometer({ value }: { value: number }) {
               y1={inner.y}
               x2={outer.x}
               y2={outer.y}
+              style={{
+                stroke: fill >= mark ? MONO : 'rgba(120, 140, 130, 0.35)',
+              }}
             />
             <text
               className="dash-sales__gauge-tick-label"
