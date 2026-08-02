@@ -36,7 +36,7 @@ function sourceLabel(app: Application): string {
   }
   if (app.status === 'viewed') return 'Viewed';
   if (app.status === 'saved') return 'Saved';
-  return app.status.charAt(0).toUpperCase() + app.status.slice(1);
+  return 'Matched';
 }
 
 function statusClass(app: Application): string {
