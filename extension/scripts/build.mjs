@@ -12,6 +12,7 @@ const clientPublicZip = path.resolve(
   root,
   '../client/public/cosmo-chrome-extension.zip'
 );
+const edgeZip = path.resolve(root, '../client/public/cosmo-edge-extension.zip');
 const firefoxZip = path.resolve(root, '../cosmo-agent-firefox.zip');
 const watch = process.argv.includes('--watch');
 const release = process.argv.includes('--release');
@@ -238,6 +239,8 @@ if (watch) {
   // and Firefox keeps scripts-only (no unsupported-field warning).
   writeManifest('chromium');
   writeZipFromDirectory(dist, clientPublicZip);
+  // Edge Add-ons accepts the same Chromium MV3 package; keep a dedicated zip name.
+  writeZipFromDirectory(dist, edgeZip);
 
   if (firefox || release) {
     writeManifest('firefox');
@@ -248,7 +251,10 @@ if (watch) {
   // Firefox packages are already zipped above; load those for about:debugging.
   writeManifest('chromium');
 
-  const targets = [path.relative(root, clientPublicZip)];
+  const targets = [
+    path.relative(root, clientPublicZip),
+    path.relative(root, edgeZip),
+  ];
   if (firefox || release) {
     targets.push(path.relative(root, firefoxZip));
   }

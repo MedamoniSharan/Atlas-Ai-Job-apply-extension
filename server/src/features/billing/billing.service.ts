@@ -16,6 +16,7 @@ import {
   type VerifySubscriptionInput,
 } from '@cosmo/shared';
 import { env } from '../../config/env';
+import { logger } from '../../config/logger';
 import { AppError } from '../../middleware/errorHandler';
 import { ApplicationModel } from '../applications/application.model';
 import {
@@ -32,6 +33,22 @@ import { SubscriptionModel } from './subscription.model';
 
 const SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles
 
+function razorpayAppError(error: unknown, fallback: string): AppError {
+  const err = error as {
+    statusCode?: number;
+    error?: { description?: string; code?: string };
+    message?: string;
+  };
+  const description =
+    err?.error?.description ||
+    (error instanceof Error ? error.message : undefined) ||
+    fallback;
+  const status =
+    typeof err?.statusCode === 'number' && err.statusCode >= 400
+      ? Math.min(err.statusCode, 502)
+      : 502;
+  return new AppError(description, status, err?.error?.code || 'RAZORPAY_ERROR');
+}
 function getRazorpay() {
   if (!env.razorpayKeyId || !env.razorpayKeySecret) {
     throw new AppError(
@@ -146,21 +163,47 @@ async function ensureRazorpayCustomer(userId: string) {
 
 async function ensureRazorpayPlanId(plan: PaidPlan): Promise<string> {
   const cfg = await getPlanConfig(plan);
-  if (cfg.razorpayPlanId) return cfg.razorpayPlanId;
-
   const razorpay = getRazorpay();
+
+  if (cfg.razorpayPlanId) {
+    try {
+      await razorpay.plans.fetch(cfg.razorpayPlanId);
+      return cfg.razorpayPlanId;
+    } catch (error) {
+      // Stale ID after key mode switch (test→live) or deleted Razorpay plan.
+      logger.warn('Stored Razorpay plan id invalid; recreating', {
+        plan,
+        razorpayPlanId: cfg.razorpayPlanId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const amount = cfg.amountPaise || PLAN_PRICES_PAISE[plan];
-  const created = await razorpay.plans.create({
-    period: 'monthly',
-    interval: 1,
-    item: {
-      name: `Cosmo ${cfg.name}`,
-      amount,
-      currency: 'INR',
-      description: cfg.description || `${cfg.name} monthly`,
-    },
-    notes: { tier: plan },
-  });
+  if (!amount || amount <= 0) {
+    throw new AppError(
+      `Cannot create Razorpay plan for ${plan}: invalid amount`,
+      500,
+      'PLAN_AMOUNT_INVALID'
+    );
+  }
+
+  let created: { id: string };
+  try {
+    created = await razorpay.plans.create({
+      period: 'monthly',
+      interval: 1,
+      item: {
+        name: `Cosmo ${cfg.name}`,
+        amount,
+        currency: 'INR',
+        description: cfg.description || `${cfg.name} monthly`,
+      },
+      notes: { tier: plan },
+    });
+  } catch (error) {
+    throw razorpayAppError(error, 'Could not create Razorpay plan');
+  }
 
   const { PlanConfigModel } = await import('./subscription.model');
   const { invalidatePlanCache } = await import('./planConfig.service');
@@ -360,16 +403,21 @@ export async function createSubscription(
     { status: 'cancelled', cancelledAt: new Date() }
   );
 
-  const subscription = await razorpay.subscriptions.create({
-    plan_id: razorpayPlanId,
-    total_count: SUBSCRIPTION_TOTAL_COUNT,
-    customer_notify: 1,
-    quantity: 1,
-    notes: {
-      userId,
-      plan: input.plan,
-    },
-  });
+  let subscription: { id: string };
+  try {
+    subscription = await razorpay.subscriptions.create({
+      plan_id: razorpayPlanId,
+      total_count: SUBSCRIPTION_TOTAL_COUNT,
+      customer_notify: 1,
+      quantity: 1,
+      notes: {
+        userId,
+        plan: input.plan,
+      },
+    });
+  } catch (error) {
+    throw razorpayAppError(error, 'Could not create Razorpay subscription');
+  }
 
   const doc = await SubscriptionModel.create({
     userId,
