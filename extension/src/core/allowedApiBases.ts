@@ -75,3 +75,32 @@ export function resolveApiBase(
   if (isAllowedApiBase(safeFallback)) return safeFallback;
   return BUILTIN[0];
 }
+
+const LOCAL_WEB_BASE = 'http://localhost:5173';
+
+function isLocalOrigin(url: string): boolean {
+  return /localhost|127\.0\.0\.1/.test(url);
+}
+
+/**
+ * Dashboard origin used for Google sign-in. Prefers an injected production
+ * web origin when the API is remote; otherwise local Vite.
+ */
+export function resolveWebBase(apiBaseUrl: string): string {
+  const injected = injectedWebOrigins();
+  if (isLocalOrigin(apiBaseUrl)) {
+    return (
+      injected.find((origin) => isLocalOrigin(origin)) || LOCAL_WEB_BASE
+    );
+  }
+  return (
+    injected.find((origin) => !isLocalOrigin(origin)) ||
+    injected[0] ||
+    LOCAL_WEB_BASE
+  );
+}
+
+export function googleLoginUrl(apiBaseUrl: string): string {
+  const web = resolveWebBase(apiBaseUrl).replace(/\/$/, '');
+  return `${web}/login?next=${encodeURIComponent('/dashboard')}`;
+}

@@ -71,7 +71,6 @@ export function AdminLoginPage() {
               name="email"
               type="email"
               autoComplete="username"
-              placeholder="admin@cosmo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

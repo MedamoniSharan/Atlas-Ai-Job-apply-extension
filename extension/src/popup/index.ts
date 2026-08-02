@@ -6,19 +6,21 @@ import type { CopilotAlert, CopilotState } from '../core/copilotState';
 const authStateEl = document.getElementById('auth-state')!;
 const healthStateEl = document.getElementById('health-state')!;
 const scanStateEl = document.getElementById('scan-state')!;
-const loginForm = document.getElementById('login-form')!;
+const loginPanel = document.getElementById('login-panel')!;
 const authedSection = document.getElementById('authed')!;
 const formError = document.getElementById('form-error')!;
 const prefsMsg = document.getElementById('prefs-msg')!;
 const toastHost = document.getElementById('popup-toast-host')!;
-const emailInput = document.getElementById('email') as HTMLInputElement;
-const passwordInput = document.getElementById('password') as HTMLInputElement;
+const googleSignInBtn = document.getElementById(
+  'google-sign-in'
+) as HTMLButtonElement;
 const alertEl = document.getElementById('copilot-alert')!;
 const alertTitleEl = document.getElementById('copilot-alert-title')!;
 const alertMsgEl = document.getElementById('copilot-alert-msg')!;
 const alertDismissBtn = document.getElementById('copilot-alert-dismiss')!;
 
 let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
+let waitingForGoogle = false;
 
 function showToast(
   title: string,
@@ -81,7 +83,6 @@ function renderAlert(alert: CopilotAlert | null | undefined) {
   }
   alertEl.classList.remove('hidden');
   alertEl.classList.toggle('is-error', alert.level === 'error');
-  // retrigger flash animation
   alertEl.classList.remove('flash');
   void alertEl.offsetWidth;
   alertEl.classList.add('flash');
@@ -215,15 +216,22 @@ async function refreshUi() {
         ? `Co-pilot paused · matched ${status.copilot.matched}, applied ${status.copilot.applied}`
         : `Co-pilot running · matched ${status.copilot.matched}, applied ${status.copilot.applied}`;
     }
+  } else if (waitingForGoogle && !signedIn) {
+    scanStateEl.textContent = 'Waiting for Google sign-in…';
   } else {
     scanStateEl.textContent = '';
   }
 
-  loginForm.classList.toggle('hidden', signedIn);
+  loginPanel.classList.toggle('hidden', signedIn);
   authedSection.classList.toggle('hidden', !signedIn);
 
   if (signedIn) {
-    // Always pull from DB so popup matches dashboard preferences.
+    if (waitingForGoogle) {
+      waitingForGoogle = false;
+      googleSignInBtn.disabled = false;
+      formError.textContent = '';
+      showToast('Signed in', 'Google session synced to Cosmo.');
+    }
     const prefsRes = await send<{ success: boolean; data: JobPreferences }>({
       type: 'GET_PREFERENCES',
     });
@@ -248,20 +256,35 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-
-loginForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
+googleSignInBtn.addEventListener('click', async () => {
   formError.textContent = '';
-  const result = await send<{ success: boolean; message?: string }>({
-    type: 'LOGIN',
-    email: emailInput.value,
-    password: passwordInput.value,
+  googleSignInBtn.disabled = true;
+  waitingForGoogle = true;
+  scanStateEl.textContent = 'Waiting for Google sign-in…';
+
+  const result = await send<{ ok: boolean; message?: string }>({
+    type: 'OPEN_GOOGLE_LOGIN',
   });
-  if (!result.success) {
-    formError.textContent = result.message ?? 'Login failed';
+
+  if (!result?.ok) {
+    waitingForGoogle = false;
+    googleSignInBtn.disabled = false;
+    scanStateEl.textContent = '';
+    formError.textContent =
+      result?.message ?? 'Could not open Google sign-in.';
+    showToast(
+      'Sign-in failed',
+      result?.message ?? 'Could not open Cosmo login.',
+      'error'
+    );
     return;
   }
-  await refreshUi();
+
+  showToast(
+    'Continue in Cosmo',
+    'Finish Google sign-in in the Cosmo tab — this popup updates automatically.'
+  );
+  googleSignInBtn.disabled = false;
 });
 
 document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
@@ -287,6 +310,7 @@ document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
 });
 
 document.getElementById('logout')!.addEventListener('click', async () => {
+  waitingForGoogle = false;
   await send({ type: 'LOGOUT' });
   await refreshUi();
 });

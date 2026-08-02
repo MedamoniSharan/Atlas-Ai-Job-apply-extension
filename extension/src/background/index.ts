@@ -17,7 +17,7 @@ import {
   getCachedPreferences,
   DEFAULT_API,
 } from '../core/storageManager';
-import { resolveApiBase, injectedWebOrigins } from '../core/allowedApiBases';
+import { resolveApiBase, injectedWebOrigins, googleLoginUrl } from '../core/allowedApiBases';
 import { logger } from '../core/logger';
 import { handleError } from '../core/errorHandler';
 import { runScan } from '../core/scanManager';
@@ -238,6 +238,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             await fetchPreferences();
           }
           sendResponse(result);
+          break;
+        }
+        case 'OPEN_GOOGLE_LOGIN': {
+          try {
+            const auth = await getAuthState();
+            const url = googleLoginUrl(auth.apiBaseUrl);
+            const existing = await chrome.tabs.query({
+              url: DASHBOARD_TAB_URLS,
+            });
+            const preferred =
+              existing.find((tab) =>
+                Boolean(tab.url && /\/login(?:\?|$)/.test(tab.url))
+              ) ?? existing[0];
+            if (preferred?.id != null) {
+              await chrome.tabs.update(preferred.id, { url, active: true });
+              if (preferred.windowId != null) {
+                await chrome.windows.update(preferred.windowId, {
+                  focused: true,
+                });
+              }
+            } else {
+              await chrome.tabs.create({ url, active: true });
+            }
+            sendResponse({ ok: true });
+          } catch (error) {
+            sendResponse({
+              ok: false,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : 'Could not open Cosmo login',
+            });
+          }
           break;
         }
         case 'LOGOUT': {
