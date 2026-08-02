@@ -39,7 +39,7 @@ npm run build --workspace=@cosmo/extension
 #
 # Override origins / gecko id if needed:
 # EXTENSION_API_ORIGIN=https://atlas-ai-job-apply-extension-1.onrender.com \
-# EXTENSION_WEB_ORIGIN=https://atlas-ai-job-apply-extension-client-roan.vercel.app \
+# EXTENSION_WEB_ORIGIN=https://www.cosmovai.in,https://atlas-ai-job-apply-extension-client-roan.vercel.app \
 # EXTENSION_GECKO_ID=cosmo-job-assistant@cosmovai.com \
 # npm run build:firefox --workspace=@cosmo/extension
 ```

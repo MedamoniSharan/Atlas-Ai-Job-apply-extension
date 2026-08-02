@@ -5,6 +5,9 @@ declare const __EXTENSION_WEB_ORIGIN__: string | undefined;
 export const PRODUCTION_API_BASE =
   'https://atlas-ai-job-apply-extension-1.onrender.com';
 
+/** Deployed Cosmo web app. */
+export const PRODUCTION_WEB_BASE = 'https://www.cosmovai.in';
+
 /**
  * API bases the extension may call. Built-in localhost for local/dev
  * plus the production API; release builds can inject more via
@@ -85,6 +88,7 @@ function isLocalOrigin(url: string): boolean {
 /**
  * Dashboard origin used for Google sign-in. Prefers an injected production
  * web origin when the API is remote; otherwise local Vite.
+ * Production fallback is always https://www.cosmovai.in.
  */
 export function resolveWebBase(apiBaseUrl: string): string {
   const injected = injectedWebOrigins();
@@ -95,11 +99,11 @@ export function resolveWebBase(apiBaseUrl: string): string {
   }
   return (
     injected.find((origin) => !isLocalOrigin(origin)) ||
-    injected[0] ||
-    LOCAL_WEB_BASE
+    PRODUCTION_WEB_BASE
   );
 }
 
+/** Opens Cosmo login; after auth the web app navigates to /dashboard. */
 export function googleLoginUrl(apiBaseUrl: string): string {
   const web = resolveWebBase(apiBaseUrl).replace(/\/$/, '');
   return `${web}/login?next=${encodeURIComponent('/dashboard')}`;

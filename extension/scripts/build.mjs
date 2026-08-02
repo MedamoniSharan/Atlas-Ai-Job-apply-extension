@@ -20,9 +20,9 @@ const firefox = process.argv.includes('--firefox');
 /** Production Cosmo API (Render). */
 const DEFAULT_PROD_API =
   'https://atlas-ai-job-apply-extension-1.onrender.com';
-/** Production dashboard (repo homepage / Vercel). Override via env. */
+/** Production dashboard origins (custom domain + original Vercel). Override via env. */
 const DEFAULT_PROD_WEB =
-  'https://atlas-ai-job-apply-extension-client-roan.vercel.app';
+  'https://www.cosmovai.in,https://atlas-ai-job-apply-extension-client-roan.vercel.app';
 /** Stable AMO / Firefox add-on ID (email-shaped). */
 const DEFAULT_GECKO_ID = 'cosmo-job-assistant@cosmovai.com';
 
