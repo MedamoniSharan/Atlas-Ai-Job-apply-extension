@@ -14,9 +14,10 @@ import {
   mountMinimizeIcon,
   mountPauseIcon,
   mountPlayIcon,
+  mountRunningButton,
   mountStopIcon,
-  runningVideoHtml,
 } from '../shared/actionIcons';
+import { clearChildren, setTrustedHtml } from '../shared/dom';
 
 const ROOT_ID = 'cosmo-copilot-root';
 const naukri = new NaukriAdapter();
@@ -47,7 +48,9 @@ export function mountCopilotPanel() {
 
   const root = document.createElement('div');
   root.id = ROOT_ID;
-  root.innerHTML = `
+  setTrustedHtml(
+    root,
+    `
     <style>
       #${ROOT_ID} {
         all: initial;
@@ -991,7 +994,8 @@ export function mountCopilotPanel() {
       </div>
     </div>
     </div>
-  `;
+  `
+  );
   document.documentElement.appendChild(root);
 
   const jobsEl = root.querySelector('#cosmo-jobs') as HTMLElement;
@@ -1182,14 +1186,17 @@ export function mountCopilotPanel() {
     const el = document.createElement('div');
     el.className = 'cosmo-toast';
     el.setAttribute('role', 'status');
-    el.innerHTML = `
+    setTrustedHtml(
+      el,
+      `
       <div class="cosmo-toast-icon" aria-hidden="true">✓</div>
       <div class="cosmo-toast-copy">
         <p class="cosmo-toast-title">${escapeHtml(toast.title)}</p>
         <p class="cosmo-toast-msg">${escapeHtml(toast.message)}</p>
       </div>
       <button type="button" class="cosmo-toast-close" aria-label="Dismiss">×</button>
-    `;
+    `
+    );
     const closeBtn = el.querySelector('.cosmo-toast-close') as HTMLButtonElement;
     closeBtn.addEventListener('click', () => dismissToast(el));
     toastHost.appendChild(el);
@@ -1211,14 +1218,17 @@ export function mountCopilotPanel() {
       const el = document.createElement('div');
       el.className = 'cosmo-toast is-pace';
       el.setAttribute('role', 'status');
-      el.innerHTML = `
+      setTrustedHtml(
+        el,
+        `
         <div class="cosmo-toast-icon" aria-hidden="true">⏱</div>
         <div class="cosmo-toast-copy">
           <p class="cosmo-toast-title" data-pace-title></p>
           <p class="cosmo-toast-msg" data-pace-msg></p>
         </div>
         <span class="cosmo-toast-countdown" data-pace-cd></span>
-      `;
+      `
+      );
       toastHost.prepend(el);
       paceToastEl = el;
     }
@@ -1352,8 +1362,10 @@ export function mountCopilotPanel() {
     const scanned = scannedTotal ?? matched;
     jobsCountEl.textContent = `${scanned} scanned · ${matched} matched`;
     if (!jobs.length) {
-      jobsEl.innerHTML =
-        '<div class="cosmo-empty">Matched jobs will appear here as Cosmo scans the list.</div>';
+      setTrustedHtml(
+        jobsEl,
+        '<div class="cosmo-empty">Matched jobs will appear here as Cosmo scans the list.</div>'
+      );
       return;
     }
     const order: Record<ScannedJobItem['status'], number> = {
@@ -1366,7 +1378,9 @@ export function mountCopilotPanel() {
     const sorted = [...jobs].sort(
       (a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9)
     );
-    jobsEl.innerHTML = sorted
+    setTrustedHtml(
+      jobsEl,
+      sorted
       .slice(0, 50)
       .map((j) => {
         const reason = (j.skipReason || '').trim();
@@ -1393,7 +1407,8 @@ export function mountCopilotPanel() {
         }
       </div>`;
       })
-      .join('');
+      .join('')
+    );
 
     for (const row of Array.from(jobsEl.querySelectorAll('.job-row'))) {
       const el = row as HTMLElement;
@@ -1475,7 +1490,10 @@ export function mountCopilotPanel() {
 
     if (state.running && state.currentTitle && !pacing) {
       nowEl.classList.add('show');
-      nowEl.innerHTML = `<strong>Now</strong>${escapeHtml(state.currentTitle)}`;
+      clearChildren(nowEl);
+      const label = document.createElement('strong');
+      label.textContent = 'Now';
+      nowEl.append(label, document.createTextNode(state.currentTitle));
     } else {
       nowEl.classList.remove('show');
       nowEl.textContent = '';
@@ -1497,15 +1515,7 @@ export function mountCopilotPanel() {
     if (startIconMode !== nextStartMode) {
       startIconMode = nextStartMode;
       if (nextStartMode === 'running') {
-        startBtn.innerHTML = runningVideoHtml(runningMp4);
-        const video = startBtn.querySelector('video');
-        if (video) {
-          video.src = runningMp4;
-          video.muted = true;
-          video.loop = true;
-          video.playsInline = true;
-          void video.play().catch(() => undefined);
-        }
+        mountRunningButton(startBtn, runningMp4);
       } else if (nextStartMode === 'scanning') {
         startBtn.textContent = 'Scanning…';
       } else {

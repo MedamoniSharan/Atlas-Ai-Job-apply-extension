@@ -1,3 +1,5 @@
+import { setTrustedSvg } from './dom';
+
 const PAUSE_SVG = `
 <svg viewBox="0 0 24 24" aria-hidden="true" class="cosmo-fi-icon cosmo-fi-pause">
   <rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/>
@@ -20,26 +22,50 @@ const MINIMIZE_SVG = `
 </svg>`;
 
 export function mountPauseIcon(host: HTMLElement) {
-  host.innerHTML = PAUSE_SVG;
+  setTrustedSvg(host, PAUSE_SVG);
 }
 
 export function mountPlayIcon(host: HTMLElement) {
-  host.innerHTML = PLAY_SVG;
+  setTrustedSvg(host, PLAY_SVG);
 }
 
 export function mountStopIcon(host: HTMLElement) {
-  host.innerHTML = STOP_SVG;
+  setTrustedSvg(host, STOP_SVG);
 }
 
 export function mountMinimizeIcon(host: HTMLElement) {
-  host.innerHTML = MINIMIZE_SVG;
+  setTrustedSvg(host, MINIMIZE_SVG);
 }
 
-export function runningVideoHtml(src: string): string {
-  return `
-    <span class="run-anim run-anim--video" aria-hidden="true">
-      <video src="${src}" autoplay muted loop playsinline preload="auto"></video>
-    </span>
-    <span class="run-label">Running<span class="run-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></span>
-  `;
+/** Build the Start button's "Running" state with a looping video (no innerHTML). */
+export function mountRunningButton(host: HTMLElement, src: string): void {
+  host.replaceChildren();
+
+  const anim = document.createElement('span');
+  anim.className = 'run-anim run-anim--video';
+  anim.setAttribute('aria-hidden', 'true');
+
+  const video = document.createElement('video');
+  video.src = src;
+  video.autoplay = true;
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  anim.appendChild(video);
+
+  const label = document.createElement('span');
+  label.className = 'run-label';
+  label.append('Running');
+
+  const dots = document.createElement('span');
+  dots.className = 'run-dots';
+  dots.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i += 1) {
+    dots.appendChild(document.createElement('i')).textContent = '.';
+  }
+  label.appendChild(dots);
+
+  host.append(anim, label);
+  void video.play().catch(() => undefined);
 }

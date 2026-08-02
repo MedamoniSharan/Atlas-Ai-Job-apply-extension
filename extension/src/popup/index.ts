@@ -3,6 +3,7 @@ import { CONSENT_VERSION } from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
 import { ensureChromeNamespace } from '../shared/browser';
+import { clearChildren, setTrustedHtml } from '../shared/dom';
 
 ensureChromeNamespace();
 
@@ -30,11 +31,13 @@ function showToast(
   message: string,
   variant: 'success' | 'error' = 'success'
 ) {
-  toastHost.innerHTML = '';
+  clearChildren(toastHost);
   const el = document.createElement('div');
   el.className = `popup-toast${variant === 'error' ? ' is-error' : ''}`;
   el.setAttribute('role', 'status');
-  el.innerHTML = `
+  setTrustedHtml(
+    el,
+    `
     <div class="popup-toast-icon" aria-hidden="true">${
       variant === 'error' ? '!' : '✓'
     }</div>
@@ -43,7 +46,8 @@ function showToast(
       <p class="popup-toast-msg"></p>
     </div>
     <button type="button" class="popup-toast-close" aria-label="Dismiss">×</button>
-  `;
+  `
+  );
   (el.querySelector('.popup-toast-title') as HTMLElement).textContent = title;
   (el.querySelector('.popup-toast-msg') as HTMLElement).textContent = message;
   const closeBtn = el.querySelector('.popup-toast-close') as HTMLButtonElement;

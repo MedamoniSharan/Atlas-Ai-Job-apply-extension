@@ -128,10 +128,11 @@ function createManifest(target) {
   ];
 
   // Required for Firefox MV3 / AMO. Chromium ignores this key.
+  // data_collection_permissions needs desktop ≥140 and Android ≥142.
   base.browser_specific_settings = {
     gecko: {
       id: geckoId,
-      strict_min_version: '121.0',
+      strict_min_version: '140.0',
       data_collection_permissions: {
         required: [
           'authenticationInfo',
@@ -141,6 +142,9 @@ function createManifest(target) {
           'websiteContent',
         ],
       },
+    },
+    gecko_android: {
+      strict_min_version: '142.0',
     },
   };
 
