@@ -40,6 +40,26 @@ applicationsRouter.post(
 );
 
 applicationsRouter.get(
+  '/stats',
+  requireAuth,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const from =
+      typeof req.query.from === 'string' && req.query.from.trim()
+        ? req.query.from.trim()
+        : undefined;
+    const to =
+      typeof req.query.to === 'string' && req.query.to.trim()
+        ? req.query.to.trim()
+        : undefined;
+    const result = await applicationsService.getApplicationStats(req.user!.sub, {
+      from,
+      to,
+    });
+    res.json(ok(result));
+  })
+);
+
+applicationsRouter.get(
   '/',
   requireAuth,
   asyncHandler(async (req: AuthedRequest, res) => {

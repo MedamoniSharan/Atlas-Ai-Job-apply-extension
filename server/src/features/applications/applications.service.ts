@@ -171,6 +171,75 @@ export async function listApplications(
   };
 }
 
+export type ApplicationStatsQuery = {
+  from?: string;
+  to?: string;
+};
+
+export type ApplicationStats = {
+  period: {
+    from?: string;
+    to?: string;
+    all: number;
+    matched: number;
+    applied: number;
+    skipped: number;
+    company_site: number;
+    auto_apply: number;
+  };
+  lifetime: {
+    all: number;
+    applied: number;
+  };
+};
+
+/** Bucket + auto-apply counts for a window, plus lifetime totals — one round-trip for the dashboard. */
+export async function getApplicationStats(
+  userId: string,
+  query: ApplicationStatsQuery = {}
+): Promise<ApplicationStats> {
+  const range = { from: query.from, to: query.to };
+  const count = (partial: ListApplicationsQuery) =>
+    ApplicationModel.countDocuments(buildFilter(userId, partial));
+
+  const [
+    all,
+    matched,
+    applied,
+    skipped,
+    company_site,
+    auto_apply,
+    lifetimeAll,
+    lifetimeApplied,
+  ] = await Promise.all([
+    count({ ...range, bucket: 'all' }),
+    count({ ...range, bucket: 'matched' }),
+    count({ ...range, bucket: 'applied' }),
+    count({ ...range, bucket: 'skipped' }),
+    count({ ...range, bucket: 'company_site' }),
+    count({ ...range, source: 'auto_apply' }),
+    count({ bucket: 'all' }),
+    count({ bucket: 'applied' }),
+  ]);
+
+  return {
+    period: {
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      all,
+      matched,
+      applied,
+      skipped,
+      company_site,
+      auto_apply,
+    },
+    lifetime: {
+      all: lifetimeAll,
+      applied: lifetimeApplied,
+    },
+  };
+}
+
 function normalizeUrl(url: string | undefined | null): string | null {
   if (!url) return null;
   try {

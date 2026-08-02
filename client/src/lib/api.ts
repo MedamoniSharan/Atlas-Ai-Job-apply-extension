@@ -222,6 +222,36 @@ export async function fetchApplications(params: ApplicationsQuery = {}) {
   }>(`/api/v1/applications?${search.toString()}`);
 }
 
+export type ApplicationStats = {
+  period: {
+    from?: string;
+    to?: string;
+    all: number;
+    matched: number;
+    applied: number;
+    skipped: number;
+    company_site: number;
+    auto_apply: number;
+  };
+  lifetime: {
+    all: number;
+    applied: number;
+  };
+};
+
+export async function fetchApplicationStats(params: {
+  from?: string;
+  to?: string;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.from) search.set('from', params.from);
+  if (params.to) search.set('to', params.to);
+  const qs = search.toString();
+  return request<ApplicationStats>(
+    `/api/v1/applications/stats${qs ? `?${qs}` : ''}`
+  );
+}
+
 export type TrackerColumn =
   | 'matched'
   | 'applied'

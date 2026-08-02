@@ -1,7 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Target, Search } from 'lucide-react';
-import { fetchApplications, fetchBillingMe, fetchScanStats } from '../lib/api';
+import {
+  fetchApplications,
+  fetchApplicationStats,
+  fetchBillingMe,
+  fetchScanStats,
+} from '../lib/api';
 import {
   DASH_PERIODS,
   dashPeriodRange,
@@ -43,84 +48,20 @@ export function DashboardPage() {
     () => dashPeriodRange(statsPeriod),
     [statsPeriod],
   );
-  const periodQuery = {
-    from: periodRange.from,
-    to: periodRange.to,
-  };
+  const invalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: matchData } = useQuery({
-    queryKey: ['applications', 'top-matches', statsPeriod, periodRange.from],
-    queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 8,
-        bucket: 'matched',
-        ...periodQuery,
-      });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: appliedStats } = useQuery({
-    queryKey: ['applications', 'applied-count', statsPeriod, periodRange.from],
-    queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 1,
-        bucket: 'applied',
-        ...periodQuery,
-      });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: skippedStats } = useQuery({
-    queryKey: ['applications', 'skipped-count', statsPeriod, periodRange.from],
-    queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 1,
-        bucket: 'skipped',
-        ...periodQuery,
-      });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: companySiteStats } = useQuery({
+  const { data: appStats } = useQuery({
     queryKey: [
       'applications',
-      'company-site-count',
+      'stats',
       statsPeriod,
       periodRange.from,
+      periodRange.to,
     ],
     queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 1,
-        bucket: 'company_site',
-        ...periodQuery,
-      });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: allStats } = useQuery({
-    queryKey: ['applications', 'all-count', statsPeriod, periodRange.from],
-    queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 1,
-        bucket: 'all',
-        ...periodQuery,
+      const res = await fetchApplicationStats({
+        from: periodRange.from,
+        to: periodRange.to,
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -129,57 +70,20 @@ export function DashboardPage() {
   });
 
   const { data: recentApps } = useQuery({
-    queryKey: ['applications', 'recent-activity', statsPeriod, periodRange.from],
+    queryKey: [
+      'applications',
+      'recent-activity',
+      statsPeriod,
+      periodRange.from,
+      periodRange.to,
+    ],
     queryFn: async () => {
       const res = await fetchApplications({
         page: 1,
         limit: 6,
         bucket: 'all',
-        ...periodQuery,
-      });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: autoApplyStats } = useQuery({
-    queryKey: [
-      'applications',
-      'auto-apply-count',
-      statsPeriod,
-      periodRange.from,
-    ],
-    queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 1,
-        source: 'auto_apply',
-        ...periodQuery,
-      });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: lifetimeAll } = useQuery({
-    queryKey: ['applications', 'lifetime-all'],
-    queryFn: async () => {
-      const res = await fetchApplications({ page: 1, limit: 1, bucket: 'all' });
-      if (!res.success) throw new Error(res.message);
-      return res.data;
-    },
-    staleTime: 30_000,
-  });
-
-  const { data: lifetimeApplied } = useQuery({
-    queryKey: ['applications', 'lifetime-applied'],
-    queryFn: async () => {
-      const res = await fetchApplications({
-        page: 1,
-        limit: 1,
-        bucket: 'applied',
+        from: periodRange.from,
+        to: periodRange.to,
       });
       if (!res.success) throw new Error(res.message);
       return res.data;
@@ -218,22 +122,36 @@ export function DashboardPage() {
   });
 
   const onUpdate = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['applications'] });
-    void queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
-    void queryClient.invalidateQueries({ queryKey: ['scan-sessions'] });
+    if (invalidateTimer.current) clearTimeout(invalidateTimer.current);
+    // Coalesce socket bursts during co-pilot into one refetch wave.
+    invalidateTimer.current = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: ['applications', 'stats'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['applications', 'recent-activity'],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['applications', 'nav-count'] });
+      void queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
+      void queryClient.invalidateQueries({ queryKey: ['scan-sessions'] });
+    }, 1500);
   }, [queryClient]);
+
+  useEffect(() => {
+    return () => {
+      if (invalidateTimer.current) clearTimeout(invalidateTimer.current);
+    };
+  }, []);
 
   useApplicationSocket(onUpdate);
 
   const firstName = user?.name?.split(' ')[0] || 'there';
-  const jobsCount = allStats?.total ?? 0;
-  const appliedCount = appliedStats?.total ?? 0;
-  const matchedCount = matchData?.total ?? 0;
-  const skippedCount = skippedStats?.total ?? 0;
-  const companySiteCount = companySiteStats?.total ?? 0;
-  const autoApplyCount = autoApplyStats?.total ?? 0;
-  const lifetimeJobsCount = lifetimeAll?.total ?? 0;
-  const lifetimeAppliedCount = lifetimeApplied?.total ?? 0;
+  const jobsCount = appStats?.period.all ?? 0;
+  const appliedCount = appStats?.period.applied ?? 0;
+  const matchedCount = appStats?.period.matched ?? 0;
+  const skippedCount = appStats?.period.skipped ?? 0;
+  const companySiteCount = appStats?.period.company_site ?? 0;
+  const autoApplyCount = appStats?.period.auto_apply ?? 0;
+  const lifetimeJobsCount = appStats?.lifetime.all ?? 0;
+  const lifetimeAppliedCount = appStats?.lifetime.applied ?? 0;
   const scannedTotal = scanStats?.totals.scanned ?? 0;
   const scannedWindow = scanStats?.window.scanned ?? 0;
   const scanMatchedTotal = scanStats?.totals.matched ?? 0;
