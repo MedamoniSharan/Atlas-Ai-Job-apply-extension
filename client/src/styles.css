@@ -1307,6 +1307,21 @@ textarea {
   animation: dash-stat-glow-blue 9s ease-in-out infinite;
 }
 
+.dash-stat-card--scanned {
+  border-color: #e2dcf0;
+  background:
+    radial-gradient(circle at 16% 20%, rgba(107, 91, 149, 0.22), transparent 42%),
+    radial-gradient(circle at 90% 80%, rgba(186, 170, 220, 0.4), transparent 48%),
+    linear-gradient(145deg, #f7f4fc 0%, #eee8f8 100%);
+  background-size: 160% 160%, 180% 180%, 100% 100%;
+  animation: dash-stat-glow-purple 8.5s ease-in-out infinite;
+}
+
+.dash-stat-card--scanned .dash-stat-card__icon {
+  background: rgba(107, 91, 149, 0.14);
+  color: #5a4a82;
+}
+
 .dash-stat-card--applied .dash-stat-card__icon--naukri {
   background: #ffffff;
   border-color: #cfe3f0;
@@ -1354,6 +1369,16 @@ textarea {
   }
   50% {
     background-position: 85% 15%, 15% 85%, 0 0;
+  }
+}
+
+@keyframes dash-stat-glow-purple {
+  0%,
+  100% {
+    background-position: 5% 35%, 95% 65%, 0 0;
+  }
+  50% {
+    background-position: 75% 15%, 25% 90%, 0 0;
   }
 }
 
@@ -1945,6 +1970,10 @@ textarea {
   background: #fff3e4;
 }
 
+.dash-breakdown__icon--scanned {
+  background: #efeaf8;
+}
+
 .dash-breakdown__icon--auto,
 .dash-breakdown__icon--connect {
   background: color-mix(in srgb, var(--color-surface-raised) 12%, white);
@@ -2001,6 +2030,10 @@ textarea {
 
 .dash-breakdown__fill--orange {
   background: #e08a2b;
+}
+
+.dash-breakdown__fill--purple {
+  background: #6b5b95;
 }
 
 .dash-breakdown__fill--ink {

@@ -6,6 +6,7 @@ export type StatusIconKey =
   | 'company'
   | 'skipped'
   | 'auto'
+  | 'scanned'
   | 'chrome'
   | 'edge'
   | 'firefox'
@@ -33,6 +34,26 @@ export function FlatStatusIcon({
   };
 
   switch (icon) {
+    case 'scanned':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="10" fill="#6b5b95" />
+          <circle
+            cx="11"
+            cy="11"
+            r="4"
+            stroke="#fff"
+            strokeWidth="2"
+            fill="none"
+          />
+          <path
+            d="M14.2 14.2 17.5 17.5"
+            stroke="#fff"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
     case 'applied':
       return (
         <svg {...common}>

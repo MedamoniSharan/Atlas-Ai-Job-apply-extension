@@ -3,6 +3,8 @@ import type {
   AuthTokens,
   EventEnvelope,
   JobPreferences,
+  ScanSession,
+  ScanSessionUpsert,
   SyncEventsRequest,
   SyncEventsResult,
 } from '@cosmo/shared';
@@ -135,6 +137,16 @@ export async function syncEvents(
   return request<SyncEventsBody>('/api/v1/events/sync', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+/** Upsert by `sessionId` — safe to call repeatedly as a run progresses. */
+export async function postScanSession(
+  input: ScanSessionUpsert
+): Promise<ApiResponse<ScanSession>> {
+  return request<ScanSession>('/api/v1/scan-sessions', {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }
 

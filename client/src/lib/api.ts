@@ -4,6 +4,7 @@ import type {
   AuthTokens,
   JobPreferences,
   OnboardingStatus,
+  ScanStats,
   User,
 } from '@cosmo/shared';
 import { useAuthStore } from '../store/authStore';
@@ -370,6 +371,13 @@ export async function fetchBillingMe() {
       paidAt?: string;
     }>;
   }>('/api/v1/billing/me');
+}
+
+export async function fetchScanStats(params: { days?: number; limit?: number } = {}) {
+  const search = new URLSearchParams();
+  search.set('days', String(params.days ?? 30));
+  search.set('limit', String(params.limit ?? 10));
+  return request<ScanStats>(`/api/v1/scan-sessions/stats?${search.toString()}`);
 }
 
 // ─── Admin API ───────────────────────────────────────────────

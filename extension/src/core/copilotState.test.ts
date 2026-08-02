@@ -65,3 +65,22 @@ describe('noteJobsScanned', () => {
     expect((await getCopilotState()).scanned).toBe(3);
   });
 });
+
+describe('notePageScanned', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('increments pagesScanned', async () => {
+    const store: Store = {};
+    installChromeMock(store);
+
+    const { notePageScanned, getCopilotState, DEFAULT_COPILOT_STATE } =
+      await import('./copilotState');
+
+    store.copilotState = { ...DEFAULT_COPILOT_STATE, pagesScanned: 0 };
+    expect(await notePageScanned()).toBe(1);
+    expect(await notePageScanned()).toBe(2);
+    expect((await getCopilotState()).pagesScanned).toBe(2);
+  });
+});

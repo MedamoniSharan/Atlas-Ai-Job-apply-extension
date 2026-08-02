@@ -68,6 +68,11 @@ export type CopilotState = {
   /** Why we paused for login — drives confirm vs log-in copy. */
   loginPauseReason?: LoginPauseReason | null;
   keyword: string;
+  /** Identifies the current run to the backend; survives service-worker restarts. */
+  sessionId?: string | null;
+  sessionStartedAt?: string | null;
+  /** Result pages walked this run, reported alongside the counters. */
+  pagesScanned: number;
   /** Unique Naukri job cards seen during list scan (matched + rejected). */
   scanned: number;
   matched: number;
@@ -104,6 +109,9 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   needsLogin: false,
   loginPauseReason: null,
   keyword: '',
+  sessionId: null,
+  sessionStartedAt: null,
+  pagesScanned: 0,
   scanned: 0,
   matched: 0,
   applied: 0,
@@ -223,6 +231,14 @@ export async function noteJobsScanned(
     scanned: state.scanned + added,
   }));
   return next.scanned;
+}
+
+/** Count one Naukri result page walked during this run. */
+export async function notePageScanned(): Promise<number> {
+  const next = await commitCopilotState((state) => ({
+    pagesScanned: (state.pagesScanned ?? 0) + 1,
+  }));
+  return next.pagesScanned;
 }
 
 export async function updateScannedJob(

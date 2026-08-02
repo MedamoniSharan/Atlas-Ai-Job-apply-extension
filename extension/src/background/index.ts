@@ -3,6 +3,7 @@ import type { EventEnvelope, EventType, JobPayload, JobPreferences } from '@cosm
 import { CONSENT_VERSION } from '@cosmo/shared';
 import { enqueue } from '../core/queueManager';
 import { flushQueue } from '../core/syncManager';
+import { flushScanSessions } from '../core/scanSessionReporter';
 import { reportHealth } from '../core/healthMonitor';
 import {
   login as apiLogin,
@@ -201,6 +202,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'sync-flush' || alarm.name.startsWith('retry-')) {
     await flushQueue();
+    await flushScanSessions();
   }
   if (alarm.name === 'health-ping') {
     await reportHealth();
@@ -351,6 +353,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         case 'FLUSH_QUEUE': {
           await flushQueue();
+          await flushScanSessions();
           sendResponse({ ok: true });
           break;
         }

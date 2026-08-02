@@ -25,7 +25,12 @@ import {
   updateScannedJob,
   upsertScannedJobs,
   noteJobsScanned,
+  notePageScanned,
 } from './copilotState';
+import {
+  beginScanSession,
+  reportScanSession,
+} from './scanSessionReporter';
 import { mergeJobFields, jobDetailRichness } from './jobFields';
 import {
   getApplyQuotaBlock,
@@ -1238,6 +1243,8 @@ async function collectUntilMatchedBatch(opts: {
       into: batch,
       logPrefix: `${prefix} p${page + 1}`,
     });
+    await notePageScanned();
+    await reportScanSession('running');
     if (batch.length >= SCAN_BATCH_SIZE) break;
 
     if (batch.length === before) {
@@ -1321,6 +1328,7 @@ async function applyCollectedJobs(opts: {
 export async function stopBot(): Promise<void> {
   lastSession = null;
   setActiveWorkTabId(null);
+  await reportScanSession('stopped');
   await setCopilotState({
     running: false,
     paused: false,
@@ -1404,6 +1412,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
       matched: 0,
       applied: 0,
       skipped: 0,
+      pagesScanned: 0,
       appliesThisSession: 0,
       stealthAppliesThisSession: 0,
       stealthStartedAt: existing.runInBackground
@@ -1416,6 +1425,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
       scannedJobs: [],
       runInBackground: existing.runInBackground,
     });
+    await beginScanSession();
 
     const stealth = (await getCopilotState()).runInBackground;
     const mode = paceModeFromStealth(stealth);
@@ -1608,6 +1618,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
         sessionComplete: null,
       });
     }
+    await reportScanSession('completed');
     return { ok: true, message: 'Co-pilot session finished.' };
   } catch (error) {
     logger.warn('Co-pilot failed', {
@@ -1617,9 +1628,16 @@ export async function runBot(handlers: BotHandlers): Promise<{
       `Co-pilot error: ${error instanceof Error ? error.message : String(error)}`,
       'error'
     );
+    await reportScanSession('failed');
     await setCopilotState({ running: false, paused: false });
     return { ok: false, message: 'Co-pilot failed.' };
   } finally {
+    // Early returns (login fail, stop mid-run, etc.) never hit the summary
+    // block — still flush whatever counters we gathered.
+    const leftover = await getCopilotState();
+    if (leftover.sessionId) {
+      await reportScanSession('stopped');
+    }
     botRunning = false;
   }
 }
@@ -1663,6 +1681,11 @@ export async function continueNextPage(): Promise<{
   botRunning = true;
 
   try {
+    const existingSession = await getCopilotState();
+    if (!existingSession.sessionId) {
+      await beginScanSession();
+    }
+
     const mode = paceModeFromStealth(ctx.stealth);
     await appendCopilotLog(
       'Taking a short read pause before the next page…',
@@ -1795,14 +1818,20 @@ export async function continueNextPage(): Promise<{
         allApplied: allApplied || finalState.applied > 0,
       },
     });
+    await reportScanSession('completed');
     return { ok: true, message: hitLimit ? 'Stopped during apply.' : 'Continued to next page.' };
   } catch (error) {
     logger.warn('Continue next page failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    await reportScanSession('failed');
     await setCopilotState({ running: false });
     return { ok: false, message: 'Could not open next page.' };
   } finally {
+    const leftover = await getCopilotState();
+    if (leftover.sessionId) {
+      await reportScanSession('stopped');
+    }
     botRunning = false;
   }
 }

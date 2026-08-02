@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Target } from 'lucide-react';
-import { fetchApplications, fetchBillingMe } from '../lib/api';
+import { Target, Search } from 'lucide-react';
+import { fetchApplications, fetchBillingMe, fetchScanStats } from '../lib/api';
 import { useApplicationSocket } from '../lib/socket';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import {
@@ -134,9 +134,20 @@ export function DashboardPage() {
     staleTime: 30_000,
   });
 
+  const { data: scanStats } = useQuery({
+    queryKey: ['scan-sessions', 'stats'],
+    queryFn: async () => {
+      const res = await fetchScanStats({ days: 30, limit: 10 });
+      if (!res.success) throw new Error(res.message);
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+
   const onUpdate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['applications'] });
     void queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
+    void queryClient.invalidateQueries({ queryKey: ['scan-sessions'] });
   }, [queryClient]);
 
   useApplicationSocket(onUpdate);
@@ -148,6 +159,12 @@ export function DashboardPage() {
   const skippedCount = skippedStats?.total ?? 0;
   const companySiteCount = companySiteStats?.total ?? 0;
   const autoApplyCount = autoApplyStats?.total ?? 0;
+  const scannedTotal = scanStats?.totals.scanned ?? 0;
+  const scannedWindow = scanStats?.window.scanned ?? 0;
+  const scanMatchedTotal = scanStats?.totals.matched ?? 0;
+  const scanAppliedTotal = scanStats?.totals.applied ?? 0;
+  const scanSkippedTotal = scanStats?.totals.skipped ?? 0;
+  const scanSessionsTotal = scanStats?.totals.sessions ?? 0;
   const usage = billing?.appliesUsed ?? 0;
   const usageLimit = billing?.appliesLimit ?? 0;
   const usagePct =
@@ -268,6 +285,61 @@ export function DashboardPage() {
     jobsCount,
   ]);
 
+  const scanRows = useMemo<StatsRow[]>(() => {
+    const total = Math.max(scannedTotal, 1);
+    return [
+      {
+        id: 'scanned',
+        label: 'Scanned',
+        count: scannedTotal,
+        pct: 100,
+        barClass: 'dash-breakdown__fill dash-breakdown__fill--purple',
+        icon: 'scanned',
+      },
+      {
+        id: 'scan-matched',
+        label: 'Matched',
+        count: scanMatchedTotal,
+        pct: pctOf(scanMatchedTotal, total),
+        barClass: 'dash-breakdown__fill dash-breakdown__fill--teal',
+        icon: 'matched',
+      },
+      {
+        id: 'scan-applied',
+        label: 'Applied',
+        count: scanAppliedTotal,
+        pct: pctOf(scanAppliedTotal, total),
+        barClass: 'dash-breakdown__fill dash-breakdown__fill--green',
+        icon: 'applied',
+      },
+      {
+        id: 'scan-skipped',
+        label: 'Skipped',
+        count: scanSkippedTotal,
+        pct: pctOf(scanSkippedTotal, total),
+        barClass: 'dash-breakdown__fill dash-breakdown__fill--orange',
+        icon: 'skipped',
+      },
+      {
+        id: 'sessions',
+        label: 'Sessions',
+        count: scanSessionsTotal,
+        pct:
+          scanSessionsTotal > 0
+            ? pctOf(scanSessionsTotal, Math.max(scanSessionsTotal, 1))
+            : 0,
+        barClass: 'dash-breakdown__fill dash-breakdown__fill--ink',
+        icon: 'auto',
+      },
+    ];
+  }, [
+    scannedTotal,
+    scanMatchedTotal,
+    scanAppliedTotal,
+    scanSkippedTotal,
+    scanSessionsTotal,
+  ]);
+
   const extensionRows = useMemo<StatsRow[]>(() => {
     const connected = Boolean(onboarding?.extensionConnected);
     const prefs = Boolean(onboarding?.preferencesCompleted);
@@ -372,6 +444,17 @@ export function DashboardPage() {
             <JobsStudyLottie />
           </article>
 
+          <article className="dash-stat-card dash-stat-card--scanned">
+            <span className="dash-stat-card__icon" aria-hidden>
+              <Search size={18} strokeWidth={2} />
+            </span>
+            <span className="dash-stat-card__label">Scanned</span>
+            <strong className="dash-stat-card__value">{scannedTotal}</strong>
+            <em className="dash-stat-card__meta">
+              {scannedWindow} in last 30 days
+            </em>
+          </article>
+
           <article className="dash-stat-card dash-stat-card--applied">
             <span className="dash-stat-card__icon dash-stat-card__icon--naukri" aria-hidden>
               <img src="/naukri-logo.png" alt="" width={22} height={22} />
@@ -413,7 +496,11 @@ export function DashboardPage() {
 
       <div className="dash-board__bottom">
         <ActivityTimeline items={timelineItems} />
-        <JobsExtensionStatsCard jobsRows={jobsRows} extensionRows={extensionRows} />
+        <JobsExtensionStatsCard
+          jobsRows={jobsRows}
+          scanRows={scanRows}
+          extensionRows={extensionRows}
+        />
       </div>
     </div>
   );

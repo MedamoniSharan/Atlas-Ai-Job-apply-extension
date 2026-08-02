@@ -14,6 +14,7 @@ import { healthRouter } from './features/health/health.routes';
 import { onboardingRouter } from './features/onboarding/onboarding.routes';
 import { preferencesRouter } from './features/preferences/preferences.routes';
 import { billingRouter } from './features/billing/billing.routes';
+import { scanSessionsRouter } from './features/scanSessions/scanSessions.routes';
 import { adminRouter } from './features/admin/admin.routes';
 import * as billingService from './features/billing/billing.service';
 
@@ -51,6 +52,16 @@ export function createApp() {
 
   app.use(express.json({ limit: '1mb' }));
   app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
+
+  // Uptime / load-balancer probe — kept outside the API rate limit.
+  app.get('/health', (_req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'Server is healthy',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
@@ -67,6 +78,7 @@ export function createApp() {
   app.use('/api/v1/onboarding', onboardingRouter);
   app.use('/api/v1/preferences', preferencesRouter);
   app.use('/api/v1/billing', billingRouter);
+  app.use('/api/v1/scan-sessions', scanSessionsRouter);
   app.use('/api/v1/admin', adminRouter);
 
   app.use(errorHandler);

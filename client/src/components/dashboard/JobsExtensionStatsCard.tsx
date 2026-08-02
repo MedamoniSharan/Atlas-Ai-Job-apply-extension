@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatStatusIcon, type StatusIconKey } from './FlatStatusIcon';
 
-type TabKey = 'jobs' | 'extension';
+type TabKey = 'jobs' | 'scans' | 'extension';
 
 export type StatsRow = {
   id: string;
@@ -20,23 +20,27 @@ function formatCount(n: number): string {
 
 export function JobsExtensionStatsCard({
   jobsRows,
+  scanRows,
   extensionRows,
 }: {
   jobsRows: StatsRow[];
+  scanRows: StatsRow[];
   extensionRows: StatsRow[];
 }) {
   const [tab, setTab] = useState<TabKey>('jobs');
-  const rows = tab === 'jobs' ? jobsRows : extensionRows;
+  const rows =
+    tab === 'jobs' ? jobsRows : tab === 'scans' ? scanRows : extensionRows;
 
-  const colLabel = useMemo(
-    () => (tab === 'jobs' ? 'STATUS' : 'CHANNEL'),
-    [tab],
-  );
+  const colLabel = useMemo(() => {
+    if (tab === 'jobs') return 'STATUS';
+    if (tab === 'scans') return 'METRIC';
+    return 'CHANNEL';
+  }, [tab]);
 
   return (
     <article
       className="dash-widget dash-breakdown"
-      aria-label="Jobs and extension breakdown"
+      aria-label="Jobs, scans, and extension breakdown"
     >
       <div
         className="dash-breakdown__tabs"
@@ -51,6 +55,15 @@ export function JobsExtensionStatsCard({
           onClick={() => setTab('jobs')}
         >
           Jobs
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'scans'}
+          className={tab === 'scans' ? 'is-active' : undefined}
+          onClick={() => setTab('scans')}
+        >
+          Scans
         </button>
         <button
           type="button"

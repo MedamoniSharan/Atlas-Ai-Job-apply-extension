@@ -5,3 +5,4 @@ export * from './events';
 export * from './jobMeta';
 export * from './models';
 export * from './planLimits';
+export * from './scanSessions';
