@@ -212,8 +212,7 @@ export function ProfilePage() {
             {data.subscription?.cancelAtPeriodEnd
               ? ' · cancels at period end'
               : null}
-            . Usage: {data.appliesHourUsed ?? 0}/{data.appliesHourLimit ?? 0} this hour ·{' '}
-            {data.appliesDayUsed ?? 0}/{data.appliesDayLimit ?? 0} today ·{' '}
+            . Usage: {data.appliesDayUsed ?? 0}/{data.appliesDayLimit ?? 0} today ·{' '}
             {data.appliesUsed} / {data.appliesLimit} this month.
           </p>
           {data.subscription &&

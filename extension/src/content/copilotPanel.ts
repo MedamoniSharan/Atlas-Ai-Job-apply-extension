@@ -1338,14 +1338,12 @@ export function mountCopilotPanel() {
         return;
       }
       const q = res.quota as {
-        hourUsed: number;
-        hourLimit: number;
         dayUsed: number;
         dayLimit: number;
         monthUsed: number;
         monthLimit: number;
       };
-      safetyEl.textContent = `Assisted · ${q.hourUsed}/${q.hourLimit} this hour · ${q.dayUsed}/${q.dayLimit} today · ${q.monthUsed}/${q.monthLimit} this month`;
+      safetyEl.textContent = `Assisted · ${q.dayUsed}/${q.dayLimit} today · ${q.monthUsed}/${q.monthLimit} this month`;
     });
   }
 

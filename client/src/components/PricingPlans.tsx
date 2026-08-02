@@ -39,7 +39,7 @@ const plans: Plan[] = [
     cta: 'Get started',
     features: [
       { label: '50 assisted applies / month' },
-      { label: 'Safety: 6/hour · 15/day' },
+      { label: 'Safety: 15/day' },
       { label: '500 multi-board scans' },
     ],
   },
@@ -55,7 +55,7 @@ const plans: Plan[] = [
     paidPlan: 'pro',
     features: [
       { label: '300 assisted applies / month' },
-      { label: 'Safety: 12/hour · 40/day' },
+      { label: 'Safety: 40/day' },
       { label: '1500 multi-board scans' },
       { label: 'Human-paced co-pilot sessions' },
     ],
@@ -71,7 +71,7 @@ const plans: Plan[] = [
     paidPlan: 'max',
     features: [
       { label: '1000 assisted applies / month' },
-      { label: 'Safety: 18/hour · 60/day' },
+      { label: 'Safety: 60/day' },
       { label: '5000 multi-board scans' },
       { label: 'Human-paced co-pilot sessions' },
     ],

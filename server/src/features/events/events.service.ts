@@ -3,7 +3,6 @@ import {
   getEffectivePlan,
   getPlanAppliesLimit,
   getPlanAppliesPerDay,
-  getPlanAppliesPerHour,
   jobPayloadSchema,
   type EventEnvelope,
   type SyncEventsResult,
@@ -17,7 +16,6 @@ import { AppError } from '../../middleware/errorHandler';
 import {
   appliedCountFilter,
   dayRange,
-  hourRange,
   monthRange,
 } from '../applications/applyCount';
 
@@ -70,28 +68,18 @@ async function assertApplyCaps(userId: string): Promise<void> {
   const user = await UserModel.findById(userId).lean();
   if (!user) return;
 
-  const hour = hourRange();
   const day = dayRange();
   const month = monthRange();
 
-  const [hourUsed, dayUsed, monthUsed] = await Promise.all([
-    ApplicationModel.countDocuments(appliedCountFilter(userId, hour)),
+  const [dayUsed, monthUsed] = await Promise.all([
     ApplicationModel.countDocuments(appliedCountFilter(userId, day)),
     ApplicationModel.countDocuments(appliedCountFilter(userId, month)),
   ]);
 
   const plan = getEffectivePlan(user.plan, user.planExpiresAt);
-  const hourLimit = getPlanAppliesPerHour(user.plan, user.planExpiresAt);
   const dayLimit = getPlanAppliesPerDay(user.plan, user.planExpiresAt);
   const monthLimit = getPlanAppliesLimit(user.plan, user.planExpiresAt);
 
-  if (hourUsed >= hourLimit) {
-    throw new AppError(
-      `Hourly safety limit reached (${hourLimit}/hour on ${plan})`,
-      429,
-      'APPLY_HOUR_CAP'
-    );
-  }
   if (dayUsed >= dayLimit) {
     throw new AppError(
       `Daily safety limit reached (${dayLimit}/day on ${plan})`,

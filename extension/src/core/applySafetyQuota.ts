@@ -108,12 +108,11 @@ export function clearApplyQuotaCache(): void {
   cache = null;
 }
 
-export type ApplyQuotaBlockReason = 'hour' | 'day' | 'month';
+export type ApplyQuotaBlockReason = 'day' | 'month';
 
 export function getApplyQuotaBlock(
   quota: ApplyQuotaSnapshot
 ): ApplyQuotaBlockReason | null {
-  if (quota.hourRemaining <= 0) return 'hour';
   if (quota.dayRemaining <= 0) return 'day';
   if (quota.monthRemaining <= 0) return 'month';
   return null;
@@ -124,8 +123,6 @@ export function quotaBlockMessage(
   reason: ApplyQuotaBlockReason
 ): string {
   switch (reason) {
-    case 'hour':
-      return `Hourly safety limit reached (${quota.hourUsed}/${quota.hourLimit} this hour on ${quota.plan}).`;
     case 'day':
       return `Daily safety limit reached (${quota.dayUsed}/${quota.dayLimit} today on ${quota.plan}).`;
     case 'month':
