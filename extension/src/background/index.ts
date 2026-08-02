@@ -341,16 +341,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse(result);
           break;
         }
-        case 'SET_API_BASE': {
-          await setAuthState({
-            apiBaseUrl: resolveApiBase(
-              message.apiBaseUrl || DEFAULT_API,
-              DEFAULT_API
-            ),
-          });
-          sendResponse({ ok: true });
-          break;
-        }
         case 'FLUSH_QUEUE': {
           await flushQueue();
           await flushScanSessions();

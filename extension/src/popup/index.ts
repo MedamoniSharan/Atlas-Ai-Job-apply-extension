@@ -13,7 +13,6 @@ const prefsMsg = document.getElementById('prefs-msg')!;
 const toastHost = document.getElementById('popup-toast-host')!;
 const emailInput = document.getElementById('email') as HTMLInputElement;
 const passwordInput = document.getElementById('password') as HTMLInputElement;
-const apiBaseInput = document.getElementById('api-base') as HTMLInputElement;
 const alertEl = document.getElementById('copilot-alert')!;
 const alertTitleEl = document.getElementById('copilot-alert-title')!;
 const alertMsgEl = document.getElementById('copilot-alert-msg')!;
@@ -174,7 +173,6 @@ async function refreshUi() {
     copilot?: CopilotState;
   }>({ type: 'GET_STATUS' });
 
-  apiBaseInput.value = status.auth.apiBaseUrl;
   const signedIn = Boolean(status.auth.accessToken);
   authStateEl.textContent = signedIn ? 'Signed in' : 'Not signed in';
   authStateEl.classList.toggle('is-ok', signedIn);
@@ -254,7 +252,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   formError.textContent = '';
-  await send({ type: 'SET_API_BASE', apiBaseUrl: apiBaseInput.value });
   const result = await send<{ success: boolean; message?: string }>({
     type: 'LOGIN',
     email: emailInput.value,
