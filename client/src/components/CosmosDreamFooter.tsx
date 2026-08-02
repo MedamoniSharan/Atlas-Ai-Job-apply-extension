@@ -3,7 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useInView } from 'motion/react';
 import { CosmosIconMark, CosmovaiWordmark } from './CosmosLogo';
 
-const connectLinks = ['Instagram', 'TikTok', 'X', 'Substack'] as const;
+const connectLinks = [
+  {
+    label: 'Instagram',
+    href: 'https://www.instagram.com/codex.career/',
+  },
+  { label: 'TikTok', href: '#', stub: true },
+  { label: 'X', href: '#', stub: true },
+  { label: 'Substack', href: '#', stub: true },
+] as const;
 
 const moreLinks = [
   { label: 'Careers', href: '#' as const, stub: true },
@@ -76,6 +84,24 @@ function MoreLink({ link }: { link: (typeof moreLinks)[number] }) {
   );
 }
 
+function ConnectLink({
+  link,
+}: {
+  link: (typeof connectLinks)[number];
+}) {
+  const isStub = 'stub' in link && link.stub;
+  return (
+    <a
+      href={link.href}
+      target={isStub ? undefined : '_blank'}
+      rel={isStub ? undefined : 'noopener noreferrer'}
+      onClick={isStub ? (e) => e.preventDefault() : undefined}
+    >
+      {link.label}
+    </a>
+  );
+}
+
 export function CosmosDreamFooter() {
   return (
     <div className="cosmos-page">
@@ -83,9 +109,7 @@ export function CosmosDreamFooter() {
         <div className="desktop-footer">
           <nav aria-label="Connect" className="footer-links">
             {connectLinks.map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()}>
-                {link}
-              </a>
+              <ConnectLink key={link.label} link={link} />
             ))}
           </nav>
           <div className="footer-center">
@@ -107,9 +131,7 @@ export function CosmosDreamFooter() {
           <div className="mobile-nav-group">
             <h3>Connect</h3>
             {connectLinks.map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()}>
-                {link}
-              </a>
+              <ConnectLink key={link.label} link={link} />
             ))}
           </div>
           <div className="mobile-nav-group">
