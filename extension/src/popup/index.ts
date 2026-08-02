@@ -2,6 +2,9 @@ import type { JobPreferences, WorkMode } from '@cosmo/shared';
 import { CONSENT_VERSION } from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
+import { ensureChromeNamespace } from '../shared/browser';
+
+ensureChromeNamespace();
 
 const authStateEl = document.getElementById('auth-state')!;
 const healthStateEl = document.getElementById('health-state')!;

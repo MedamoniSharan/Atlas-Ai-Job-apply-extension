@@ -201,7 +201,7 @@ export async function processApplyQueue(
             url: item.url,
             active: true,
           });
-          activeTabId = tab.id ?? null;
+          activeTabId = tab.id ?? undefined;
           if (activeTabId != null) setActiveWorkTabId(activeTabId);
         } else {
           await chrome.tabs.update(activeTabId, { url: item.url, active: true });

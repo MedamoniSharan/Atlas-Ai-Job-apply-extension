@@ -28,7 +28,7 @@ function installChromeMock(store: Store) {
       onChanged: { addListener: vi.fn() },
     },
   };
-  (globalThis as { chrome?: typeof chromeMock }).chrome = chromeMock;
+  (globalThis as unknown as { chrome?: typeof chromeMock }).chrome = chromeMock;
   return chromeMock;
 }
 

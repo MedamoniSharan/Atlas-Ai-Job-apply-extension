@@ -6,7 +6,7 @@ MERN + Chrome Extension (Manifest V3) MVP for syncing job applications from supp
 
 - **client** — React + Vite + React Query + Zustand + Socket.IO
 - **server** — Express + MongoDB + Socket.IO
-- **extension** — Chrome MV3 with offline queue and Naukri adapter
+- **extension** — Chrome / Firefox MV3 with offline queue and Naukri adapter
 - **shared** — Zod contracts and API types
 
 ## Quick start
@@ -29,12 +29,19 @@ npm run dev:client
 # 5. Extension
 npm run build --workspace=@cosmo/extension
 # Chrome → Extensions → Load unpacked → select extension/dist
+# Firefox → about:debugging → This Firefox → Load Temporary Add-on → extension/dist/manifest.json
 
-# Store / production package (no sourcemaps; requires HTTPS origins):
-# EXTENSION_API_ORIGIN=https://api.example.com \
-# EXTENSION_WEB_ORIGIN=https://app.example.com \
-# EXTENSION_GECKO_ID=cosmo@cosmovai.com \
+# Store / production package (no sourcemaps; production HTTPS origins by default):
 # npm run build:release --workspace=@cosmo/extension
+# Firefox AMO ZIP (manifest.json at archive root):
+# npm run build:firefox --workspace=@cosmo/extension
+# → cosmo-agent-firefox.zip at repo root
+#
+# Override origins / gecko id if needed:
+# EXTENSION_API_ORIGIN=https://atlas-ai-job-apply-extension-1.onrender.com \
+# EXTENSION_WEB_ORIGIN=https://atlas-ai-job-apply-extension-client-roan.vercel.app \
+# EXTENSION_GECKO_ID=cosmo-job-assistant@cosmovai.com \
+# npm run build:firefox --workspace=@cosmo/extension
 ```
 
 Or run `bash scripts/bootstrap.sh`.

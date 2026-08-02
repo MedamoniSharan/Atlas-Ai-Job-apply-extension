@@ -1182,12 +1182,14 @@ export function dispatchPointerClick(el: HTMLElement): void {
     isPrimary: true,
   } as const;
 
+  const viewWithPointer = view as unknown as {
+    PointerEvent?: typeof PointerEvent;
+  };
   const PointerCtor =
     typeof PointerEvent !== 'undefined'
       ? PointerEvent
-      : typeof (view as Window & { PointerEvent?: typeof PointerEvent }).PointerEvent !==
-          'undefined'
-        ? (view as Window & { PointerEvent: typeof PointerEvent }).PointerEvent
+      : typeof viewWithPointer.PointerEvent !== 'undefined'
+        ? viewWithPointer.PointerEvent!
         : null;
 
   for (const type of [
@@ -2127,21 +2129,21 @@ export class NaukriAdapter implements PlatformAdapter {
       url: href,
       companyLogo,
       description,
-      experience: sanitized.experience,
-      salary: sanitized.salary,
+      experience: sanitized.experience ?? undefined,
+      salary: sanitized.salary ?? undefined,
       skills: skills.length ? skills : undefined,
       rating,
       reviews,
-      postedAt: sanitized.postedAt,
-      openings: sanitized.openings,
-      applicants: sanitized.applicants,
+      postedAt: sanitized.postedAt ?? undefined,
+      openings: sanitized.openings ?? undefined,
+      applicants: sanitized.applicants ?? undefined,
       highlights: highlights.length ? highlights : undefined,
-      role: sanitized.role,
-      industry: sanitized.industry,
-      department: sanitized.department,
-      employmentType: sanitized.employmentType,
-      roleCategory: sanitized.roleCategory,
-      education: sanitized.education,
+      role: sanitized.role ?? undefined,
+      industry: sanitized.industry ?? undefined,
+      department: sanitized.department ?? undefined,
+      employmentType: sanitized.employmentType ?? undefined,
+      roleCategory: sanitized.roleCategory ?? undefined,
+      education: sanitized.education ?? undefined,
       aboutCompany,
       status: 'detected',
     };

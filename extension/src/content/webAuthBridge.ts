@@ -6,6 +6,9 @@ const LEGACY_MESSAGE_TYPE = 'ATLAS_AUTH_SYNC';
 const STORAGE_KEY = 'cosmo-auth';
 const LEGACY_STORAGE_KEY = 'atlas-auth';
 import { PRODUCTION_API_BASE } from '../core/allowedApiBases';
+import { ensureChromeNamespace } from '../shared/browser';
+
+ensureChromeNamespace();
 
 const DEFAULT_API = PRODUCTION_API_BASE;
 

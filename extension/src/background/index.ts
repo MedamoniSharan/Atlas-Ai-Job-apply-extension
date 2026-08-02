@@ -51,6 +51,13 @@ import {
   clearAllowedExtraTab,
   installTabSpamGuard,
 } from '../core/singleTab';
+import {
+  detectBrowserFamily,
+  ensureChromeNamespace,
+} from '../shared/browser';
+
+/** Ensure `chrome.*` exists before any listener registration (Firefox may only expose `browser`). */
+ensureChromeNamespace();
 
 /** Tracks an opened Naukri login tab so we can re-verify when it closes. */
 let pendingNaukriLogin: {
@@ -591,4 +598,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-logger.info('Background service worker ready');
+logger.info('Background script ready', {
+  browser: detectBrowserFamily(),
+  background:
+    detectBrowserFamily() === 'firefox' ? 'event_page' : 'service_worker',
+});

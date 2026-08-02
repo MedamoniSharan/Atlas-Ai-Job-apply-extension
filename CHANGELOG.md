@@ -5,6 +5,21 @@ All notable changes to Cosmo Job Assistant (extension + dashboard + API) are doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Firefox MV3 compatibility: dual `background.scripts` + `service_worker`, gecko id, AMO `data_collection_permissions`, `build:firefox` → `cosmo-agent-firefox.zip`.
+
+### Changed
+
+- Full rebrand from Atlas to Cosmo (packages `@cosmo/*`, auth storage keys, extension UI, docs).
+
+### Planned
+
+- Public `/privacy` and `/terms` pages on the Cosmo web app.
+- Chrome / Edge / Firefox store listings and screenshots.
+
 ## [1.0.0] - 2026-07-24
 
 ### Added
@@ -18,19 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known limitations (pre-store)
 
-- Host permissions limited to localhost API/dashboard + Naukri; production origins not configured for store builds.
-- Firefox `browser_specific_settings.gecko.id` not yet added.
+- Production dashboard URL may need redeploy before Google auth bridge works against the default Vercel host.
 - Privacy Policy / Terms drafts exist in-repo; public HTTPS routes still required for store listing.
 - Auto Easy Apply automation may conflict with store policies and Naukri Terms of Service — review before publish.
-
-## [Unreleased]
-
-### Changed
-
-- Full rebrand from Atlas to Cosmo (packages `@cosmo/*`, auth storage keys, extension UI, docs).
-
-### Planned
-
-- Production manifest hosts and release build without source maps.
-- Public `/privacy` and `/terms` pages on the Cosmo web app.
-- Chrome / Edge / Firefox store listings and screenshots.

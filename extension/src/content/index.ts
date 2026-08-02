@@ -12,7 +12,10 @@ import {
 import type { JobPreferences } from '@cosmo/shared';
 import { resolveAdapter } from '../adapters';
 import { logger } from '../core/logger';
+import { ensureChromeNamespace } from '../shared/browser';
 import { mountCopilotPanel } from './copilotPanel';
+
+ensureChromeNamespace();
 
 const naukri = new NaukriAdapter();
 let lastFingerprint = '';
