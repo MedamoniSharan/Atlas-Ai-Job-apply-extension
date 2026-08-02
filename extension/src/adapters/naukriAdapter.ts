@@ -54,6 +54,21 @@ export const naukriSelectors: SelectorRegistry = {
     'a[href*="mnjuser"]',
     'a[href*="/mnj/"]',
     'a[href*="logout"]',
+    // Newer Naukri header / account chrome
+    '.nI-gNb-notification',
+    '[class*="nI-gNb-notification"]',
+    '[class*="ni-gnb-notification"]',
+    '[aria-label*="notification" i]',
+    '[aria-label*="Notifications" i]',
+    '[aria-label*="profile" i]',
+    '[aria-label*="View profile" i]',
+    '[title*="View profile" i]',
+    'a[href*="recruit"][href*="profile"]',
+    '.view-profile-wrapper',
+    '[class*="user-account"]',
+    '[class*="UserAccount"]',
+    '[class*="profile-menu"]',
+    '[class*="ProfileMenu"]',
   ],
   // Visible Login/Register controls only — never #login_Layer alone
   // (Naukri often keeps that node in the DOM, hidden, after login).
@@ -172,26 +187,29 @@ function hasLoggedInSignal(doc: Document): boolean {
   // Profile photo / avatar in the global nav.
   const avatars = Array.from(
     doc.querySelectorAll(
-      '.nI-gNb-header img, .nI-gNb-gnb img, header img, [class*="drawer"] img'
+      '.nI-gNb-header img, .nI-gNb-gnb img, header img, [class*="drawer"] img, [class*="ni-gnb"] img, [class*="nI-gNb"] img'
     )
   );
   for (const img of avatars) {
     const src = (img.getAttribute('src') || '').toLowerCase();
+    const alt = (img.getAttribute('alt') || '').toLowerCase();
     if (
       src.includes('profile') ||
       src.includes('photo') ||
       src.includes('avatar') ||
       src.includes('ni-gnb') ||
+      src.includes('naukimg.com') && (src.includes('/user') || src.includes('/np/')) ||
+      alt.includes('profile') ||
       /\/user|\/u\//i.test(src)
     ) {
-      return true;
+      if (isElementVisible(img)) return true;
     }
   }
 
   // Visible account name next to the avatar (not "Login").
   const nameEls = Array.from(
     doc.querySelectorAll(
-      '.nI-gNb-info__subtxt, .nI-gNb-info__name, .nI-gNb-drawer span, [class*="userName"]'
+      '.nI-gNb-info__subtxt, .nI-gNb-info__name, .nI-gNb-drawer span, [class*="userName"], [class*="user-name"], [class*="UserName"]'
     )
   );
   for (const el of nameEls) {
@@ -207,6 +225,16 @@ function hasLoggedInSignal(doc: Document): boolean {
     }
   }
 
+  // Notification / inbox badges in the header are only shown when signed in.
+  const accountChrome = Array.from(
+    doc.querySelectorAll(
+      'header [class*="badge"], header [class*=" Bell"], header [class*="bell"], [class*="nI-gNb"] [class*="count"], [class*="ni-gnb"] [class*="count"]'
+    )
+  );
+  for (const el of accountChrome) {
+    if (isElementVisible(el)) return true;
+  }
+
   return false;
 }
 
@@ -214,6 +242,19 @@ function hasVisibleLoggedOutSignal(doc: Document): boolean {
   for (const selector of naukriSelectors.loggedOut) {
     const el = doc.querySelector(selector);
     if (el && isElementVisible(el)) return true;
+  }
+  // Fallback: visible Login / Register text links in the header.
+  const headerLinks = Array.from(
+    doc.querySelectorAll('header a, .nI-gNb-header a, [class*="nI-gNb-lg-rg"] a')
+  );
+  for (const el of headerLinks) {
+    const text = cleanText(el.textContent) || '';
+    if (
+      (/^login$/i.test(text) || /^register$/i.test(text)) &&
+      isElementVisible(el)
+    ) {
+      return true;
+    }
   }
   return false;
 }

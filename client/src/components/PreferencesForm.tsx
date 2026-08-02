@@ -2,6 +2,8 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import {
   DEFAULT_JOB_PREFERENCES,
+  MIN_PREF_KEYWORDS,
+  MIN_PREF_TITLES,
   type JobPreferences,
   type WorkMode,
 } from '@cosmo/shared';
@@ -17,10 +19,19 @@ type ChipFieldProps = {
   label: string;
   values: string[];
   placeholder: string;
+  hint?: string;
+  minCount?: number;
   onChange: (next: string[]) => void;
 };
 
-function ChipField({ label, values, placeholder, onChange }: ChipFieldProps) {
+function ChipField({
+  label,
+  values,
+  placeholder,
+  hint,
+  minCount,
+  onChange,
+}: ChipFieldProps) {
   const [draft, setDraft] = useState('');
   const draftRef = useRef(draft);
   const valuesRef = useRef(values);
@@ -74,10 +85,28 @@ function ChipField({ label, values, placeholder, onChange }: ChipFieldProps) {
     }
   }
 
+  const short =
+    typeof minCount === 'number' && values.length < minCount
+      ? `${values.length}/${minCount}`
+      : null;
+
   return (
     <div className="chip-field">
-      <span className="chip-field__label">{label}</span>
-      <div className="chip-field__box">
+      <span className="chip-field__label">
+        {label}
+        {short ? (
+          <span className="chip-field__count is-short">{short}</span>
+        ) : typeof minCount === 'number' ? (
+          <span className="chip-field__count">{values.length}</span>
+        ) : null}
+      </span>
+      <div
+        className={`chip-field__box${
+          typeof minCount === 'number' && values.length < minCount
+            ? ' is-incomplete'
+            : ''
+        }`}
+      >
         {values.map((value) => (
           <span className="pref-chip" key={value}>
             {value}
@@ -111,7 +140,9 @@ function ChipField({ label, values, placeholder, onChange }: ChipFieldProps) {
           Add
         </button>
       </div>
-      <span className="chip-field__hint">Press Enter or Add to create a chip</span>
+      <span className="chip-field__hint">
+        {hint ?? 'Press Enter or Add to create a chip'}
+      </span>
     </div>
   );
 }
@@ -159,8 +190,12 @@ export function PreferencesForm({
     await new Promise((r) => setTimeout(r, 0));
     const next = prefsRef.current;
 
-    if (next.titles.length === 0 && next.keywords.length === 0) {
-      setError('Add at least one job title or keyword.');
+    if (next.titles.length < MIN_PREF_TITLES) {
+      setError(`Add at least ${MIN_PREF_TITLES} job titles.`);
+      return;
+    }
+    if (next.keywords.length < MIN_PREF_KEYWORDS) {
+      setError(`Add at least ${MIN_PREF_KEYWORDS} keywords.`);
       return;
     }
     if (next.experienceMin > next.experienceMax) {
@@ -204,12 +239,16 @@ export function PreferencesForm({
           label="Job titles"
           values={prefs.titles}
           placeholder="Software Engineer"
+          minCount={MIN_PREF_TITLES}
+          hint={`Add at least ${MIN_PREF_TITLES} titles · Enter or Add for each chip`}
           onChange={(titles) => setPrefs((p) => ({ ...p, titles }))}
         />
         <ChipField
           label="Keywords"
           values={prefs.keywords}
           placeholder="React, Node.js"
+          minCount={MIN_PREF_KEYWORDS}
+          hint={`Add at least ${MIN_PREF_KEYWORDS} keywords · Enter or Add for each chip`}
           onChange={(keywords) => setPrefs((p) => ({ ...p, keywords }))}
         />
         <ChipField

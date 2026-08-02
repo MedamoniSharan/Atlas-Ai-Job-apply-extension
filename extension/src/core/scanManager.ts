@@ -72,7 +72,15 @@ export async function runScan(options: {
   if (!prefs.titles.length && !prefs.keywords.length) {
     return {
       ok: false,
-      message: 'Add titles or keywords in preferences first.',
+      message: 'Add at least 3 job titles and 4 keywords in preferences first.',
+      matched: 0,
+      queuedForApply: 0,
+    };
+  }
+  if (prefs.titles.length < 3 || prefs.keywords.length < 4) {
+    return {
+      ok: false,
+      message: 'Preferences need at least 3 job titles and 4 keywords.',
       matched: 0,
       queuedForApply: 0,
     };

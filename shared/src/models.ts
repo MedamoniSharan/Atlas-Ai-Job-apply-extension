@@ -132,7 +132,28 @@ export const jobPreferencesSchema = z.object({
 
 export type JobPreferences = z.infer<typeof jobPreferencesSchema>;
 
-export const jobPreferencesUpdateSchema = jobPreferencesSchema;
+/** Minimum chips required to finish onboarding / run co-pilot. */
+export const MIN_PREF_TITLES = 3;
+export const MIN_PREF_KEYWORDS = 4;
+
+export const jobPreferencesUpdateSchema = jobPreferencesSchema.superRefine(
+  (prefs, ctx) => {
+    if (prefs.titles.length < MIN_PREF_TITLES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['titles'],
+        message: `Add at least ${MIN_PREF_TITLES} job titles`,
+      });
+    }
+    if (prefs.keywords.length < MIN_PREF_KEYWORDS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['keywords'],
+        message: `Add at least ${MIN_PREF_KEYWORDS} keywords`,
+      });
+    }
+  }
+);
 
 export type JobPreferencesUpdate = z.infer<typeof jobPreferencesUpdateSchema>;
 
@@ -149,7 +170,10 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
 
 export function preferencesAreComplete(prefs: JobPreferences | null | undefined): boolean {
   if (!prefs) return false;
-  return prefs.titles.length > 0 || prefs.keywords.length > 0;
+  return (
+    prefs.titles.length >= MIN_PREF_TITLES &&
+    prefs.keywords.length >= MIN_PREF_KEYWORDS
+  );
 }
 
 export const onboardingStatusSchema = z.object({

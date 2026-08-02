@@ -241,6 +241,12 @@ export async function processApplyQueue(
             await setCopilotState({ needsLogin: false, loginPauseReason: null });
             break;
           }
+          const st0 = await getCopilotState();
+          if (st0.loginUserConfirmed && login.status !== 'loggedOut') {
+            loggedIn = true;
+            await setCopilotState({ needsLogin: false, loginPauseReason: null });
+            break;
+          }
           const reason: 'loggedOut' | 'uncertain' =
             login.status === 'loggedOut' ? 'loggedOut' : 'uncertain';
           await setCopilotState({
@@ -251,8 +257,8 @@ export async function processApplyQueue(
           });
           await appendCopilotLog(
             reason === 'uncertain'
-              ? 'Paused — confirm you’re logged into Naukri, then press Resume.'
-              : 'Paused — you are not logged into Naukri. Log in, then press Resume.',
+              ? 'Paused — confirm you’re logged into Naukri, then press Confirm.'
+              : 'Paused — you are not logged into Naukri. Log in, then press Confirm.',
             'warn'
           );
           await sendToTab(activeTabId, {
@@ -262,6 +268,15 @@ export async function processApplyQueue(
           const start = Date.now();
           while (Date.now() - start < 120_000) {
             const st = await getCopilotState();
+            if (st.loginUserConfirmed) {
+              loggedIn = true;
+              await setCopilotState({
+                needsLogin: false,
+                loginPauseReason: null,
+                paused: false,
+              });
+              break;
+            }
             if (!st.paused) break;
             if (!st.running) {
               await setApplyQueue([item, ...queue]);
@@ -272,6 +287,7 @@ export async function processApplyQueue(
             }
             await wait(500);
           }
+          if (loggedIn) break;
           await wait(1000);
         }
 

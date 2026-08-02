@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowUp, MoreHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+/** Manual Naukri apply typically takes ~5 minutes per job. */
+const MINUTES_PER_APPLY = 5;
+/** Finding and filtering a listing without Cosmo. */
+const MINUTES_PER_TRACKED = 1;
 
 const chartPoints = [
   { x: 0, y: 61 },
@@ -17,15 +22,43 @@ const chartPath =
 export interface ProfileReportCardProps {
   matchRate: number;
   jobsCount: number;
+  appliedCount?: number;
   yearLabel?: string;
+}
+
+function formatTimeSaved(totalMinutes: number): string {
+  if (totalMinutes <= 0) return '0 min';
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+export function estimateTimeSavedMinutes(
+  jobsCount: number,
+  appliedCount: number
+): number {
+  const applied = Math.max(0, appliedCount);
+  const tracked = Math.max(0, jobsCount - applied);
+  return applied * MINUTES_PER_APPLY + tracked * MINUTES_PER_TRACKED;
 }
 
 export function ProfileReportCard({
   matchRate,
   jobsCount,
+  appliedCount = 0,
   yearLabel = `YEAR ${new Date().getFullYear()}`,
 }: ProfileReportCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const timeSaved = useMemo(() => {
+    const minutes = estimateTimeSavedMinutes(jobsCount, appliedCount);
+    return {
+      minutes,
+      label: formatTimeSaved(minutes),
+    };
+  }, [jobsCount, appliedCount]);
 
   return (
     <article
@@ -44,6 +77,10 @@ export function ProfileReportCard({
               <span>{matchRate}%</span>
             </p>
             <p className="dash-report__total">{jobsCount.toLocaleString()} jobs</p>
+            <p className="dash-report__saved">
+              <strong>{timeSaved.label}</strong>
+              <span> saved with Cosmo</span>
+            </p>
           </div>
         </div>
         <div className="dash-report__actions">
@@ -85,7 +122,8 @@ export function ProfileReportCard({
         >
           <title id="dash-report-chart-title">Match report trend</title>
           <desc id="dash-report-chart-desc">
-            A six-point line rising overall, with a few alternating peaks and dips.
+            Estimated time saved from Cosmo matching and applying. {timeSaved.label}{' '}
+            based on {appliedCount} applies and {jobsCount} tracked jobs.
           </desc>
           <path className="dash-report__shadow" d={chartPath} />
           <path className="dash-report__line" d={chartPath} />
@@ -99,7 +137,9 @@ export function ProfileReportCard({
             />
           ))}
         </svg>
-        <figcaption>Match quality trend</figcaption>
+        <figcaption>
+          ~{MINUTES_PER_APPLY} min/apply · ~{MINUTES_PER_TRACKED} min/match
+        </figcaption>
       </figure>
     </article>
   );

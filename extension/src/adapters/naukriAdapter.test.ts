@@ -200,6 +200,26 @@ describe('NaukriAdapter', () => {
     document.body.innerHTML = `<div></div>`;
     expect(adapter.getLoginStatus(document)).toBe('uncertain');
   });
+
+  it('treats notification chrome as logged in', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <header>
+        <button aria-label="Notifications" type="button">Bell</button>
+      </header>
+    `;
+    expect(adapter.getLoginStatus(document)).toBe('loggedIn');
+  });
+
+  it('treats profile aria-label as logged in', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <header>
+        <button aria-label="View profile" type="button">Me</button>
+      </header>
+    `;
+    expect(adapter.getLoginStatus(document)).toBe('loggedIn');
+  });
   it('scrapes rich Naukri JD detail fields', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `

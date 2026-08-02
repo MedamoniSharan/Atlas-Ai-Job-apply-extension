@@ -291,9 +291,14 @@ document.getElementById('prefs-form')!.addEventListener('submit', async (e) => {
   e.preventDefault();
   prefsMsg.textContent = 'Saving…';
   const preferences = readPrefsForm();
-  if (!preferences.titles.length && !preferences.keywords.length) {
-    prefsMsg.textContent = 'Add at least one title or keyword.';
-    showToast('Missing details', 'Add at least one title or keyword.', 'error');
+  if (preferences.titles.length < 3) {
+    prefsMsg.textContent = 'Add at least 3 job titles.';
+    showToast('Missing titles', 'Add at least 3 job titles.', 'error');
+    return;
+  }
+  if (preferences.keywords.length < 4) {
+    prefsMsg.textContent = 'Add at least 4 keywords.';
+    showToast('Missing keywords', 'Add at least 4 keywords.', 'error');
     return;
   }
   const result = await send<{ success: boolean; message?: string }>({

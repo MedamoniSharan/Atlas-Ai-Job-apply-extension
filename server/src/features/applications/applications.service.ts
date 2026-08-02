@@ -11,6 +11,10 @@ export type ListApplicationsQuery = {
   bucket?: ApplicationBucket;
   platform?: Platform | 'all';
   source?: 'all' | 'manual' | 'auto_scan' | 'auto_apply';
+  /** Inclusive lower bound (ISO). Filters by createdAt. */
+  from?: string;
+  /** Exclusive upper bound (ISO). Filters by createdAt. */
+  to?: string;
 };
 
 function toApplication(doc: IApplication): Application {
@@ -111,6 +115,19 @@ function buildFilter(
 
   if (query.source && query.source !== 'all') {
     filter['metadata.source'] = query.source;
+  }
+
+  const createdAt: Record<string, Date> = {};
+  if (query.from) {
+    const from = new Date(query.from);
+    if (!Number.isNaN(from.getTime())) createdAt.$gte = from;
+  }
+  if (query.to) {
+    const to = new Date(query.to);
+    if (!Number.isNaN(to.getTime())) createdAt.$lt = to;
+  }
+  if (Object.keys(createdAt).length) {
+    and.push({ createdAt });
   }
 
   if (and.length) {

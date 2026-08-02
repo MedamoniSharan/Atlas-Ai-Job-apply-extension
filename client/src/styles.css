@@ -1484,6 +1484,18 @@ textarea {
   color: var(--color-text-on-muted);
 }
 
+.dash-report__saved {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.dash-report__saved strong {
+  color: #1b7a4a;
+  font-weight: 700;
+}
+
 .dash-report__actions {
   position: relative;
 }
@@ -2794,6 +2806,9 @@ textarea {
   font-weight: 650;
   white-space: nowrap;
   width: fit-content;
+  background: #f1f5f9;
+  color: #334155;
+  text-transform: capitalize;
 }
 
 .dash-status--submitted {
@@ -2815,6 +2830,18 @@ textarea {
 .dash-status--company-site {
   background: #ede9fe;
   color: #5b21b6;
+}
+.dash-status--interview {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.dash-status--offer {
+  background: #ecfdf5;
+  color: #047857;
+}
+.dash-status--rejected {
+  background: #fde8e6;
+  color: #a33b32;
 }
 
 .dash-section__sub {
@@ -2953,7 +2980,7 @@ textarea {
 
 .tracker-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(280px, 1fr));
   gap: 8px;
   align-items: stretch;
   overflow-x: auto;
@@ -2979,10 +3006,10 @@ textarea {
 .tracker-board__header,
 .tracker-lane__row {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   align-items: stretch;
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: 100%;
 }
 
 .tracker-board__header {
@@ -2994,8 +3021,8 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  min-width: 0;
-  padding: 6px 8px;
+  min-width: 280px;
+  padding: 8px 10px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-surface-muted) 70%, #ececea);
   border: 1px solid var(--color-border-muted);
@@ -3237,10 +3264,11 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 0;
+  min-width: 280px;
+  width: 100%;
   min-height: 0;
   height: 100%;
-  padding: 6px;
+  padding: 8px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-surface-muted) 70%, #ececea);
   border: 1px solid var(--color-border-muted);
@@ -4619,6 +4647,24 @@ textarea {
 .chip-field__label {
   font-weight: 650;
   font-size: var(--font-size-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip-field__count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e5f3ea;
+  color: #1f6b45;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip-field__count.is-short {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .chip-field__box {
@@ -4631,6 +4677,10 @@ textarea {
   border: 1px solid var(--color-border-muted);
   border-radius: 12px;
   background: #fff;
+}
+
+.chip-field__box.is-incomplete {
+  border-color: #fcd34d;
 }
 
 .chip-field__box:focus-within {
@@ -4958,7 +5008,7 @@ textarea {
   }
 
   .tracker-board {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(280px, 1fr));
   }
 
   .prefs-row {

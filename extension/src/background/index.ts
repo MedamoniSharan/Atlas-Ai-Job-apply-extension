@@ -509,6 +509,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: true });
           break;
         }
+        case 'COPILOT_CONFIRM_LOGIN': {
+          await setCopilotState({
+            loginUserConfirmed: true,
+            needsLogin: false,
+            loginPauseReason: null,
+            paused: false,
+          });
+          await resumeBot();
+          sendResponse({ ok: true });
+          break;
+        }
         case 'COPILOT_STOP': {
           await stopBot();
           sendResponse({ ok: true });

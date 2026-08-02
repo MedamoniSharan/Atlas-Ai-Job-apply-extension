@@ -1783,14 +1783,20 @@ export function mountCopilotPanel() {
 
   loggedInBtn.addEventListener('click', () => {
     loggedInBtn.disabled = true;
-    loggedInBtn.textContent = 'Checking…';
-    try {
-      sessionStorage.setItem(RESUME_AFTER_LOGIN_KEY, '1');
-      sessionStorage.setItem(RETURN_URL_KEY, window.location.href);
-    } catch {
-      /* ignore */
-    }
-    window.location.reload();
+    loggedInBtn.textContent = 'Continuing…';
+    chrome.runtime.sendMessage({ type: 'COPILOT_CONFIRM_LOGIN' }, (res) => {
+      loggedInBtn.disabled = false;
+      loggedInBtn.textContent = 'Confirm you’re logged in';
+      if (chrome.runtime.lastError || res?.ok === false) {
+        loginHelp.textContent =
+          res?.message ||
+          'Could not resume. Press Confirm again, or Start co-pilot.';
+        return;
+      }
+      showLoginModal(false);
+      loginHelp.textContent = '';
+      void refresh();
+    });
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {

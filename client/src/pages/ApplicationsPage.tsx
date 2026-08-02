@@ -25,11 +25,18 @@ function isCompanySiteJob(app: Application): boolean {
 function sourceLabel(app: Application): string {
   if (isCompanySiteJob(app)) return 'Company site';
   if (app.metadata?.skipped) return 'Skipped';
-  if (app.status === 'applied') return 'Applied';
-  if (app.metadata?.source === 'auto_apply') return 'Applied';
-  if (app.metadata?.source === 'auto_scan') return 'Matched';
-  if (app.status === 'detected') return 'Matched';
-  return app.status;
+  if (app.status === 'applied' || app.metadata?.source === 'auto_apply') {
+    return 'Applied';
+  }
+  if (app.status === 'interview') return 'Interview';
+  if (app.status === 'offer') return 'Offer';
+  if (app.status === 'rejected') return 'Rejected';
+  if (app.status === 'detected' || app.metadata?.source === 'auto_scan') {
+    return 'Matched';
+  }
+  if (app.status === 'viewed') return 'Viewed';
+  if (app.status === 'saved') return 'Saved';
+  return app.status.charAt(0).toUpperCase() + app.status.slice(1);
 }
 
 function statusClass(app: Application): string {
@@ -37,8 +44,13 @@ function statusClass(app: Application): string {
   if (label === 'company site') return 'dash-status dash-status--company-site';
   if (label === 'applied') return 'dash-status dash-status--submitted';
   if (label === 'skipped') return 'dash-status dash-status--skipped';
-  if (label === 'matched') return 'dash-status dash-status--matched';
-  return 'dash-status';
+  if (label === 'matched' || label === 'viewed' || label === 'saved') {
+    return 'dash-status dash-status--matched';
+  }
+  if (label === 'interview') return 'dash-status dash-status--interview';
+  if (label === 'offer') return 'dash-status dash-status--offer';
+  if (label === 'rejected') return 'dash-status dash-status--rejected';
+  return 'dash-status dash-status--matched';
 }
 
 function estimateMatch(app: Application): number {

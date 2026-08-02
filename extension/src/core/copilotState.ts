@@ -65,6 +65,8 @@ export type CopilotState = {
   paused: boolean;
   runInBackground: boolean;
   needsLogin: boolean;
+  /** User pressed Confirm while detection was uncertain — trust for this run. */
+  loginUserConfirmed?: boolean;
   /** Why we paused for login — drives confirm vs log-in copy. */
   loginPauseReason?: LoginPauseReason | null;
   keyword: string;
@@ -107,6 +109,7 @@ export const DEFAULT_COPILOT_STATE: CopilotState = {
   paused: false,
   runInBackground: false,
   needsLogin: false,
+  loginUserConfirmed: false,
   loginPauseReason: null,
   keyword: '',
   sessionId: null,

@@ -23,10 +23,15 @@ function statusLabel(app: Application): string {
   if (app.status === 'applied' || app.metadata?.source === 'auto_apply') {
     return 'Applied';
   }
+  if (app.status === 'interview') return 'Interview';
+  if (app.status === 'offer') return 'Offer';
+  if (app.status === 'rejected') return 'Rejected';
   if (app.status === 'detected' || app.metadata?.source === 'auto_scan') {
     return 'Matched';
   }
-  return app.status;
+  if (app.status === 'viewed') return 'Viewed';
+  if (app.status === 'saved') return 'Saved';
+  return app.status.charAt(0).toUpperCase() + app.status.slice(1);
 }
 
 export function ApplicationDetailDrawer({

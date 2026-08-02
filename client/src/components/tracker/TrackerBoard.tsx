@@ -59,6 +59,13 @@ export function TrackerBoard({
     return map;
   }, [items, columnFor]);
 
+  /** Hide empty columns so cards stay readable; reveal all while dragging. */
+  const shownColumns = useMemo(() => {
+    if (draggingId) return columns;
+    const nonempty = columns.filter((c) => byColumn[c.id].length > 0);
+    return nonempty.length > 0 ? nonempty : columns;
+  }, [columns, byColumn, draggingId]);
+
   const laneKeys = useMemo(() => {
     if (prefs.swimlane === 'none') return ['All'];
     const keys = new Set<string>();
@@ -68,20 +75,20 @@ export function TrackerBoard({
     return [...keys].sort((a, b) => a.localeCompare(b));
   }, [items, prefs.swimlane]);
 
-  const colTemplate = `minmax(0, 1fr) `.repeat(columns.length).trim();
+  const colTemplate = `minmax(280px, 1fr) `.repeat(shownColumns.length).trim();
 
   return (
     <div
       className={`tracker-board tracker-board--advanced${
         prefs.density === 'compact' ? ' is-compact' : ''
       }${prefs.swimlane !== 'none' ? ' has-swimlanes' : ''}`}
-      style={{ ['--tracker-cols' as string]: String(columns.length) }}
+      style={{ ['--tracker-cols' as string]: String(shownColumns.length) }}
     >
       <div
         className="tracker-board__header"
         style={{ gridTemplateColumns: colTemplate }}
       >
-        {columns.map((col) => (
+        {shownColumns.map((col) => (
           <div
             key={col.id}
             className={`tracker-col-head tracker-col--${col.id}${
@@ -119,7 +126,7 @@ export function TrackerBoard({
               <button
                 type="button"
                 className="tracker-lane__head"
-                style={{ gridColumn: `1 / span ${columns.length}` }}
+                style={{ gridColumn: `1 / span ${shownColumns.length}` }}
                 onClick={() =>
                   setCollapsed((prev) => ({ ...prev, [lane]: !prev[lane] }))
                 }
@@ -139,7 +146,7 @@ export function TrackerBoard({
                 className="tracker-lane__row"
                 style={{ gridTemplateColumns: colTemplate }}
               >
-                {columns.map((col) => {
+                {shownColumns.map((col) => {
                   const cards = laneItems.filter(
                     (a) => columnFor(a) === col.id
                   );

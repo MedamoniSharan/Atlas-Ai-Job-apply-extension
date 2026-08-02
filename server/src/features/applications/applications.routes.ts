@@ -69,6 +69,15 @@ applicationsRouter.get(
       ? (sourceRaw as 'all' | 'manual' | 'auto_scan' | 'auto_apply')
       : 'all';
 
+    const from =
+      typeof req.query.from === 'string' && req.query.from.trim()
+        ? req.query.from.trim()
+        : undefined;
+    const to =
+      typeof req.query.to === 'string' && req.query.to.trim()
+        ? req.query.to.trim()
+        : undefined;
+
     const result = await applicationsService.listApplications(req.user!.sub, {
       page,
       limit,
@@ -76,6 +85,8 @@ applicationsRouter.get(
       bucket,
       platform,
       source,
+      from,
+      to,
     });
     res.json(ok(result));
   })

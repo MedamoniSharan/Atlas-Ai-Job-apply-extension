@@ -190,6 +190,10 @@ export type ApplicationsQuery = {
   bucket?: 'all' | 'matched' | 'applied' | 'skipped' | 'company_site';
   platform?: string;
   source?: 'all' | 'manual' | 'auto_scan' | 'auto_apply';
+  /** Inclusive lower bound (ISO). */
+  from?: string;
+  /** Exclusive upper bound (ISO). */
+  to?: string;
 };
 
 export async function fetchApplications(params: ApplicationsQuery = {}) {
@@ -206,6 +210,8 @@ export async function fetchApplications(params: ApplicationsQuery = {}) {
   if (params.source && params.source !== 'all') {
     search.set('source', params.source);
   }
+  if (params.from) search.set('from', params.from);
+  if (params.to) search.set('to', params.to);
 
   return request<{
     items: Application[];

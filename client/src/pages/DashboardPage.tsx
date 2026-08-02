@@ -490,7 +490,11 @@ export function DashboardPage() {
             <SubscriptionCelebrate />
           </article>
 
-          <ProfileReportCard matchRate={matchRate} jobsCount={jobsCount} />
+          <ProfileReportCard
+            matchRate={matchRate}
+            jobsCount={jobsCount}
+            appliedCount={appliedCount}
+          />
         </aside>
       </div>
 

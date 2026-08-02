@@ -40,6 +40,13 @@ export async function updatePreferences(
       'VALIDATION_ERROR'
     );
   }
+  if (!preferencesAreComplete(prefs)) {
+    throw new AppError(
+      'Add at least 3 job titles and 4 keywords',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
 
   const completed = preferencesAreComplete(prefs);
   const user = await UserModel.findByIdAndUpdate(

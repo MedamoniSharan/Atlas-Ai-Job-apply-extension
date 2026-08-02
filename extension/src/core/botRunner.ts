@@ -324,7 +324,8 @@ async function waitWhilePausedForQuestions(
 
 /**
  * Before each apply: require positive Naukri login.
- * loggedOut → pause with login CTA; uncertain → pause with confirm CTA (don't guess).
+ * loggedOut → pause with login CTA; uncertain → pause with confirm CTA (don't guess),
+ * unless the user already confirmed login this run.
  */
 async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -348,6 +349,17 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
       return true;
     }
 
+    const state = await getCopilotState();
+    // User already confirmed this session — don't keep showing the popup.
+    if (state.loginUserConfirmed && login.status !== 'loggedOut') {
+      await setCopilotState({ needsLogin: false, loginPauseReason: null });
+      await appendCopilotLog(
+        'Using your confirmed Naukri login — continuing',
+        'success'
+      );
+      return true;
+    }
+
     const reason: 'loggedOut' | 'uncertain' =
       login.status === 'loggedOut' ? 'loggedOut' : 'uncertain';
 
@@ -358,8 +370,8 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
     });
     await appendCopilotLog(
       reason === 'uncertain'
-        ? 'Paused — confirm you’re logged into Naukri, then press Continue.'
-        : 'Paused — please log into Naukri to continue. Open login in a new tab, then press Continue.',
+        ? 'Paused — confirm you’re logged into Naukri, then press Confirm.'
+        : 'Paused — please log into Naukri to continue. Open login in a new tab, then press Confirm.',
       'warn'
     );
     await sendToTab(tabId, {
@@ -368,6 +380,17 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
     }).catch(() => undefined);
 
     if (!(await waitWhilePaused())) return false;
+
+    // After Confirm / Resume, re-read state — honor sticky confirm immediately.
+    const after = await getCopilotState();
+    if (after.loginUserConfirmed) {
+      await setCopilotState({ needsLogin: false, loginPauseReason: null });
+      await appendCopilotLog(
+        'Login confirmed — continuing co-pilot',
+        'success'
+      );
+      return true;
+    }
 
     await appendCopilotLog('Resumed — checking Naukri login again…');
     await wait(2000);
@@ -1395,7 +1418,14 @@ export async function runBot(handlers: BotHandlers): Promise<{
 
     if (!prefs.titles.length && !prefs.keywords.length) {
       await appendCopilotLog(
-        'Add titles or keywords in preferences first',
+        'Add at least 3 job titles and 4 keywords in preferences first',
+        'error'
+      );
+      return { ok: false, message: 'Preferences incomplete.' };
+    }
+    if (prefs.titles.length < 3 || prefs.keywords.length < 4) {
+      await appendCopilotLog(
+        'Preferences need at least 3 job titles and 4 keywords',
         'error'
       );
       return { ok: false, message: 'Preferences incomplete.' };
@@ -1406,6 +1436,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
       running: true,
       paused: false,
       needsLogin: false,
+      loginUserConfirmed: false,
       loginPauseReason: null,
       keyword,
       scanned: 0,

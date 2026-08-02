@@ -37,12 +37,12 @@ export type BoardPrefs = {
   swimlane: SwimlaneMode;
 };
 
-export const BOARD_PREFS_KEY = 'cosmo_tracker_board_v2';
+export const BOARD_PREFS_KEY = 'cosmo_tracker_board_v3';
 
 export const DEFAULT_BOARD_PREFS: BoardPrefs = {
-  mode: 'advanced',
-  visibleColumns: [...ADVANCED_COLUMN_IDS],
-  density: 'compact',
+  mode: 'simple',
+  visibleColumns: [...SIMPLE_COLUMN_IDS],
+  density: 'comfortable',
   swimlane: 'none',
 };
 
