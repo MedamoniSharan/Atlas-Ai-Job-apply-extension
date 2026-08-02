@@ -1018,69 +1018,57 @@ textarea {
   padding: 8px 24px 0;
 }
 
-.dash-sales__ring {
-  width: min(260px, 70vw);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  position: relative;
+.dash-sales__gauge {
+  width: min(280px, 78vw);
   outline: none;
   cursor: default;
 }
 
-.dash-sales__ring-svg {
-  position: absolute;
-  inset: 0;
+.dash-sales__gauge-svg {
+  display: block;
   width: 100%;
-  height: 100%;
-  transform: translateZ(0);
+  height: auto;
+  overflow: visible;
 }
 
-.dash-sales__ring-track,
-.dash-sales__ring-progress {
-  stroke-width: 10;
+.dash-sales__gauge-track,
+.dash-sales__gauge-progress {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
 }
 
-.dash-sales__ring-track {
-  stroke: #e9edf0;
+.dash-sales__gauge-track {
+  stroke: #eef1ef;
 }
 
-.dash-sales__ring-progress {
-  stroke: #2f6b52;
-  stroke-linecap: butt;
-  will-change: stroke-dashoffset;
+.dash-sales__gauge-progress {
+  stroke: #4a7d63;
 }
 
-.dash-sales__ring::before {
-  content: none;
+.dash-sales__gauge-needle {
+  stroke: #6b756f;
+  stroke-width: 1.75;
+  stroke-linecap: round;
 }
 
-.dash-sales__ring-inner {
-  position: relative;
-  z-index: 1;
-  width: 68%;
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-on-muted);
-  text-align: center;
+.dash-sales__gauge-hub {
+  fill: #6b756f;
 }
 
-.dash-sales__ring-inner strong {
-  margin-top: 6px;
-  font-size: 1.65rem;
-  line-height: 1.1;
+.dash-sales__gauge-value {
+  fill: var(--color-text-on-muted);
+  font-size: 24px;
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+  text-anchor: middle;
 }
 
-.dash-sales__ring-inner span {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 600;
+.dash-sales__gauge-label {
+  fill: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-anchor: middle;
 }
 
 .dash-sales__body {

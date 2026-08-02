@@ -155,6 +155,7 @@ export function DashboardPage() {
   const scannedTotal = scanStats?.totals.scanned ?? 0;
   const scannedWindow = scanStats?.window.scanned ?? 0;
   const scanMatchedTotal = scanStats?.totals.matched ?? 0;
+  const scanMatchedWindow = scanStats?.window.matched ?? 0;
   const scanAppliedTotal = scanStats?.totals.applied ?? 0;
   const scanAppliedWindow = scanStats?.window.applied ?? 0;
   const scanSkippedTotal = scanStats?.totals.skipped ?? 0;
@@ -217,7 +218,6 @@ export function DashboardPage() {
     scannedWindow > 0
       ? Math.min(100, Math.round((scanAppliedWindow / scannedWindow) * 100))
       : 0;
-  const conversionPct = applyRate;
 
   const timelineItems = useMemo(
     () => appsToTimeline(recentApps?.items ?? []),
@@ -424,9 +424,8 @@ export function DashboardPage() {
             <SalesStatsCard
               period={statsPeriod}
               onPeriodChange={setStatsPeriod}
-              conversionPct={conversionPct}
-              totalJobs={scannedWindow}
-              appliedCount={scanAppliedWindow}
+              scannedCount={scannedWindow}
+              matchedCount={scanMatchedWindow}
             />
           </div>
         </div>
