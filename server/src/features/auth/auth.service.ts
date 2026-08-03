@@ -153,12 +153,8 @@ export async function login(input: LoginInput): Promise<AuthTokens> {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
   }
 
-  if (user.role !== 'admin' && !isAdminEmail(user.email)) {
-    throw new AppError(
-      'Password sign-in is for admins only. Continue with Google instead.',
-      403,
-      'USE_GOOGLE_SIGN_IN'
-    );
+  if (user.status === 'suspended') {
+    throw new AppError('Account suspended', 403, 'ACCOUNT_SUSPENDED');
   }
 
   return issueTokens(user);

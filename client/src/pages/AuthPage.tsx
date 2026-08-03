@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
-import { loginWithGoogle } from '../lib/api';
+import { login, loginWithGoogle, register } from '../lib/api';
 import { googleClientId } from '../lib/googleAuth';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosMark } from '../components/CosmosLogo';
@@ -196,8 +196,12 @@ function GoogleSignInButton({
 export function AuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const setSession = useAuthStore((s) => s.setSession);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const googleConfigured = Boolean(googleClientId());
 
   function finishAuth(isNewAccount: boolean) {
@@ -216,6 +220,26 @@ export function AuthPage({ mode }: { mode: Mode }) {
       return;
     }
     navigate(isNewAccount ? '/get-extension' : '/dashboard');
+  }
+
+  async function onPasswordSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const result =
+        mode === 'register'
+          ? await register(name.trim(), email.trim(), password)
+          : await login(email.trim(), password);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      setSession(result.data);
+      finishAuth(mode === 'register');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -282,6 +306,73 @@ export function AuthPage({ mode }: { mode: Mode }) {
               </button>
             )}
           </div>
+
+          <div className="auth-divider" aria-hidden="true">
+            <span>or</span>
+          </div>
+
+          <form onSubmit={onPasswordSubmit} noValidate>
+            {mode === 'register' ? (
+              <div className="auth-field">
+                <label htmlFor="auth-name">Name</label>
+                <input
+                  id="auth-name"
+                  name="name"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            ) : null}
+            <div className="auth-field">
+              <label htmlFor="auth-email">Email</label>
+              <input
+                id="auth-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="auth-field">
+              <label htmlFor="auth-password">Password</label>
+              <input
+                id="auth-password"
+                name="password"
+                type="password"
+                autoComplete={
+                  mode === 'login' ? 'current-password' : 'new-password'
+                }
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={mode === 'register' ? 8 : 1}
+                required
+                disabled={loading}
+              />
+            </div>
+            <button
+              type="submit"
+              className="auth-submit-button"
+              disabled={loading}
+            >
+              {loading ? (
+                <CosmosLoader
+                  label={mode === 'login' ? 'Signing in…' : 'Creating…'}
+                  size={20}
+                  className="auth-submit-loader"
+                />
+              ) : mode === 'login' ? (
+                'Sign in'
+              ) : (
+                'Create account'
+              )}
+            </button>
+          </form>
 
           {error ? (
             <p className="error auth-status-message" role="alert">
