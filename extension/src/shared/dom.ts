@@ -11,10 +11,18 @@ export function clearChildren(el: Element): void {
 /**
  * Replace an element's children with nodes parsed from a trusted HTML string
  * (extension-owned markup / already escaped dynamic text).
+ *
+ * HTML5 parsing moves `<style>` / `<link>` into the document head, so those
+ * must be copied explicitly — otherwise Cosmo panel CSS never mounts and the
+ * floating side icon disappears on Naukri.
  */
 export function setTrustedHtml(el: Element, html: string): void {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  el.replaceChildren(...Array.from(doc.body.childNodes));
+  const nodes = [
+    ...Array.from(doc.head.querySelectorAll('style, link')),
+    ...Array.from(doc.body.childNodes),
+  ].map((node) => el.ownerDocument.importNode(node, true));
+  el.replaceChildren(...nodes);
 }
 
 /** Mount a trusted SVG document (single root `<svg>`) into `host`. */
