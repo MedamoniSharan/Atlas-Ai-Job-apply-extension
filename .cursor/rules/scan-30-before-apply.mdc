@@ -1,14 +1,16 @@
 ---
-description: Cosmo must collect 30 matched jobs before any apply
+description: Cosmo scans toward 30 matches, then applies whatever was found
 alwaysApply: true
 ---
 
-# Rule 2 — Scan 30 before apply
+# Rule 2 — Scan toward 30, then apply what was found
 
-**Strict rule:** Do not start applying to any Naukri job until Cosmo has **30 preference-matched** jobs queued.
+**Scan target:** Prefer collecting up to **30 preference-matched** jobs before apply.
 
-- Phase 1: open All Filters, apply prefs, scan/scroll and **auto next-page** until `matched >= 30`. **Never ask** the user to click “Next page”.
-- Phase 2: only then apply one by one (with humanPace slowdown).
-- When applies finish, tell the user **all jobs matched and applied** (dashboard close) — do not prompt for another Next page.
-- If fewer than 30 matches exist after exhausting pages, **do not apply** — report the shortfall; do not block on a Next-page modal.
-- Never call Easy Apply while the matched batch is still under 30.
+- Phase 1: open All Filters, apply prefs, scan/scroll and **auto next-page** until `matched >= 30` or pages/search plan are exhausted. **Never ask** the user to click “Next page”.
+- Phase 2: apply the queued matches one by one (with humanPace slowdown).
+  - If `matched >= 30`, apply the batch of 30.
+  - If scan exhausts with `0 < matched < 30`, **still apply** every match found — do not block apply on a full 30.
+  - If `matched === 0`, do not apply; report that nothing matched.
+- When applies finish, tell the user **jobs matched and applied** (dashboard close) — do not prompt for another Next page.
+- Never invent extra result pages past real pagination while filling the batch.

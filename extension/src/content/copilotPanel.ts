@@ -946,9 +946,6 @@ export function mountCopilotPanel() {
           Cosmo finished matching and applying. Close to review on your dashboard.
         </p>
         <div class="cosmo-modal-actions">
-          <button type="button" class="btn-resume-login" id="cosmo-done-next" style="display:none">
-            Next page jobs
-          </button>
           <button type="button" class="btn-login" id="cosmo-done-close">
             Close — view dashboard
           </button>
@@ -1015,7 +1012,6 @@ export function mountCopilotPanel() {
   const doneModal = root.querySelector('#cosmo-done-modal') as HTMLElement;
   const doneTitle = root.querySelector('#cosmo-done-title') as HTMLElement;
   const doneBody = root.querySelector('#cosmo-done-body') as HTMLElement;
-  const doneNextBtn = root.querySelector('#cosmo-done-next') as HTMLButtonElement;
   const doneCloseBtn = root.querySelector('#cosmo-done-close') as HTMLButtonElement;
   const consentCheck = root.querySelector('#cosmo-consent-check') as HTMLInputElement;
   const consentStartBtn = root.querySelector('#cosmo-consent-start') as HTMLButtonElement;
@@ -1320,7 +1316,6 @@ export function mountCopilotPanel() {
       applied: number;
       matched: number;
       skipped: number;
-      offerNextPage?: boolean;
       allApplied?: boolean;
     }
   ) {
@@ -1333,12 +1328,10 @@ export function mountCopilotPanel() {
         : 'Session finished';
       doneBody.textContent = allDone
         ? `Matched and applied ${summary.applied} job(s) (matched ${summary.matched}, skipped ${summary.skipped}). Review them on your Cosmo dashboard.`
-        : `Found ${summary.matched}/${30} matches after auto page scan (skipped ${summary.skipped}). Apply starts only at 30 — close and review on your dashboard, or Start again with broader prefs.`;
-      const offerNext = Boolean(summary.offerNextPage) && !allDone;
-      doneNextBtn.style.display = offerNext ? '' : 'none';
-      doneCloseBtn.textContent = allDone
-        ? 'Close — view dashboard'
-        : 'Close — view dashboard';
+        : summary.matched > 0
+          ? `Found ${summary.matched} match(es) after auto page scan (skipped ${summary.skipped}), but none were newly applied this round. Close and review on your dashboard, or Start again.`
+          : `No preference matches after auto page scan (skipped ${summary.skipped}). Broaden prefs and Start again.`;
+      doneCloseBtn.textContent = 'Close — view dashboard';
     }
   }
 
@@ -1709,28 +1702,32 @@ export function mountCopilotPanel() {
 
   consentStartBtn.addEventListener('click', () => {
     if (!consentCheck.checked) return;
-    showConsentModal(false);
+    consentStartBtn.disabled = true;
     chrome.runtime.sendMessage(
       {
         type: 'COPILOT_START',
         consentAccepted: true,
         consentVersion: CONSENT_VERSION,
       },
-      () => void refresh()
-    );
-  });
-
-  doneNextBtn.addEventListener('click', () => {
-    showDoneModal(false);
-    noticeEl.classList.add('show', 'is-alert');
-    noticeEl.textContent =
-      'Taking a short read pause, then opening the next page of jobs…';
-    chrome.runtime.sendMessage({ type: 'COPILOT_NEXT_PAGE' }, (res) => {
-      if (res?.ok === false && res?.message) {
-        noticeEl.textContent = res.message;
+      (res) => {
+        const err = chrome.runtime.lastError;
+        if (err || res?.ok === false) {
+          showConsentModal(false);
+          noticeEl.classList.add('show', 'is-alert');
+          noticeEl.textContent =
+            res?.message ||
+            err?.message ||
+            'Could not start co-pilot. Check you are signed into Cosmo.';
+          consentStartBtn.disabled = !consentCheck.checked;
+          void refresh();
+          return;
+        }
+        showConsentModal(false);
+        noticeEl.classList.remove('show', 'is-alert');
+        noticeEl.textContent = '';
+        void refresh();
       }
-      void refresh();
-    });
+    );
   });
 
   doneCloseBtn.addEventListener('click', () => {

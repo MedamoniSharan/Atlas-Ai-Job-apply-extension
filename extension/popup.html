@@ -93,30 +93,59 @@
         <form id="prefs-form" class="prefs">
           <fieldset class="prefs-group">
             <legend>Job search</legend>
-            <label>
-              Titles (min 3)
-              <input
-                id="pref-titles"
-                type="text"
-                placeholder="Software Engineer, Backend Developer, Full Stack"
-              />
-            </label>
-            <label>
-              Keywords (min 4)
-              <input
-                id="pref-keywords"
-                type="text"
-                placeholder="react, node, python, typescript"
-              />
-            </label>
-            <label>
-              Locations
-              <input
-                id="pref-locations"
-                type="text"
-                placeholder="Hyderabad, Bangalore, Remote"
-              />
-            </label>
+            <div class="chip-suggest" data-pref="titles">
+              <div class="chip-suggest__label-row">
+                <span class="chip-suggest__label">Titles</span>
+                <span class="chip-suggest__count" id="pref-titles-count">0/3</span>
+              </div>
+              <div class="chip-suggest__box is-incomplete" id="pref-titles-box">
+                <div class="chip-suggest__chips" id="pref-titles-chips"></div>
+                <input
+                  class="chip-suggest__input"
+                  id="pref-titles"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Software Engineer"
+                />
+              </div>
+              <div class="chip-suggest__menu hidden" id="pref-titles-menu" role="listbox"></div>
+              <p class="chip-suggest__hint">Pick spaced Naukri-style titles · min 3</p>
+            </div>
+            <div class="chip-suggest" data-pref="keywords">
+              <div class="chip-suggest__label-row">
+                <span class="chip-suggest__label">Keywords</span>
+                <span class="chip-suggest__count" id="pref-keywords-count">0/4</span>
+              </div>
+              <div class="chip-suggest__box is-incomplete" id="pref-keywords-box">
+                <div class="chip-suggest__chips" id="pref-keywords-chips"></div>
+                <input
+                  class="chip-suggest__input"
+                  id="pref-keywords"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Spring Boot, React.js"
+                />
+              </div>
+              <div class="chip-suggest__menu hidden" id="pref-keywords-menu" role="listbox"></div>
+              <p class="chip-suggest__hint">Skills with spaces like Naukri · min 4</p>
+            </div>
+            <div class="chip-suggest" data-pref="locations">
+              <div class="chip-suggest__label-row">
+                <span class="chip-suggest__label">Locations</span>
+              </div>
+              <div class="chip-suggest__box" id="pref-locations-box">
+                <div class="chip-suggest__chips" id="pref-locations-chips"></div>
+                <input
+                  class="chip-suggest__input"
+                  id="pref-locations"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Hyderabad, Bengaluru"
+                />
+              </div>
+              <div class="chip-suggest__menu hidden" id="pref-locations-menu" role="listbox"></div>
+              <p class="chip-suggest__hint">Match Naukri city filter names</p>
+            </div>
           </fieldset>
 
           <fieldset class="prefs-group">

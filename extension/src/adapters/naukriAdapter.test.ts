@@ -835,6 +835,30 @@ describe('preference matching helpers', () => {
     ).toBeNull();
   });
 
+  it('matches spaced preference keywords against compact Naukri skill text', () => {
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Software Engineer'],
+      keywords: ['Spring Boot', 'React.js'],
+      minSalaryLpa: 10,
+      experienceMin: 2,
+      experienceMax: 5,
+    };
+    expect(
+      preferenceSkipReason(
+        {
+          title: 'SoftwareEngineer',
+          company: 'Acme',
+          url: 'https://www.naukri.com/job-listings-compact',
+          experienceText: '3-4 Yrs',
+          salaryText: '12 LPA',
+          skills: ['SpringBoot', 'ReactJS'],
+        },
+        prefs
+      )
+    ).toBeNull();
+  });
+
   it('filters by experience range', () => {
     const prefs = {
       ...DEFAULT_JOB_PREFERENCES,
@@ -866,6 +890,103 @@ describe('preference matching helpers', () => {
         prefs
       )
     ).toBe(true);
+  });
+});
+
+describe('Naukri pagination', () => {
+  it('bumps -jobs path and page query, but not arbitrary paths', () => {
+    const adapter = new NaukriAdapter();
+    expect(
+      adapter.nextSearchPageUrl('https://www.naukri.com/react-jobs')
+    ).toBe('https://www.naukri.com/react-jobs-2');
+    expect(
+      adapter.nextSearchPageUrl('https://www.naukri.com/react-jobs-2')
+    ).toBe('https://www.naukri.com/react-jobs-3');
+    expect(
+      adapter.nextSearchPageUrl(
+        'https://www.naukri.com/jobs?k=react&pageNo=2'
+      )
+    ).toContain('pageNo=3');
+    expect(
+      adapter.nextSearchPageUrl('https://www.naukri.com/mnjuser/homepage')
+    ).toBeNull();
+    expect(
+      adapter.nextSearchPageUrl('https://www.naukri.com/job-listings-abc-123')
+    ).toBeNull();
+  });
+
+  it('does not click Next when pagination Next is disabled', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <div class="styles_pagination">
+        <a>1</a>
+        <a class="styles_disabled" aria-disabled="true">Next</a>
+      </div>
+      <button>Next article</button>
+    `;
+    expect(adapter.clickNextSearchPage(document)).toEqual({
+      ok: false,
+      reason: 'Already on the last page',
+    });
+  });
+
+  it('ignores non-pagination Next buttons on short result pages', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      <div class="job-list"><article>one job</article></div>
+      <footer><button>Next steps</button><a href="/blog">Next post</a></footer>
+    `;
+    expect(adapter.clickNextSearchPage(document)).toEqual({
+      ok: false,
+      reason: 'Next page control not found',
+    });
+  });
+
+  it('clicks an enabled pagination Next control', () => {
+    const adapter = new NaukriAdapter();
+    let clicked = false;
+    document.body.innerHTML = `
+      <div class="styles_pagination">
+        <a href="/react-jobs-2" id="next-pg">Next</a>
+      </div>
+    `;
+    const next = document.getElementById('next-pg')!;
+    next.addEventListener('click', (e) => {
+      e.preventDefault();
+      clicked = true;
+    });
+    expect(adapter.clickNextSearchPage(document)).toEqual({ ok: true });
+    expect(clicked).toBe(true);
+  });
+
+  it('advances numbered pagination without inventing URLs past the last page', () => {
+    const adapter = new NaukriAdapter();
+    let clickedId: string | null = null;
+    document.body.innerHTML = `
+      <div class="styles_pagination">
+        <a class="styles_active" id="p1">1</a>
+        <a id="p2">2</a>
+      </div>
+    `;
+    for (const id of ['p1', 'p2']) {
+      document.getElementById(id)!.addEventListener('click', (e) => {
+        e.preventDefault();
+        clickedId = id;
+      });
+    }
+    expect(adapter.clickNextSearchPage(document)).toEqual({ ok: true });
+    expect(clickedId).toBe('p2');
+
+    document.body.innerHTML = `
+      <div class="styles_pagination">
+        <a>1</a>
+        <a class="styles_active" aria-current="page">2</a>
+      </div>
+    `;
+    expect(adapter.clickNextSearchPage(document)).toEqual({
+      ok: false,
+      reason: 'Already on the last page',
+    });
   });
 });
 

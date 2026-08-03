@@ -1,8 +1,16 @@
 import type { JobPreferences, WorkMode } from '@cosmo/shared';
-import { CONSENT_VERSION } from '@cosmo/shared';
+import {
+  CONSENT_VERSION,
+  KEYWORD_SUGGESTIONS,
+  LOCATION_SUGGESTIONS,
+  MIN_PREF_KEYWORDS,
+  MIN_PREF_TITLES,
+  TITLE_SUGGESTIONS,
+} from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
 import { ensureChromeNamespace } from '../shared/browser';
+import { mountChipSuggestField } from '../shared/chipSuggestField';
 import { clearChildren, setTrustedHtml } from '../shared/dom';
 
 ensureChromeNamespace();
@@ -22,6 +30,28 @@ const alertEl = document.getElementById('copilot-alert')!;
 const alertTitleEl = document.getElementById('copilot-alert-title')!;
 const alertMsgEl = document.getElementById('copilot-alert-msg')!;
 const alertDismissBtn = document.getElementById('copilot-alert-dismiss')!;
+
+const titlesField = mountChipSuggestField({
+  root: document.querySelector('.chip-suggest[data-pref="titles"]') as HTMLElement,
+  catalog: TITLE_SUGGESTIONS,
+  placeholder: 'Software Engineer',
+  minCount: MIN_PREF_TITLES,
+});
+const keywordsField = mountChipSuggestField({
+  root: document.querySelector(
+    '.chip-suggest[data-pref="keywords"]'
+  ) as HTMLElement,
+  catalog: KEYWORD_SUGGESTIONS,
+  placeholder: 'Spring Boot, React.js',
+  minCount: MIN_PREF_KEYWORDS,
+});
+const locationsField = mountChipSuggestField({
+  root: document.querySelector(
+    '.chip-suggest[data-pref="locations"]'
+  ) as HTMLElement,
+  catalog: LOCATION_SUGGESTIONS,
+  placeholder: 'Hyderabad, Bengaluru',
+});
 
 let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 let waitingForGoogle = false;
@@ -97,13 +127,6 @@ function renderAlert(alert: CopilotAlert | null | undefined) {
   alertMsgEl.textContent = alert.message;
 }
 
-function parseList(value: string): string[] {
-  return value
-    .split(/[,|\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 function send<T>(message: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
     try {
@@ -134,12 +157,9 @@ function showStatusError(message: string) {
 }
 
 function fillPrefsForm(prefs: JobPreferences) {
-  (document.getElementById('pref-titles') as HTMLInputElement).value =
-    prefs.titles.join(', ');
-  (document.getElementById('pref-keywords') as HTMLInputElement).value =
-    prefs.keywords.join(', ');
-  (document.getElementById('pref-locations') as HTMLInputElement).value =
-    prefs.locations.join(', ');
+  titlesField.setValues(prefs.titles);
+  keywordsField.setValues(prefs.keywords);
+  locationsField.setValues(prefs.locations);
   (document.getElementById('pref-exp-min') as HTMLInputElement).value = String(
     prefs.experienceMin
   );
@@ -157,19 +177,16 @@ function fillPrefsForm(prefs: JobPreferences) {
 }
 
 function readPrefsForm(): JobPreferences {
+  titlesField.flushDraft();
+  keywordsField.flushDraft();
+  locationsField.flushDraft();
   const salaryRaw = (document.getElementById('pref-salary') as HTMLInputElement)
     .value;
   return {
     ...DEFAULT_JOB_PREFERENCES,
-    titles: parseList(
-      (document.getElementById('pref-titles') as HTMLInputElement).value
-    ),
-    keywords: parseList(
-      (document.getElementById('pref-keywords') as HTMLInputElement).value
-    ),
-    locations: parseList(
-      (document.getElementById('pref-locations') as HTMLInputElement).value
-    ),
+    titles: titlesField.getValues(),
+    keywords: keywordsField.getValues(),
+    locations: locationsField.getValues(),
     experienceMin: Number(
       (document.getElementById('pref-exp-min') as HTMLInputElement).value
     ),

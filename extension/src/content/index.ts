@@ -320,18 +320,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'CLICK_NEXT_PAGE': {
-        const clicked = naukri.clickNextSearchPage(document);
-        if (clicked.ok) {
-          sendResponse(clicked);
-          break;
-        }
-        const nextUrl = naukri.nextSearchPageUrl(window.location.href);
-        if (nextUrl) {
-          window.location.href = nextUrl;
-          sendResponse({ ok: true, via: 'url' });
-          break;
-        }
-        sendResponse(clicked);
+        // Do not invent /foo-jobs-N URLs when Next is missing or disabled —
+        // narrow searches often have only 1–2 real pages; fabricating more
+        // just burns empty "pages" until MAX_EMPTY_PAGES.
+        sendResponse(naukri.clickNextSearchPage(document));
         break;
       }
       case 'CHECK_BLOCK_PAGE': {

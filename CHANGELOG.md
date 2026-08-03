@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Public `/privacy` and `/terms` pages on the Cosmo web app.
 - Chrome / Edge / Firefox store listings and screenshots.
 
+## [1.0.3] - 2026-08-03
+
+### Added
+
+- Naukri-style chips + autocomplete for titles, keywords, and locations (extension popup + dashboard).
+- Curated spaced suggestion catalogs so prefs store labels like `Spring Boot`.
+
+### Fixed
+
+- Title/keyword matching treats spaced and compact forms as equivalent (`Spring Boot` ≡ `SpringBoot`).
+
 ## [1.0.2] - 2026-08-03
 
 ### Fixed

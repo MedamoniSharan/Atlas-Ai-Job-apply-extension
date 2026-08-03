@@ -43,7 +43,6 @@ import {
   resumeBot,
   runBot,
   stopBot,
-  continueNextPage,
   closeSessionComplete,
 } from '../core/botRunner';
 import {
@@ -530,11 +529,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'COPILOT_STOP': {
           await stopBot();
           sendResponse({ ok: true });
-          break;
-        }
-        case 'COPILOT_NEXT_PAGE': {
-          const result = await continueNextPage();
-          sendResponse(result);
           break;
         }
         case 'COPILOT_SESSION_CLOSE': {

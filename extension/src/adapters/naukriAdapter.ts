@@ -1,5 +1,9 @@
 import type { JobPayload, JobPreferences } from '@cosmo/shared';
-import { sanitizeJobMetaFields, stripEmbeddedLabels } from '@cosmo/shared';
+import {
+  compactMatchText,
+  sanitizeJobMetaFields,
+  stripEmbeddedLabels,
+} from '@cosmo/shared';
 import {
   PlatformAdapter,
   SelectorRegistry,
@@ -2509,45 +2513,71 @@ export class NaukriAdapter implements PlatformAdapter {
     ok: boolean;
     reason?: string;
   } {
-    const nodes = Array.from(
+    // Scope to pagination only — never scan every a/button on the page
+    // (false "Next" hits invent pages past short 1–2 page result sets).
+    const roots = Array.from(
       doc.querySelectorAll<HTMLElement>(
         [
-          '[class*="pagination"] a',
-          '[class*="Pagination"] a',
-          '[class*="styles_pagination"] a',
-          '[class*="styles_pages"] a',
-          'a[aria-label*="next" i]',
-          'button[aria-label*="next" i]',
-          'a, button, [role="button"]',
+          '[class*="pagination"]',
+          '[class*="Pagination"]',
+          '[class*="styles_pagination"]',
+          '[class*="styles_pages"]',
+          'nav[aria-label*="pagination" i]',
+          'nav[aria-label*="page" i]',
+          '[data-testid*="pagination" i]',
         ].join(', ')
       )
     );
-    const next = nodes.find((el) => {
-      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-      const title = (el.getAttribute('title') || '').toLowerCase();
-      const rel = (el.getAttribute('rel') || '').toLowerCase();
-      if (rel === 'next') return true;
-      if (/^next$/i.test(text) || /^›$|^>$|^»$/.test(text)) return true;
-      if (aria.includes('next') || title.includes('next')) return true;
-      if (/^next\b/i.test(text) && text.length < 12) return true;
-      return false;
-    });
-    if (!next) {
-      return { ok: false, reason: 'Next page control not found' };
+    const scoped = roots.length
+      ? roots.flatMap((root) =>
+          Array.from(
+            root.querySelectorAll<HTMLElement>('a, button, [role="button"], li')
+          )
+        )
+      : Array.from(
+          doc.querySelectorAll<HTMLElement>(
+            [
+              'a[aria-label*="next" i]',
+              'button[aria-label*="next" i]',
+              'a[rel="next"]',
+            ].join(', ')
+          )
+        );
+
+    const next = scoped.find((el) => isNaukriNextPageControl(el));
+    if (next) {
+      if (isNaukriPagerControlDisabled(next)) {
+        return { ok: false, reason: 'Already on the last page' };
+      }
+      const clickTarget =
+        (next.closest('a, button, [role="button"]') as HTMLElement | null) ||
+        next;
+      if (isNaukriPagerControlDisabled(clickTarget)) {
+        return { ok: false, reason: 'Already on the last page' };
+      }
+      clickInSameTab(clickTarget);
+      return { ok: true };
     }
-    const disabled =
-      next.getAttribute('disabled') != null ||
-      next.getAttribute('aria-disabled') === 'true' ||
-      /disabled|inactive/i.test(next.className);
-    if (disabled) {
+
+    // Numbered pager only (no Next label): click current+1 when it exists.
+    const numbered = findNaukriNextNumberedPage(scoped);
+    if (numbered) {
+      clickInSameTab(numbered);
+      return { ok: true };
+    }
+
+    if (roots.length) {
+      // Pagination UI exists but nothing ahead — real last page (1–2 page sets).
       return { ok: false, reason: 'Already on the last page' };
     }
-    clickInSameTab(next);
-    return { ok: true };
+    return { ok: false, reason: 'Next page control not found' };
   }
 
-  /** Bump Naukri search URL to the next results page when Next click fails. */
+  /**
+   * Bump Naukri search URL to the next results page.
+   * Only used when Next was clicked but the SPA did not navigate —
+   * must not invent pages for arbitrary paths.
+   */
   nextSearchPageUrl(currentUrl: string): string | null {
     try {
       const u = new URL(currentUrl);
@@ -2566,20 +2596,96 @@ export class NaukriAdapter implements PlatformAdapter {
         u.pathname = `${base}-${n + 1}`;
         return u.toString();
       }
-      const loose = u.pathname.match(/^(.*?)(?:-(\d+))?\/?$/);
-      if (loose) {
-        const base = loose[1]!;
-        const n = loose[2] ? Number(loose[2]) : 1;
-        if (base.length > 1) {
-          u.pathname = `${base}-${n + 1}`;
-          return u.toString();
-        }
-      }
       return null;
     } catch {
       return null;
     }
   }
+}
+
+function isNaukriNextPageControl(el: HTMLElement): boolean {
+  const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+  const title = (el.getAttribute('title') || '').toLowerCase();
+  const rel = (el.getAttribute('rel') || '').toLowerCase();
+  if (rel === 'next') return true;
+  if (/^next$/i.test(text) || /^›$|^>$|^»$/.test(text)) return true;
+  if (aria.includes('next') || title.includes('next')) return true;
+  if (/^next\b/i.test(text) && text.length < 12) return true;
+  return false;
+}
+
+/** Find page-(current+1) control inside a numbered pager. */
+function findNaukriNextNumberedPage(
+  nodes: HTMLElement[]
+): HTMLElement | null {
+  let current = 0;
+  const pages: { n: number; el: HTMLElement }[] = [];
+  for (const el of nodes) {
+    if (isNaukriPagerControlDisabled(el) && !isNaukriActivePageControl(el)) {
+      continue;
+    }
+    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!/^\d+$/.test(text)) continue;
+    const n = Number(text);
+    if (!Number.isFinite(n) || n < 1) continue;
+    pages.push({ n, el });
+    if (isNaukriActivePageControl(el)) current = n;
+  }
+  if (!pages.length) return null;
+  if (!current) {
+    // Prefer an explicitly selected page; else assume lowest visible is current.
+    current = Math.min(...pages.map((p) => p.n));
+  }
+  const target = pages.find((p) => p.n === current + 1);
+  if (!target) return null;
+  return (
+    (target.el.closest('a, button, [role="button"]') as HTMLElement | null) ||
+    target.el
+  );
+}
+
+function isNaukriActivePageControl(el: HTMLElement): boolean {
+  const aria = (el.getAttribute('aria-current') || '').toLowerCase();
+  if (aria === 'page' || aria === 'true') return true;
+  const cls = `${el.className || ''}`;
+  if (/active|selected|current|is-active|styles_selected|styles_active/i.test(cls)) {
+    return true;
+  }
+  const parentCls = `${el.parentElement?.className || ''}`;
+  return /active|selected|current|is-active|styles_selected|styles_active/i.test(
+    parentCls
+  );
+}
+
+function isNaukriPagerControlDisabled(el: HTMLElement): boolean {
+  const chain: HTMLElement[] = [el];
+  let parent: HTMLElement | null = el.parentElement;
+  for (let i = 0; i < 4 && parent; i++) {
+    chain.push(parent);
+    parent = parent.parentElement;
+  }
+  return chain.some((node) => {
+    if (node.getAttribute('disabled') != null) return true;
+    if (node.getAttribute('aria-disabled') === 'true') return true;
+    if (
+      node.getAttribute('tabindex') === '-1' &&
+      /next/i.test(
+        node.textContent || node.getAttribute('aria-label') || ''
+      )
+    ) {
+      return true;
+    }
+    const cls = `${node.className || ''}`;
+    if (
+      /disabled|inactive|is-disabled|styles_disabled|cursor-not-allowed/i.test(
+        cls
+      )
+    ) {
+      return true;
+    }
+    return false;
+  });
 }
 
 export function matchesPreferences(
@@ -2606,11 +2712,27 @@ function normalizeMatchText(value: string): string {
     .trim();
 }
 
+/** Spaced or compact equality: "Spring Boot" matches "SpringBoot" / "spring-boot". */
+function textMatchesPreference(haystack: string, needle: string): boolean {
+  const spacedHay = normalizeMatchText(haystack);
+  const spacedNeedle = normalizeMatchText(needle);
+  if (!spacedHay || !spacedNeedle) return false;
+  if (spacedHay.includes(spacedNeedle) || spacedNeedle.includes(spacedHay)) {
+    return true;
+  }
+  const compactHay = compactMatchText(haystack);
+  const compactNeedle = compactMatchText(needle);
+  if (!compactHay || !compactNeedle) return false;
+  return (
+    compactHay.includes(compactNeedle) || compactNeedle.includes(compactHay)
+  );
+}
+
 function titleMatchesPreference(jobTitle: string, prefTitle: string): boolean {
+  if (textMatchesPreference(jobTitle, prefTitle)) return true;
   const jt = normalizeMatchText(jobTitle);
   const pt = normalizeMatchText(prefTitle);
   if (!jt || !pt) return false;
-  if (jt.includes(pt) || pt.includes(jt)) return true;
   const tokens = pt.split(' ').filter((t) => t.length > 1);
   if (!tokens.length) return false;
   const hits = tokens.filter((t) => jt.includes(t)).length;
@@ -2638,9 +2760,7 @@ export function matchesTitleAndKeywords(
     .join(' ');
 
   const titleHit = titles.some((t) => titleMatchesPreference(jobTitle, t));
-  const keywordHit = keywords.some((k) =>
-    normalizeMatchText(haystack).includes(normalizeMatchText(k))
-  );
+  const keywordHit = keywords.some((k) => textMatchesPreference(haystack, k));
 
   if (titles.length && keywords.length) return titleHit && keywordHit;
   if (titles.length) return titleHit;
@@ -2705,9 +2825,7 @@ export function preferenceSkipReason(
   ]
     .filter(Boolean)
     .join(' ');
-  const keywordHit = keywords.some((k) =>
-    normalizeMatchText(haystack).includes(normalizeMatchText(k))
-  );
+  const keywordHit = keywords.some((k) => textMatchesPreference(haystack, k));
 
   if (titles.length && keywords.length) {
     if (!titleHit && !keywordHit) {
