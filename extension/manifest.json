@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cosmo Job Assistant",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Naukri job co-pilot — scan and assist Easy Apply from your preferences, synced to Cosmo",
   "permissions": ["storage", "alarms", "tabs"],
   "host_permissions": [

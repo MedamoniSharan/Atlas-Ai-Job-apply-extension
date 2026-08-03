@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Public `/privacy` and `/terms` pages on the Cosmo web app.
 - Chrome / Edge / Firefox store listings and screenshots.
 
+## [1.0.2] - 2026-08-03
+
+### Fixed
+
+- Ship release zips with production `webBridge` matches so Google auth syncs on cosmovai.in.
+- Preserve panel `<style>` tags so the floating Cosmo dock appears on Naukri.
+- Mount action SVGs via HTML parsing so Pause / Stop / Minimize icons are visible in Chrome.
+- Show animated dots on the Start button while scanning.
+
 ## [1.0.0] - 2026-07-24
 
 ### Added
