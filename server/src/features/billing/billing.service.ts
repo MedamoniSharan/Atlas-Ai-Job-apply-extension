@@ -144,21 +144,37 @@ async function ensureRazorpayCustomer(userId: string) {
   if (!user) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
-  if (user.razorpayCustomerId) {
-    return { user, customerId: user.razorpayCustomerId };
-  }
 
   const razorpay = getRazorpay();
-  const customer = await razorpay.customers.create({
-    name: user.name,
-    email: user.email,
-    fail_existing: 0,
-    notes: { userId },
-  });
 
-  user.razorpayCustomerId = customer.id;
-  await user.save();
-  return { user, customerId: customer.id };
+  if (user.razorpayCustomerId) {
+    try {
+      await razorpay.customers.fetch(user.razorpayCustomerId);
+      return { user, customerId: user.razorpayCustomerId };
+    } catch (error) {
+      // Stale ID after test→live key switch or deleted Razorpay customer.
+      logger.warn('Stored Razorpay customer id invalid; recreating', {
+        userId,
+        razorpayCustomerId: user.razorpayCustomerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      user.razorpayCustomerId = undefined;
+    }
+  }
+
+  try {
+    const customer = await razorpay.customers.create({
+      name: user.name,
+      email: user.email,
+      fail_existing: 0,
+      notes: { userId },
+    });
+    user.razorpayCustomerId = customer.id;
+    await user.save();
+    return { user, customerId: customer.id };
+  } catch (error) {
+    throw razorpayAppError(error, 'Could not create Razorpay customer');
+  }
 }
 
 async function ensureRazorpayPlanId(plan: PaidPlan): Promise<string> {
