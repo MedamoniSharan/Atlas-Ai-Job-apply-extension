@@ -37,6 +37,28 @@ export function mountMinimizeIcon(host: HTMLElement) {
   setTrustedSvg(host, MINIMIZE_SVG);
 }
 
+function mountLabeledDots(host: HTMLElement, text: string): void {
+  host.replaceChildren();
+
+  const label = document.createElement('span');
+  label.className = 'run-label';
+  label.append(text);
+
+  const dots = document.createElement('span');
+  dots.className = 'run-dots';
+  dots.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i += 1) {
+    dots.appendChild(document.createElement('i')).textContent = '.';
+  }
+  label.appendChild(dots);
+  host.append(label);
+}
+
+/** Build the Start button's "Scanning" state with animated dots (no innerHTML). */
+export function mountScanningButton(host: HTMLElement): void {
+  mountLabeledDots(host, 'Scanning');
+}
+
 /** Build the Start button's "Running" state with a looping video (no innerHTML). */
 export function mountRunningButton(host: HTMLElement, src: string): void {
   host.replaceChildren();

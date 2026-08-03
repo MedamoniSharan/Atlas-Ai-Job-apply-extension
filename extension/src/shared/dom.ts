@@ -25,14 +25,17 @@ export function setTrustedHtml(el: Element, html: string): void {
   el.replaceChildren(...nodes);
 }
 
-/** Mount a trusted SVG document (single root `<svg>`) into `host`. */
+/**
+ * Mount a trusted SVG fragment into `host`.
+ *
+ * Parse as `text/html` (not `image/svg+xml`): Chrome gives XML-parsed SVGs a
+ * null namespace and 0×0 layout unless xmlns is present, so pause/stop/minimize
+ * icons disappear even though the buttons still exist.
+ */
 export function setTrustedSvg(host: Element, svgMarkup: string): void {
-  const doc = new DOMParser().parseFromString(
-    svgMarkup.trim(),
-    'image/svg+xml'
-  );
-  const svg = doc.documentElement;
-  if (!svg || svg.localName === 'parsererror' || svg.querySelector('parsererror')) {
+  const doc = new DOMParser().parseFromString(svgMarkup.trim(), 'text/html');
+  const svg = doc.body.querySelector('svg');
+  if (!svg || svg.querySelector('parsererror')) {
     clearChildren(host);
     return;
   }

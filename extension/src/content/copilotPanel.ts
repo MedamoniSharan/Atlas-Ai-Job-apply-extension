@@ -15,6 +15,7 @@ import {
   mountPauseIcon,
   mountPlayIcon,
   mountRunningButton,
+  mountScanningButton,
   mountStopIcon,
 } from '../shared/actionIcons';
 import { clearChildren, setTrustedHtml } from '../shared/dom';
@@ -1517,7 +1518,7 @@ export function mountCopilotPanel() {
       if (nextStartMode === 'running') {
         mountRunningButton(startBtn, runningMp4);
       } else if (nextStartMode === 'scanning') {
-        startBtn.textContent = 'Scanning…';
+        mountScanningButton(startBtn);
       } else {
         startBtn.textContent = nextStartMode === 'paused' ? 'Paused' : 'Start';
       }
