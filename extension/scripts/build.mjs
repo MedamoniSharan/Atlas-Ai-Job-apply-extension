@@ -237,30 +237,31 @@ if (watch) {
 
   // Same JS bundle; manifest differs per browser so Chrome keeps service_worker
   // and Firefox keeps scripts-only (no unsupported-field warning).
+  //
+  // Only release/Firefox builds may write client/public download zips.
+  // A non-release build only matches localhost for webBridge.js — publishing
+  // that zip breaks Google auth sync on production (www.cosmovai.in).
   writeManifest('chromium');
-  writeZipFromDirectory(dist, clientPublicZip);
-  // Edge Add-ons accepts the same Chromium MV3 package; keep a dedicated zip name.
-  writeZipFromDirectory(dist, edgeZip);
+  const targets = [];
 
-  if (firefox || release) {
+  if (release || firefox) {
+    writeZipFromDirectory(dist, clientPublicZip);
+    // Edge Add-ons accepts the same Chromium MV3 package; keep a dedicated zip name.
+    writeZipFromDirectory(dist, edgeZip);
+    targets.push(path.relative(root, clientPublicZip), path.relative(root, edgeZip));
+
     writeManifest('firefox');
     writeZipFromDirectory(dist, firefoxZip);
+    targets.push(path.relative(root, firefoxZip));
   }
 
   // Always leave Chromium manifest in dist/ for chrome://extensions load-unpacked.
   // Firefox packages are already zipped above; load those for about:debugging.
   writeManifest('chromium');
 
-  const targets = [
-    path.relative(root, clientPublicZip),
-    path.relative(root, edgeZip),
-  ];
-  if (firefox || release) {
-    targets.push(path.relative(root, firefoxZip));
-  }
   console.log(
     release || firefox
       ? `Release extension built to dist/ + ${targets.join(' + ')} (API: ${apiOrigins.join(', ')}; web: ${webOrigins.join(', ')}; gecko: ${geckoId}; dist manifest: chromium)`
-      : `Extension built to dist/ + ${targets.join(' + ')} (dist manifest: chromium)`
+      : 'Extension built to dist/ only (dev/localhost webBridge matches; run build:release to publish downloadable zips)'
   );
 }
