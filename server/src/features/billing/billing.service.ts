@@ -405,7 +405,8 @@ export async function createSubscription(
 
   let subscription: { id: string };
   try {
-    subscription = await razorpay.subscriptions.create({
+    // Razorpay runtime accepts customer_id; SDK typings omit it.
+    subscription = (await razorpay.subscriptions.create({
       plan_id: razorpayPlanId,
       total_count: SUBSCRIPTION_TOTAL_COUNT,
       customer_notify: 1,
@@ -414,7 +415,10 @@ export async function createSubscription(
         userId,
         plan: input.plan,
       },
-    });
+      ...(customerId ? { customer_id: customerId } : {}),
+    } as Parameters<typeof razorpay.subscriptions.create>[0])) as {
+      id: string;
+    };
   } catch (error) {
     throw razorpayAppError(error, 'Could not create Razorpay subscription');
   }
@@ -428,9 +432,6 @@ export async function createSubscription(
     source: 'razorpay',
     cancelAtPeriodEnd: false,
   });
-
-  // Ensure customer link if API supports it via notes; customer id already stored on user
-  void customerId;
 
   return {
     subscriptionId: subscription.id,

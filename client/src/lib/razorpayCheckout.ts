@@ -20,15 +20,27 @@ type RazorpayOptions = {
   name: string;
   description: string;
   subscription_id: string;
-  prefill?: { name?: string; email?: string };
+  image?: string;
+  prefill?: { name?: string; email?: string; contact?: string };
+  notes?: Record<string, string>;
   theme?: { color?: string };
+  /** Keep default methods; UPI QR (desktop) / Intent (mobile) for Autopay. */
+  config?: {
+    display?: {
+      preferences?: { show_default_blocks?: boolean };
+    };
+  };
+  remember_customer?: boolean;
   handler: (response: RazorpaySuccessResponse) => void;
   modal?: { ondismiss?: () => void };
 };
 
 type RazorpayInstance = {
   open: () => void;
-  on: (event: string, handler: (response: unknown) => void) => void;
+  on: (
+    event: string,
+    handler: (response: unknown) => void
+  ) => void;
 };
 
 declare global {
@@ -90,13 +102,17 @@ export async function startPlanCheckout(
 
   const sub = subRes.data;
   const user = useAuthStore.getState().user;
-  const key =
-    sub.keyId ||
-    (import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined) ||
-    '';
+  // Always prefer key from API — QR status polling needs an explicit live key id.
+  const key = (sub.keyId || '').trim();
 
   if (!key) {
-    throw new Error('Razorpay key is not configured');
+    throw new Error(
+      'Razorpay key is not configured on the server. Contact support.'
+    );
+  }
+
+  if (!key.startsWith('rzp_')) {
+    throw new Error('Invalid Razorpay key returned by server');
   }
 
   return new Promise<CheckoutResult>((resolve, reject) => {
@@ -109,10 +125,23 @@ export async function startPlanCheckout(
         plan === 'pro'
           ? 'Premium — monthly subscription'
           : 'UltraMag — monthly subscription',
+      image: '/favicon.svg',
       subscription_id: sub.subscriptionId,
       prefill: {
-        name: user?.name,
-        email: user?.email,
+        name: user?.name || undefined,
+        email: user?.email || undefined,
+      },
+      notes: {
+        plan,
+        product: 'cosmo-job-assistant',
+      },
+      remember_customer: true,
+      config: {
+        display: {
+          preferences: {
+            show_default_blocks: true,
+          },
+        },
       },
       theme: { color: '#15362b' },
       handler: (response) => {
@@ -165,11 +194,17 @@ export async function startPlanCheckout(
       },
     });
 
-    rzp.on('payment.failed', () => {
-      if (!settled) {
-        settled = true;
-        reject(new Error('Payment failed'));
-      }
+    rzp.on('payment.failed', (response: unknown) => {
+      if (settled) return;
+      settled = true;
+      const detail = response as {
+        error?: { description?: string; reason?: string; code?: string };
+      };
+      const message =
+        detail?.error?.description ||
+        detail?.error?.reason ||
+        'Payment failed. If UPI QR did not complete, try UPI apps on mobile or card.';
+      reject(new Error(message));
     });
 
     rzp.open();
