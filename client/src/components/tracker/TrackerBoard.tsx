@@ -16,6 +16,7 @@ type TrackerBoardProps = {
   onToggleSelect: (id: string, shiftKey: boolean) => void;
   onOpen: (app: Application) => void;
   onMove: (id: string, column: ColumnId) => void;
+  onDelete: (id: string) => void;
   onDragStart: (id: string, e: DragEvent) => void;
   onDragEnd: () => void;
   onDragOverColumn: (column: ColumnId) => void;
@@ -35,6 +36,7 @@ export function TrackerBoard({
   onToggleSelect,
   onOpen,
   onMove,
+  onDelete,
   onDragStart,
   onDragEnd,
   onDragOverColumn,
@@ -192,6 +194,7 @@ export function TrackerBoard({
                               onToggleSelect={onToggleSelect}
                               onOpen={onOpen}
                               onMove={onMove}
+                              onDelete={onDelete}
                               onDragStart={onDragStart}
                               onDragEnd={onDragEnd}
                               suppressClickRef={suppressClickRef}

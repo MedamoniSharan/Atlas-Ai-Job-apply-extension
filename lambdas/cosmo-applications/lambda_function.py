@@ -609,12 +609,54 @@ def move_applications_bulk(
     return {"items": items, "moved": len(items), "missing": missing}
 
 
+def delete_application(user_id: str, application_id: str) -> bool:
+    item = get_by_application_id(application_id)
+    if not item or item.get("userId") != user_id:
+        return False
+    event_id = item.get("eventId")
+    if not event_id:
+        return False
+    apps_tbl.delete_item(Key={"userId": user_id, "eventId": event_id})
+    return True
+
+
+def delete_applications_bulk(user_id: str, ids: List[str]) -> Dict[str, Any]:
+    unique = list(dict.fromkeys(i.strip() for i in ids if isinstance(i, str) and i.strip()))[
+        :50
+    ]
+    deleted: List[str] = []
+    missing: List[str] = []
+    for app_id in unique:
+        if delete_application(user_id, app_id):
+            deleted.append(app_id)
+        else:
+            missing.append(app_id)
+    return {"deleted": deleted, "deletedCount": len(deleted), "missing": missing}
+
+
 def extract_tracker_id(path: str) -> Optional[str]:
     # .../applications/<id>/tracker
     parts = [p for p in path.split("/") if p]
     if len(parts) >= 3 and parts[-1] == "tracker" and parts[-2] != "bulk":
         return parts[-2]
     return None
+
+
+def extract_application_id(path: str) -> Optional[str]:
+    # .../applications/<id>  (not stats/lookup/tracker/bulk)
+    parts = [p for p in path.split("/") if p]
+    try:
+        i = parts.index("applications")
+    except ValueError:
+        return None
+    if i + 1 >= len(parts):
+        return None
+    candidate = parts[i + 1]
+    if candidate in ("stats", "lookup", "tracker", "bulk"):
+        return None
+    if i + 2 < len(parts):
+        return None
+    return candidate
 
 
 def handle_list(event: Dict[str, Any], user_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -702,6 +744,29 @@ def handle_tracker_bulk(
     )
 
 
+def handle_delete(
+    event: Dict[str, Any], user_id: str, application_id: str
+) -> Dict[str, Any]:
+    if not application_id:
+        return err(event, "Invalid application id", 400, "VALIDATION_ERROR")
+    if not delete_application(user_id, application_id):
+        return err(event, "Application not found", 404, "NOT_FOUND")
+    return ok(event, {"id": application_id}, "Application deleted")
+
+
+def handle_delete_bulk(
+    event: Dict[str, Any], user_id: str, body: Dict[str, Any]
+) -> Dict[str, Any]:
+    ids = body.get("ids") or []
+    if not isinstance(ids, list) or not any(isinstance(i, str) and i.strip() for i in ids):
+        return err(event, "Provide at least one application id", 400, "VALIDATION_ERROR")
+    return ok(
+        event,
+        delete_applications_bulk(user_id, [i for i in ids if isinstance(i, str)]),
+        "Applications deleted",
+    )
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if http_method(event) == "OPTIONS":
         return ok(event, {})
@@ -734,6 +799,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if action in ("moveTracker", "tracker"):
         app_id = body.get("id") or body.get("applicationId") or ""
         return handle_tracker(event, user_id, str(app_id), body)
+    if action in ("deleteApplicationsBulk", "deleteBulk"):
+        return handle_delete_bulk(event, user_id, body)
+    if action in ("deleteApplication", "delete"):
+        app_id = body.get("id") or body.get("applicationId") or ""
+        return handle_delete(event, user_id, str(app_id))
 
     # REST routing
     if method == "GET" and path.endswith("/applications/stats"):
@@ -742,6 +812,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return handle_lookup(event, user_id, body)
     if method == "PATCH" and path.endswith("/applications/tracker/bulk"):
         return handle_tracker_bulk(event, user_id, body)
+    if method == "DELETE" and path.endswith("/applications/bulk"):
+        return handle_delete_bulk(event, user_id, body)
     if method == "PATCH" and path.endswith("/tracker"):
         app_id = (
             (event.get("pathParameters") or {}).get("id")
@@ -749,6 +821,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             or ""
         )
         return handle_tracker(event, user_id, app_id, body)
+    if method == "DELETE":
+        app_id = (
+            (event.get("pathParameters") or {}).get("proxy")
+            or (event.get("pathParameters") or {}).get("id")
+            or extract_application_id(path)
+            or ""
+        )
+        # proxy may be "abc123" or nested; only accept a single segment id
+        if isinstance(app_id, str) and "/" in app_id:
+            app_id = ""
+        if app_id:
+            return handle_delete(event, user_id, app_id)
     if method == "GET" and (
         path.endswith("/applications") or path.endswith("/api/v1/applications")
     ):

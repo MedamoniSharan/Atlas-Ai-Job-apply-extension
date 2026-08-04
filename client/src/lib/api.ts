@@ -284,6 +284,23 @@ export async function moveApplicationsTrackerBulk(
   });
 }
 
+export async function deleteApplication(id: string) {
+  return request<{ id: string }>(`/api/v1/applications/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function deleteApplicationsBulk(ids: string[]) {
+  return request<{
+    deleted: string[];
+    deletedCount: number;
+    missing: string[];
+  }>('/api/v1/applications/bulk', {
+    method: 'DELETE',
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export async function fetchPreferences() {
   return request<JobPreferences>('/api/v1/preferences');
 }

@@ -3278,8 +3278,34 @@ textarea {
 }
 
 .tracker-bulk .dash-btn--ghost {
-  color: #e2e8f0;
-  border-color: rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.tracker-bulk .dash-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.tracker-bulk__delete {
+  border-color: rgba(251, 113, 133, 0.55) !important;
+  color: #fecdd3 !important;
+}
+
+.tracker-bulk__delete:hover:not(:disabled) {
+  background: rgba(225, 29, 72, 0.25) !important;
+  border-color: rgba(251, 113, 133, 0.85) !important;
+  color: #fff !important;
+}
+
+.tracker-bulk__delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tracker-settings {
@@ -3628,6 +3654,17 @@ textarea {
 
 .tracker-card__menu-pop button:hover {
   background: #f1f5f9;
+}
+
+.tracker-card__menu-danger {
+  color: var(--color-danger);
+  border-top: 1px solid var(--color-border-muted) !important;
+  margin-top: 2px;
+  border-radius: 0 0 6px 6px !important;
+}
+
+.tracker-card__menu-danger:hover {
+  background: #fff1f2 !important;
 }
 
 /* —— Shared panels / forms / auth —— */
