@@ -1,35 +1,29 @@
-import { useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
-import type { Application } from '@cosmo/shared';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { SOCKET_URL } from './endpoints';
 
-export function useApplicationSocket(
-  onUpdate: (app: Application) => void
-) {
+/**
+ * Light refresh when the tab becomes visible again.
+ * Replaces Socket.IO — no interval polling (that caused request storms).
+ */
+export function useApplicationSocket(onUpdate: (app?: unknown) => void) {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
   useEffect(() => {
     if (!accessToken) return;
 
-    let socket: Socket | null = io(SOCKET_URL || undefined, {
-      auth: { token: accessToken },
-      transports: ['websocket', 'polling'],
-    });
-
-    socket.on('application.updated', (app: Application) => {
-      onUpdate(app);
-    });
-
-    socket.on('connect_error', (err) => {
-      if (/unauthorized/i.test(err.message)) {
-        useAuthStore.getState().clearSession();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        onUpdateRef.current();
       }
-    });
-
-    return () => {
-      socket?.disconnect();
-      socket = null;
     };
-  }, [accessToken, onUpdate]);
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [accessToken]);
 }

@@ -437,3 +437,34 @@ export async function moveApplicationsBulk(
   }
   return { items, moved: items.length, missing };
 }
+
+/** Permanently delete one application owned by the user. */
+export async function deleteApplication(
+  userId: string,
+  applicationId: string
+): Promise<boolean> {
+  const result = await ApplicationModel.deleteOne({
+    _id: applicationId,
+    userId,
+  });
+  return result.deletedCount === 1;
+}
+
+/** Bulk-delete up to 50 applications. */
+export async function deleteApplicationsBulk(
+  userId: string,
+  ids: string[]
+): Promise<{ deleted: string[]; deletedCount: number; missing: string[] }> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(
+    0,
+    50
+  );
+  const deleted: string[] = [];
+  const missing: string[] = [];
+  for (const id of unique) {
+    const ok = await deleteApplication(userId, id);
+    if (ok) deleted.push(id);
+    else missing.push(id);
+  }
+  return { deleted, deletedCount: deleted.length, missing };
+}

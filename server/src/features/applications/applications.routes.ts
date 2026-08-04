@@ -144,6 +144,29 @@ applicationsRouter.patch(
   })
 );
 
+applicationsRouter.delete(
+  '/bulk',
+  requireAuth,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = req.body as { ids?: unknown };
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === 'string')
+      : [];
+    if (!ids.length) {
+      res.status(400).json({
+        success: false,
+        message: 'Provide at least one application id',
+      });
+      return;
+    }
+    const result = await applicationsService.deleteApplicationsBulk(
+      req.user!.sub,
+      ids
+    );
+    res.json(ok(result, 'Applications deleted'));
+  })
+);
+
 applicationsRouter.patch(
   '/:id/tracker',
   requireAuth,
@@ -175,5 +198,29 @@ applicationsRouter.patch(
       return;
     }
     res.json(ok(updated));
+  })
+);
+
+applicationsRouter.delete(
+  '/:id',
+  requireAuth,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const id = typeof req.params.id === 'string' ? req.params.id : '';
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid application id',
+      });
+      return;
+    }
+    const deleted = await applicationsService.deleteApplication(
+      req.user!.sub,
+      id
+    );
+    if (!deleted) {
+      res.status(404).json({ success: false, message: 'Application not found' });
+      return;
+    }
+    res.json(ok({ id }, 'Application deleted'));
   })
 );

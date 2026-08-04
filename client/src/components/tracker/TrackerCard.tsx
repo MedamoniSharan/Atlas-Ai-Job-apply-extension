@@ -17,6 +17,7 @@ type TrackerCardProps = {
   onToggleSelect: (id: string, shiftKey: boolean) => void;
   onOpen: (app: Application) => void;
   onMove: (id: string, column: ColumnId) => void;
+  onDelete: (id: string) => void;
   onDragStart: (id: string, e: DragEvent) => void;
   onDragEnd: () => void;
   suppressClickRef: MutableRefObject<boolean>;
@@ -49,6 +50,7 @@ export function TrackerCard({
   onToggleSelect,
   onOpen,
   onMove,
+  onDelete,
   onDragStart,
   onDragEnd,
   suppressClickRef,
@@ -145,6 +147,17 @@ export function TrackerCard({
                 Move to {c.title}
               </button>
             ))}
+            <button
+              type="button"
+              role="menuitem"
+              className="tracker-card__menu-danger"
+              onClick={() => {
+                setMenuOpen(false);
+                onDelete(app.id);
+              }}
+            >
+              Delete
+            </button>
           </div>
         ) : null}
       </div>

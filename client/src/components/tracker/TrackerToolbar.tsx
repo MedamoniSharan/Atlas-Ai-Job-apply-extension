@@ -18,7 +18,9 @@ type TrackerToolbarProps = {
   onSwimlane: (v: SwimlaneMode) => void;
   onOpenSettings: () => void;
   onBulkMove: (column: ColumnId) => void;
+  onBulkDelete: () => void;
   onClearSelection: () => void;
+  deleteBusy?: boolean;
 };
 
 export function TrackerToolbar({
@@ -37,7 +39,9 @@ export function TrackerToolbar({
   onSwimlane,
   onOpenSettings,
   onBulkMove,
+  onBulkDelete,
   onClearSelection,
+  deleteBusy = false,
 }: TrackerToolbarProps) {
   return (
     <div className="tracker-toolbar">
@@ -160,6 +164,14 @@ export function TrackerToolbar({
               ))}
             </select>
           </label>
+          <button
+            type="button"
+            className="dash-btn dash-btn--ghost tracker-bulk__delete"
+            onClick={onBulkDelete}
+            disabled={deleteBusy}
+          >
+            Delete
+          </button>
           <button
             type="button"
             className="dash-btn dash-btn--ghost"

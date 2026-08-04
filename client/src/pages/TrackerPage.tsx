@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Application } from '@cosmo/shared';
 import {
+  deleteApplication,
+  deleteApplicationsBulk,
   fetchApplications,
   moveApplicationTracker,
   moveApplicationsTrackerBulk,
@@ -157,6 +159,42 @@ export function TrackerPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 1) {
+        const res = await deleteApplication(ids[0]!);
+        if (!res.success) throw new Error(res.message || 'Delete failed');
+        return { deleted: ids, deletedCount: 1, missing: [] as string[] };
+      }
+      const res = await deleteApplicationsBulk(ids);
+      if (!res.success) throw new Error(res.message || 'Delete failed');
+      return res.data;
+    },
+    onMutate: async (ids) => {
+      setMoveError(null);
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const prev = queryClient.getQueryData<TrackerListData>(QUERY_KEY);
+      const idSet = new Set(ids);
+      patchItems((items) => items.filter((app) => !idSet.has(app.id)));
+      setSelectedIds((cur) => {
+        const next = new Set(cur);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setSelected((cur) => (cur && idSet.has(cur.id) ? null : cur));
+      return { prev };
+    },
+    onError: (err, _ids, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(QUERY_KEY, ctx.prev);
+      setMoveError(
+        err instanceof Error ? err.message : 'Could not delete jobs'
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
+    },
+  });
+
   const onUpdate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['applications'] });
   }, [queryClient]);
@@ -194,6 +232,27 @@ export function TrackerPage() {
     if (!app) return;
     if (columnFor(app) === column) return;
     moveMutation.mutate({ id, column });
+  }
+
+  function deleteOne(id: string) {
+    const app = data?.items.find((a) => a.id === id);
+    const label = app ? `${app.company} — ${app.title}` : 'this job';
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    deleteMutation.mutate([id]);
+  }
+
+  function deleteSelected() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    const n = ids.length;
+    if (
+      !window.confirm(
+        `Delete ${n} selected job${n === 1 ? '' : 's'}? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    deleteMutation.mutate(ids);
   }
 
   function handleDrop(column: ColumnId) {
@@ -248,7 +307,9 @@ export function TrackerPage() {
           if (!ids.length) return;
           bulkMutation.mutate({ ids, column });
         }}
+        onBulkDelete={deleteSelected}
         onClearSelection={() => setSelectedIds(new Set())}
+        deleteBusy={deleteMutation.isPending}
       />
 
       {moveError ? <p className="error">{moveError}</p> : null}
@@ -300,6 +361,7 @@ export function TrackerPage() {
           onToggleSelect={toggleSelect}
           onOpen={setSelected}
           onMove={moveOne}
+          onDelete={deleteOne}
           onDragStart={(id, e) => {
             suppressClickRef.current = false;
             setDraggingId(id);

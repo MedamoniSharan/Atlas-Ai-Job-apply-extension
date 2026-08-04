@@ -20,12 +20,8 @@ export default defineConfig({
       allow: [path.resolve(__dirname, '..')],
     },
     proxy: {
-      '/api': 'https://atlas-ai-job-apply-extension-1.onrender.com',
-      '/socket.io': {
-        target: 'https://atlas-ai-job-apply-extension-1.onrender.com',
-        ws: true,
-        changeOrigin: true,
-      },
+      '/api': 'https://shjisr6492.execute-api.ap-south-2.amazonaws.com',
+      '/health': 'https://shjisr6492.execute-api.ap-south-2.amazonaws.com',
     },
   },
 });
