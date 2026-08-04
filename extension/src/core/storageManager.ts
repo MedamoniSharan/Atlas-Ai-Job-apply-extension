@@ -1,6 +1,10 @@
 import type { JobPreferences } from '@cosmo/shared';
 import { DEFAULT_JOB_PREFERENCES } from './defaults';
-import { PRODUCTION_API_BASE, resolveApiBase } from './allowedApiBases';
+import {
+  PRODUCTION_API_BASE,
+  migrateApiBaseIfNeeded,
+  resolveApiBase,
+} from './allowedApiBases';
 
 export const DEFAULT_API = PRODUCTION_API_BASE;
 
@@ -51,13 +55,16 @@ export async function getAuthState(): Promise<AuthState> {
     KEYS.refreshToken,
     KEYS.apiBaseUrl,
   ]);
+  const apiBaseUrl = migrateApiBaseIfNeeded(
+    (data[KEYS.apiBaseUrl] as string | undefined) ?? undefined
+  );
+  if (apiBaseUrl !== data[KEYS.apiBaseUrl]) {
+    await chrome.storage.local.set({ [KEYS.apiBaseUrl]: apiBaseUrl });
+  }
   return {
     accessToken: (data[KEYS.accessToken] as string) ?? null,
     refreshToken: (data[KEYS.refreshToken] as string) ?? null,
-    apiBaseUrl: resolveApiBase(
-      (data[KEYS.apiBaseUrl] as string | undefined) ?? undefined,
-      DEFAULT_API
-    ),
+    apiBaseUrl,
   };
 }
 

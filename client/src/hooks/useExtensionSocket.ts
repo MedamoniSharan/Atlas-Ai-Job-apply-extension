@@ -1,29 +1,29 @@
-import { useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { SOCKET_URL } from '../lib/endpoints';
 
+/**
+ * Refresh onboarding when the tab is focused again.
+ * No interval — `useOnboardingStatus` already polls slowly until connected.
+ */
 export function useExtensionSocket(onConnected: () => void) {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const onConnectedRef = useRef(onConnected);
+  onConnectedRef.current = onConnected;
 
   useEffect(() => {
     if (!accessToken) return;
 
-    const socket: Socket = io(SOCKET_URL || undefined, {
-      auth: { token: accessToken },
-      transports: ['websocket', 'polling'],
-    });
-
-    socket.on('extension.connected', onConnected);
-
-    socket.on('connect_error', (err) => {
-      if (/unauthorized/i.test(err.message)) {
-        useAuthStore.getState().clearSession();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        onConnectedRef.current();
       }
-    });
-
-    return () => {
-      socket.disconnect();
     };
-  }, [accessToken, onConnected]);
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [accessToken]);
 }

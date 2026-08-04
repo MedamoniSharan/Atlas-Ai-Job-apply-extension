@@ -17,3 +17,5 @@ shared/dist/
 .turbo/
 
 server/storage/
+__pycache__/
+*.pyc

@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   NavLink,
   Outlet,
@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
   Briefcase,
@@ -29,7 +29,6 @@ import {
   fetchBillingMe,
   logout,
 } from './lib/api';
-import { useApplicationSocket } from './lib/socket';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
 import { ShimmerButton } from './components/ui/ShimmerButton';
 
@@ -102,7 +101,6 @@ function formatNavCount(n: number): string {
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const queryClient = useQueryClient();
   const { data: onboarding } = useOnboardingStatus();
   const [sessionReady, setSessionReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -124,12 +122,6 @@ export function AppLayout() {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  const refreshNavCount = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['applications', 'nav-count'] });
-  }, [queryClient]);
-
-  useApplicationSocket(refreshNavCount);
-
   const { data: appCount } = useQuery({
     queryKey: ['applications', 'nav-count'],
     queryFn: async () => {
@@ -138,7 +130,7 @@ export function AppLayout() {
       return res.data.total ?? 0;
     },
     enabled: Boolean(accessToken),
-    staleTime: 15_000,
+    staleTime: 60_000,
     refetchOnWindowFocus: true,
   });
 

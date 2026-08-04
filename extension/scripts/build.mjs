@@ -18,10 +18,9 @@ const watch = process.argv.includes('--watch');
 const release = process.argv.includes('--release');
 const firefox = process.argv.includes('--firefox');
 
-/** Production Cosmo API (Render). */
+/** Production Cosmo API (API Gateway, ap-south-2). */
 const DEFAULT_PROD_API =
-  'https://atlas-ai-job-apply-extension-1.onrender.com';
-/** Production dashboard origins (custom domain + original Vercel). Override via env. */
+  'https://shjisr6492.execute-api.ap-south-2.amazonaws.com';/** Production dashboard origins (custom domain + original Vercel). Override via env. */
 const DEFAULT_PROD_WEB =
   'https://www.cosmovai.in,https://atlas-ai-job-apply-extension-client-roan.vercel.app';
 /** Stable AMO / Firefox add-on ID (email-shaped). */
