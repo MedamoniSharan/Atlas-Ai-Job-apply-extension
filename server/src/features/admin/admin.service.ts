@@ -29,7 +29,12 @@ import {
   seedPlanConfigs,
 } from '../billing/planConfig.service';
 import { env } from '../../config/env';
+import { signAccessToken } from '../../middleware/auth';
 import Razorpay from 'razorpay';
+
+/** Access-only TTL for admin proxy login (does not rotate user refresh tokens). */
+const IMPERSONATION_EXPIRES_IN = '30m';
+const IMPERSONATION_EXPIRES_SECONDS = 30 * 60;
 
 export const adminRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -555,6 +560,85 @@ export async function patchUser(
   });
 
   return getUser(userId);
+}
+
+/**
+ * Issue a short-lived access token as the target user for support/debug.
+ * Does not touch the user's refreshTokenHash (their real sessions stay valid).
+ */
+export async function impersonateUser(
+  adminId: string,
+  userId: string,
+  ip?: string
+) {
+  if (adminId === userId) {
+    throw new AppError(
+      'Cannot impersonate yourself',
+      400,
+      'SELF_IMPERSONATE'
+    );
+  }
+
+  const user = await UserModel.findById(userId)
+    .select('-passwordHash -refreshTokenHash')
+    .lean();
+  if (!user) {
+    throw new AppError('User not found', 404, 'NOT_FOUND');
+  }
+
+  if ((user.status ?? 'active') === 'suspended') {
+    throw new AppError(
+      'Cannot impersonate a suspended user',
+      403,
+      'ACCOUNT_SUSPENDED'
+    );
+  }
+
+  const role = user.role ?? 'user';
+  const accessToken = signAccessToken(
+    {
+      sub: user._id.toString(),
+      email: user.email,
+      role,
+      impersonatedBy: adminId,
+    },
+    IMPERSONATION_EXPIRES_IN
+  );
+
+  await writeAudit({
+    adminId,
+    action: 'user.impersonate',
+    targetType: 'user',
+    targetId: userId,
+    before: undefined,
+    after: {
+      email: user.email,
+      name: user.name,
+      role,
+      status: user.status ?? 'active',
+    },
+    ip,
+  });
+
+  return {
+    accessToken,
+    expiresInSeconds: IMPERSONATION_EXPIRES_SECONDS,
+    user: {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      role,
+      status: (user.status ?? 'active') as 'active' | 'suspended',
+      plan: user.plan ?? 'free',
+      ...(user.planExpiresAt
+        ? { planExpiresAt: user.planExpiresAt.toISOString() }
+        : {}),
+      ...(user.createdAt ? { createdAt: user.createdAt.toISOString() } : {}),
+      ...(user.extensionConnectedAt
+        ? { extensionConnectedAt: user.extensionConnectedAt.toISOString() }
+        : {}),
+    },
+  };
 }
 
 export async function deleteUser(

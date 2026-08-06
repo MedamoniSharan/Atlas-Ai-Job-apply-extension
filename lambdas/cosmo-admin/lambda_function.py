@@ -38,6 +38,7 @@ PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "CosmoAdminAudit")
 INVOICES_BUCKET = os.environ.get("INVOICES_BUCKET", "cosmo-invoices")
 JWT_ACCESS_SECRET = os.environ.get("JWT_ACCESS_SECRET", "dev-access-secret-change-me")
+IMPERSONATION_EXPIRES = 30 * 60
 CORS_ORIGINS = [
     o.strip().rstrip("/")
     for o in os.environ.get("CORS_ORIGINS", "*").split(",")
@@ -151,6 +152,20 @@ def client_ip(event: Dict[str, Any]) -> Optional[str]:
 
 def b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
+
+
+def b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def sign_jwt(payload: Dict[str, Any], secret: str, expires_in: int) -> str:
+    header = {"alg": "HS256", "typ": "JWT"}
+    now = int(time.time())
+    body = {**payload, "iat": now, "exp": now + expires_in}
+    h = b64url_encode(json.dumps(header, separators=(",", ":")).encode())
+    p = b64url_encode(json.dumps(body, separators=(",", ":")).encode())
+    sig = hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest()
+    return f"{h}.{p}.{b64url_encode(sig)}"
 
 
 def verify_jwt(token: str, secret: str) -> Dict[str, Any]:
@@ -558,6 +573,50 @@ def patch_user(event: Dict[str, Any], aid: str, uid: str, body: Dict[str, Any], 
     return get_user_detail(event, aid, uid, message)
 
 
+def impersonate_user(event: Dict[str, Any], aid: str, uid: str) -> Dict[str, Any]:
+    if aid == uid:
+        return err(event, "Cannot impersonate yourself", 400, "SELF_IMPERSONATE")
+    user = get_user_by_id(uid)
+    if not user:
+        return err(event, "User not found", 404, "NOT_FOUND")
+    if (user.get("status") or "active") == "suspended":
+        return err(event, "Cannot impersonate a suspended user", 403, "ACCOUNT_SUSPENDED")
+    role = user.get("role") or "user"
+    token = sign_jwt(
+        {
+            "sub": uid,
+            "email": user.get("email"),
+            "role": role,
+            "impersonatedBy": aid,
+        },
+        JWT_ACCESS_SECRET,
+        IMPERSONATION_EXPIRES,
+    )
+    write_audit(
+        aid,
+        "user.impersonate",
+        "user",
+        uid,
+        None,
+        {
+            "email": user.get("email"),
+            "name": user.get("name"),
+            "role": role,
+            "status": user.get("status") or "active",
+        },
+        client_ip(event),
+    )
+    return ok(
+        event,
+        {
+            "accessToken": token,
+            "expiresInSeconds": IMPERSONATION_EXPIRES,
+            "user": public_user(user),
+        },
+        "Impersonation started",
+    )
+
+
 def delete_user(event: Dict[str, Any], aid: str, uid: str) -> Dict[str, Any]:
     user = get_user_by_id(uid)
     if not user:
@@ -854,7 +913,7 @@ def list_audit(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
 
 # ─── Routing ───────────────────────────────────────────────────
 
-_RE_USER = re.compile(r"/admin/users/([^/]+)(?:/(plan|suspend|unsuspend))?$")
+_RE_USER = re.compile(r"/admin/users/([^/]+)(?:/(plan|suspend|unsuspend|impersonate))?$")
 _RE_SUB = re.compile(r"/admin/subscriptions/([^/]+)/(cancel|extend)$")
 _RE_PAY = re.compile(r"/admin/payments/([^/]+)(?:/(reconcile|invoice))?$")
 _RE_PLAN = re.compile(r"/admin/plans/([^/]+)$")
@@ -904,6 +963,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return patch_user(event, admin_id, uid, {"status": "suspended"}, "User suspended")
     if action == "unsuspendUser":
         return patch_user(event, admin_id, uid, {"status": "active"}, "User unsuspended")
+    if action == "impersonateUser":
+        return impersonate_user(event, admin_id, uid)
     if action == "cancelSubscription":
         imm = str(body.get("immediate", "")).lower() in ("1", "true", "yes")
         return cancel_subscription(event, admin_id, sid, imm)
@@ -943,6 +1004,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return patch_user(event, admin_id, u, {"status": "suspended"}, "User suspended")
         if sub == "unsuspend" and method == "POST":
             return patch_user(event, admin_id, u, {"status": "active"}, "User unsuspended")
+        if sub == "impersonate" and method == "POST":
+            return impersonate_user(event, admin_id, u)
 
     m = _RE_SUB.search(path)
     if m and method == "POST":

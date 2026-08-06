@@ -32,6 +32,7 @@ function pageTitle(pathname: string): string {
 export function AdminLayout() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const impersonating = useAuthStore((s) => s.impersonating);
   const [sessionReady, setSessionReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
@@ -58,6 +59,10 @@ export function AdminLayout() {
 
   if (!accessToken) {
     return <Navigate to="/admin/login" replace />;
+  }
+
+  if (impersonating) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (user?.role !== 'admin') {

@@ -92,3 +92,24 @@ export const adminMetricsQuerySchema = z.object({
 });
 
 export type AdminMetricsQuery = z.infer<typeof adminMetricsQuerySchema>;
+
+/** Short-lived access-only session for admin → user proxy login. */
+export const adminImpersonateResultSchema = z.object({
+  accessToken: z.string(),
+  expiresInSeconds: z.number().int().positive(),
+  user: z.object({
+    id: z.string(),
+    email: z.string().email(),
+    name: z.string(),
+    role: z.enum(['user', 'admin']),
+    status: z.enum(['active', 'suspended']),
+    plan: z.enum(['free', 'pro', 'max']),
+    planExpiresAt: z.string().optional(),
+    createdAt: z.string().optional(),
+    extensionConnectedAt: z.string().optional(),
+  }),
+});
+
+export type AdminImpersonateResult = z.infer<
+  typeof adminImpersonateResultSchema
+>;

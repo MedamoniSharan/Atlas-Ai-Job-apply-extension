@@ -1,8 +1,5 @@
 import { ArrowRight, Puzzle } from 'lucide-react';
-import {
-  CHROME_EXTENSION_ZIP_FILENAME,
-  CHROME_EXTENSION_ZIP_URL,
-} from '../lib/chromeExtension';
+import { CHROME_EXTENSION_URL } from '../lib/chromeExtension';
 
 function ChromeIcon({ size = 18 }: { size?: number }) {
   return (
@@ -48,22 +45,23 @@ export function ChromeInstallCta() {
         <span className="chrome-cta__gradient">your job search?</span>
       </h2>
       <p className="chrome-cta__sub">
-        Download the Cosmo Chrome extension zip, load it in Chrome, and sync
-        applications to your dashboard.
+        Add Cosmo from the Chrome Web Store and sync applications to your
+        dashboard.
       </p>
       <a
         className="chrome-cta__btn"
-        href={CHROME_EXTENSION_ZIP_URL}
-        download={CHROME_EXTENSION_ZIP_FILENAME}
+        href={CHROME_EXTENSION_URL}
+        target="_blank"
+        rel="noreferrer noopener"
       >
         <ChromeIcon />
-        <span>Download for Chrome — Free</span>
+        <span>Add to Chrome — Free</span>
         <ArrowRight size={18} strokeWidth={2.2} aria-hidden="true" />
       </a>
       <div className="chrome-cta__meta">
         <span>
           <Puzzle size={14} strokeWidth={2} aria-hidden="true" />
-          Free zip install
+          Chrome Web Store
         </span>
         <span>Naukri co-pilot</span>
       </div>

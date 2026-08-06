@@ -529,6 +529,45 @@ textarea {
   color: var(--color-text-tertiary);
 }
 
+.impersonation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin: var(--space-5) var(--space-7) 0;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-xs);
+  background: #1a2332;
+  color: #f4f7fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.impersonation-banner p {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.impersonation-banner__email {
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+.impersonation-banner__exit {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-xs);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: #ffffff;
+  color: #1a2332;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.impersonation-banner__exit:hover {
+  background: #f0f3f7;
+}
+
 .setup-banner p {
   margin: 0;
   font-size: var(--font-size-lg);

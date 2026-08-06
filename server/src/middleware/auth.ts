@@ -8,15 +8,21 @@ export interface AuthPayload {
   sub: string;
   email: string;
   role: UserRole;
+  /** Present when an admin is viewing the app as this user. */
+  impersonatedBy?: string;
 }
 
 export interface AuthedRequest extends Request {
   user?: AuthPayload;
 }
 
-export function signAccessToken(payload: AuthPayload): string {
+export function signAccessToken(
+  payload: AuthPayload,
+  expiresIn?: jwt.SignOptions['expiresIn']
+): string {
   return jwt.sign(payload, env.jwtAccessSecret, {
-    expiresIn: env.jwtAccessExpiresIn as jwt.SignOptions['expiresIn'],
+    expiresIn: (expiresIn ??
+      env.jwtAccessExpiresIn) as jwt.SignOptions['expiresIn'],
   });
 }
 
@@ -34,6 +40,9 @@ export function verifyAccessToken(token: string): AuthPayload {
     sub: payload.sub,
     email: payload.email,
     role: payload.role ?? 'user',
+    ...(typeof payload.impersonatedBy === 'string' && payload.impersonatedBy
+      ? { impersonatedBy: payload.impersonatedBy }
+      : {}),
   };
 }
 

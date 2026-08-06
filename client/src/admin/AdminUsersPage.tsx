@@ -5,6 +5,7 @@ import {
   Ban,
   CalendarPlus,
   Check,
+  LogIn,
   Pencil,
   Search,
   Sparkles,
@@ -17,11 +18,14 @@ import {
   deleteAdminUser,
   fetchAdminUser,
   fetchAdminUsers,
+  impersonateAdminUser,
   setAdminUserPlan,
   patchAdminUser,
 } from '../lib/api';
 import { CosmosLoader } from '../components/CosmosLogo';
-import type { PaidPlan } from '@cosmo/shared';
+import { useAuthStore } from '../store/authStore';
+import type { PaidPlan, User } from '@cosmo/shared';
+import { useNavigate } from 'react-router-dom';
 
 type UserDetail = {
   id: string;
@@ -50,6 +54,9 @@ export function AdminUsersPage() {
   const [editEmail, setEditEmail] = useState('');
   const [editRole, setEditRole] = useState<'user' | 'admin'>('user');
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const startImpersonation = useAuthStore((s) => s.startImpersonation);
+  const adminUser = useAuthStore((s) => s.user);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'users', search, page],
@@ -143,6 +150,24 @@ export function AdminUsersPage() {
     },
   });
 
+  const impersonateMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedId) return;
+      const res = await impersonateAdminUser(selectedId);
+      if (!res.success) throw new Error(res.message);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      startImpersonation({
+        accessToken: data.accessToken,
+        user: data.user as User,
+      });
+      void queryClient.clear();
+      navigate('/dashboard', { replace: true });
+    },
+  });
+
   function onSearch(e: FormEvent) {
     e.preventDefault();
     setPage(1);
@@ -163,11 +188,21 @@ export function AdminUsersPage() {
     deleteMutation.mutate();
   }
 
+  function onImpersonate() {
+    if (!detail.data) return;
+    const ok = window.confirm(
+      `Open ${detail.data.name}'s dashboard as them?\n\nYour admin session will be restored when you exit. This is logged in the audit trail.`
+    );
+    if (!ok) return;
+    impersonateMutation.mutate();
+  }
+
   const actionError =
     planMutation.error ||
     statusMutation.error ||
     editMutation.error ||
-    deleteMutation.error;
+    deleteMutation.error ||
+    impersonateMutation.error;
 
   return (
     <div className="admin-page admin-page--split">
@@ -344,6 +379,28 @@ export function AdminUsersPage() {
                 <button
                   type="button"
                   className="dash-btn dash-btn--primary"
+                  disabled={
+                    impersonateMutation.isPending ||
+                    detail.data.status === 'suspended' ||
+                    detail.data.id === adminUser?.id
+                  }
+                  onClick={onImpersonate}
+                  title={
+                    detail.data.id === adminUser?.id
+                      ? 'Cannot impersonate yourself'
+                      : detail.data.status === 'suspended'
+                        ? 'Unsuspend the user first'
+                        : 'Open this user’s dashboard'
+                  }
+                >
+                  <LogIn size={15} strokeWidth={2} aria-hidden />
+                  {impersonateMutation.isPending
+                    ? 'Opening…'
+                    : 'Login as user'}
+                </button>
+                <button
+                  type="button"
+                  className="dash-btn dash-btn--ghost"
                   onClick={() => setEditing(true)}
                 >
                   <Pencil size={15} strokeWidth={2} aria-hidden />

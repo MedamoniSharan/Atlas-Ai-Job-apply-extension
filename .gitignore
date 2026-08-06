@@ -19,3 +19,5 @@ shared/dist/
 server/storage/
 __pycache__/
 *.pyc
+.vercel
+.env*.local

@@ -1,4 +1,5 @@
 import type {
+  AdminImpersonateResult,
   ApiResponse,
   Application,
   AuthTokens,
@@ -19,7 +20,16 @@ function isAuthFailure(
   return code === 'TOKEN_INVALID' || code === 'UNAUTHORIZED';
 }
 
+/** Prefer restoring admin session over wiping everything during proxy login. */
+function handleImpersonationAuthLoss(): boolean {
+  if (!useAuthStore.getState().impersonating) return false;
+  return useAuthStore.getState().endImpersonation();
+}
+
 async function refreshSession(): Promise<boolean> {
+  if (useAuthStore.getState().impersonating) {
+    return false;
+  }
   const refreshToken = useAuthStore.getState().refreshToken;
   if (!refreshToken) return false;
 
@@ -46,6 +56,10 @@ async function refreshSession(): Promise<boolean> {
 
 /** Best-effort server revoke, then clear local session. */
 export async function logout(): Promise<void> {
+  if (useAuthStore.getState().impersonating) {
+    useAuthStore.getState().endImpersonation();
+    return;
+  }
   const { accessToken, refreshToken } = useAuthStore.getState();
   try {
     const headers: Record<string, string> = {
@@ -64,6 +78,7 @@ export async function logout(): Promise<void> {
 }
 
 function forceLocalLogout(): void {
+  if (handleImpersonationAuthLoss()) return;
   useAuthStore.getState().clearSession();
 }
 
@@ -111,11 +126,15 @@ async function request<T>(
 
 /** Refresh access token or clear the session when tokens are no longer valid. */
 export async function ensureSession(): Promise<boolean> {
-  const { accessToken, refreshToken } = useAuthStore.getState();
+  const { accessToken, refreshToken, impersonating } = useAuthStore.getState();
   if (!accessToken && !refreshToken) return false;
 
   if (accessToken && !isJwtExpired(accessToken)) {
     return true;
+  }
+
+  if (impersonating) {
+    return handleImpersonationAuthLoss();
   }
 
   const refreshed = await refreshSession();
@@ -568,6 +587,13 @@ export async function setAdminUserPlan(
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export async function impersonateAdminUser(id: string) {
+  return request<AdminImpersonateResult>(
+    `/api/v1/admin/users/${id}/impersonate`,
+    { method: 'POST' }
+  );
 }
 
 export async function fetchAdminSubscriptions(params: {

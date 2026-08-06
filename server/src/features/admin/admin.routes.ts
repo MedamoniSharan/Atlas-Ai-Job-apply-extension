@@ -130,6 +130,18 @@ adminRouter.post(
   })
 );
 
+adminRouter.post(
+  '/users/:id/impersonate',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await adminService.impersonateUser(
+      req.user!.sub,
+      String(req.params.id),
+      clientIp(req)
+    );
+    res.json(ok(data, 'Impersonation started'));
+  })
+);
+
 adminRouter.get(
   '/subscriptions',
   asyncHandler(async (req: AuthedRequest, res) => {

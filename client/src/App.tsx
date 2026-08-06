@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
   Briefcase,
@@ -101,12 +101,15 @@ function formatNavCount(n: number): string {
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const impersonating = useAuthStore((s) => s.impersonating);
+  const endImpersonation = useAuthStore((s) => s.endImpersonation);
   const { data: onboarding } = useOnboardingStatus();
   const [sessionReady, setSessionReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let cancelled = false;
@@ -250,7 +253,7 @@ export function AppLayout() {
             </span>
             Settings
           </NavLink>
-          {user?.role === 'admin' ? (
+          {user?.role === 'admin' && !impersonating ? (
             <NavLink to="/admin" className="sidebar__link">
               <span className="sidebar__icon" aria-hidden>
                 <Shield size={18} strokeWidth={1.9} className="icon-motion" />
@@ -294,19 +297,50 @@ export function AppLayout() {
               type="button"
               className="sidebar__signout"
               onClick={() => {
+                if (impersonating) {
+                  endImpersonation();
+                  void queryClient.clear();
+                  navigate('/admin/users', { replace: true });
+                  return;
+                }
                 void logout().finally(() => {
                   window.location.replace('/');
                 });
               }}
             >
               <LogOut size={14} strokeWidth={2} aria-hidden />
-              Sign out
+              {impersonating ? 'Exit' : 'Sign out'}
             </button>
           </div>
         </div>
       </aside>
 
       <div className="shell__main">
+        {impersonating ? (
+          <div className="impersonation-banner" role="status">
+            <p>
+              Viewing as <strong>{user?.name || user?.email}</strong>
+              {user?.email ? (
+                <span className="impersonation-banner__email">
+                  {' '}
+                  ({user.email})
+                </span>
+              ) : null}
+            </p>
+            <button
+              type="button"
+              className="impersonation-banner__exit"
+              onClick={() => {
+                endImpersonation();
+                void queryClient.clear();
+                navigate('/admin/users', { replace: true });
+              }}
+            >
+              Exit to admin
+            </button>
+          </div>
+        ) : null}
+
         {needsSetup && (
           <div className="setup-banner">
             <p>
