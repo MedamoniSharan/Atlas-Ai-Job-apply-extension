@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /support
+Allow: /faq
+Allow: /blog
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /applications
+Disallow: /tracker
+Disallow: /settings
+Disallow: /profile
+Disallow: /get-extension
+Disallow: /get-started
+Disallow: /login
+Disallow: /register
+Disallow: /browse
+
+Sitemap: https://www.cosmovai.in/sitemap.xml

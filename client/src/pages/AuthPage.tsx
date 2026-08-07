@@ -6,6 +6,7 @@ import { googleClientId } from '../lib/googleAuth';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosMark } from '../components/CosmosLogo';
 import Lightfall from '../components/Lightfall';
+import { NoIndexHead } from '../components/NoIndexHead';
 import '../styles/landing-fonts.css';
 
 type Mode = 'login' | 'register';
@@ -89,12 +90,12 @@ function AuthPromoPanel() {
         </header>
 
         <section className="auth-promo__headline" aria-labelledby="auth-promo-heading">
-          <h1 id="auth-promo-heading">Apply to jobs in 1-click.</h1>
-          <h2>Power your entire job search, with our recruiter-approved AI.</h2>
+          <h1 id="auth-promo-heading">Assist Naukri Easy Apply.</h1>
+          <h2>Scan matches from your preferences and track every application in Cosmo.</h2>
         </section>
 
         <section className="auth-promo__trust" aria-labelledby="auth-trust-heading">
-          <h3 id="auth-trust-heading">Browse handpicked jobs from the best companies</h3>
+          <h3 id="auth-trust-heading">Built for Naukri job seekers in India</h3>
           <p className="auth-promo__trust-line">
             <img
               src={PEOPLE_PREVIEW}
@@ -105,7 +106,7 @@ function AuthPromoPanel() {
               loading="lazy"
               decoding="async"
             />
-            <span>Trusted by 1,000,000+ job seekers</span>
+            <span>Human-paced co-pilot — not unattended bulk apply</span>
           </p>
         </section>
 
@@ -220,6 +221,10 @@ export function AuthPage({ mode }: { mode: Mode }) {
 
   return (
     <div className="auth-shell">
+      <NoIndexHead
+        title={mode === 'login' ? 'Sign in' : 'Create account'}
+        path={mode === 'login' ? '/login' : '/register'}
+      />
       <AuthPromoPanel />
 
       <main className="auth-form-shell">
@@ -253,9 +258,10 @@ export function AuthPage({ mode }: { mode: Mode }) {
           <h1 id="auth-form-title">
             {mode === 'login' ? 'Sign in to Cosmo' : 'Create your Cosmo account'}
           </h1>
-          <p className="auth-form-panel__tagline">Apply to jobs in 1-click.</p>
+          <p className="auth-form-panel__tagline">Assist Naukri Easy Apply.</p>
           <p className="auth-form-panel__description">
-            Power your entire job search, with our recruiter-approved AI.
+            Preference-based scanning, human-paced co-pilot sessions, and a
+            dashboard that tracks your applications.
           </p>
 
           <div className="auth-social-stack" aria-label="Sign in options">

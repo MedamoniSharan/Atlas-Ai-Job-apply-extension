@@ -1,0 +1,37 @@
+# Cosmo Job Assistant (llms.txt)
+
+> Cosmo is a Naukri Easy Apply co-pilot and job application tracker by Cosmovai.
+
+## Product
+
+- Name: Cosmo / Cosmo Job Assistant
+- Company: Cosmovai
+- Website: https://www.cosmovai.in/
+- Chrome extension: https://chromewebstore.google.com/detail/cosmo-job-assistant/gdapodjlojmapjdopfdnmhfhhlfamgkb
+
+## What Cosmo is
+
+- Preference-based scanning of Naukri listings
+- Human-paced assisted Easy Apply in the user's browser (explicit consent required)
+- Sync of application activity into the Cosmo dashboard tracker
+- Plans: Free, Pro, Max (INR, Razorpay) with assisted-apply safety caps
+
+## What Cosmo is not
+
+- Unattended bulk-apply or silent mass apply bots
+- A multi-board Greenhouse / Workday / Ashby co-pilot today (current focus is Naukri)
+- A guarantee of interviews or job offers
+
+## Primary pages
+
+- Home: https://www.cosmovai.in/
+- FAQ: https://www.cosmovai.in/faq
+- Support: https://www.cosmovai.in/support
+- Guides: https://www.cosmovai.in/blog
+- Pricing: https://www.cosmovai.in/#pricing
+- Privacy: https://www.cosmovai.in/privacy
+- Terms: https://www.cosmovai.in/terms
+
+## Contact
+
+- Support: support@cosmovai.com

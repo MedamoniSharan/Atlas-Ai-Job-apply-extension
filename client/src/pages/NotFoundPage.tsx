@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Menu, Sparkle, X } from 'lucide-react';
 import { CosmosMark } from '../components/CosmosLogo';
+import { SeoHead } from '../components/SeoHead';
 import './NotFoundPage.css';
 
 const NAV_LINKS = [
   { label: 'Pricing', to: '/#pricing' },
-  { label: 'Get Extension', to: '/get-extension' },
+  { label: 'FAQ', to: '/faq' },
+  { label: 'Guides', to: '/blog' },
+  { label: 'Support', to: '/support' },
   { label: 'Sign in', to: '/login' },
-  { label: 'Sign up', to: '/register' },
   { label: 'Privacy', to: '/privacy' },
 ] as const;
 
@@ -38,14 +40,6 @@ export function NotFoundPage() {
   }, []);
 
   useEffect(() => {
-    const prevTitle = document.title;
-    document.title = '404 - Page Not Found';
-    return () => {
-      document.title = prevTitle;
-    };
-  }, []);
-
-  useEffect(() => {
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
@@ -61,6 +55,12 @@ export function NotFoundPage() {
 
   return (
     <div className="tt-404">
+      <SeoHead
+        title="Page not found"
+        description="The page you requested could not be found on Cosmo."
+        path="/404"
+        robots="noindex,follow"
+      />
       {/* Soft 404 + vertical spotlight (matches reference glow) */}
       <div
         className="tt-404__bg"

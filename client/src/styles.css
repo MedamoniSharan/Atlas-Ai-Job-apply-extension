@@ -8435,3 +8435,32 @@ textarea {
     padding: 28px 20px;
   }
 }
+
+.blog-index-list {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.blog-index-list li {
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.blog-index-list li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.blog-index-list p {
+  margin: 6px 0 0;
+}
+
+.blog-index-date {
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+

@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { ensureSession, logout } from '../lib/api';
 import { CosmosLogo, CosmosLoader } from '../components/CosmosLogo';
+import { NoIndexHead } from '../components/NoIndexHead';
 
 function pageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/users')) return 'Users';
@@ -71,6 +72,7 @@ export function AdminLayout() {
 
   return (
     <div className={`admin-shell${navOpen ? ' admin-shell--nav-open' : ''}`}>
+      <NoIndexHead title={`Admin — ${pageTitle(location.pathname)}`} path={location.pathname} />
       <div
         className="admin-shell__backdrop"
         aria-hidden={!navOpen}

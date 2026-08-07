@@ -6,35 +6,38 @@ import { CHROME_EXTENSION_URL } from '../lib/chromeExtension';
 
 const featureItems = [
   {
-    title: 'AI Job Application',
-    description: 'Auto-apply with personalized resumes & cover letters',
+    title: 'Naukri Easy Apply co-pilot',
+    description: 'Assist Easy Apply from your preferences at a human pace',
     href: '#get-extension',
   },
   {
-    title: 'AI Resume Builder',
-    description: 'ATS-optimized resumes tailored to every job',
+    title: 'Preference-based scanning',
+    description: 'Match titles, keywords, location, salary, and work mode',
     href: '#get-extension',
   },
   {
-    title: 'AI Cover Letter Generator',
-    description: 'Job-specific cover letters in 30 seconds',
+    title: 'Application tracker',
+    description: 'Sync Naukri activity into your Cosmo dashboard',
     href: '#get-extension',
   },
   {
-    title: 'ATS Resume Checker',
-    description: 'Score your resume across 24+ ATS criteria',
-    href: '#get-extension',
+    title: 'Safety caps & plans',
+    description: 'Daily and monthly assisted-apply limits on Free, Pro, and Max',
+    href: '#pricing',
   },
 ] as const;
 
 const moreItems = [
   { title: 'Get Extension', href: '#get-extension' },
+  { title: 'FAQ', href: '/faq' },
+  { title: 'Guides', href: '/blog' },
   { title: 'Sign up', href: '/register' },
   { title: 'Log in', href: '/login' },
 ] as const;
 
 const contactItems = [
-  { title: 'Support', href: 'mailto:codexcareer-info@gmail.com' },
+  { title: 'Support', href: '/support' },
+  { title: 'FAQ', href: '/faq' },
   { title: 'Get Extension', href: '#get-extension' },
 ] as const;
 

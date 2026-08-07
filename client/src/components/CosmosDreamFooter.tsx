@@ -14,7 +14,9 @@ const connectLinks = [
 ] as const;
 
 const moreLinks = [
-  { label: 'Careers', href: '#' as const, stub: true },
+  { label: 'Support', to: '/support' as const },
+  { label: 'FAQ', to: '/faq' as const },
+  { label: 'Guides', to: '/blog' as const },
   { label: 'Terms', to: '/terms' as const },
   { label: 'Privacy', to: '/privacy' as const },
 ] as const;
@@ -71,17 +73,7 @@ function FooterLogo({ size }: { size: number }) {
 }
 
 function MoreLink({ link }: { link: (typeof moreLinks)[number] }) {
-  if ('to' in link) {
-    return <Link to={link.to}>{link.label}</Link>;
-  }
-  return (
-    <a
-      href={link.href}
-      onClick={link.stub ? (e) => e.preventDefault() : undefined}
-    >
-      {link.label}
-    </a>
-  );
+  return <Link to={link.to}>{link.label}</Link>;
 }
 
 function ConnectLink({

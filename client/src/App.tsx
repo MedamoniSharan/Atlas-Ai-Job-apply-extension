@@ -30,6 +30,7 @@ import {
   logout,
 } from './lib/api';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
+import { NoIndexHead } from './components/NoIndexHead';
 import { ShimmerButton } from './components/ui/ShimmerButton';
 
 export type ShellOutletContext = {
@@ -188,6 +189,7 @@ export function AppLayout() {
 
   return (
     <div className={`shell${sidebarOpen ? ' shell--nav-open' : ''}`}>
+      <NoIndexHead title="Cosmo account" path={location.pathname} />
       <div
         className="shell__backdrop"
         aria-hidden={!sidebarOpen}

@@ -4,8 +4,15 @@ import { JobSearchSteps } from '../components/JobSearchSteps';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { PricingPlans } from '../components/PricingPlans';
+import { SeoHead } from '../components/SeoHead';
 import { SproutJobsMarquee } from '../components/SproutJobsMarquee';
 import { TrustedCompanyMarquee } from '../components/TrustedCompanyMarquee';
+import {
+  organizationJsonLd,
+  softwareApplicationJsonLd,
+  websiteJsonLd,
+} from '../lib/jsonLd';
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE } from '../lib/seo';
 import { useAuthStore } from '../store/authStore';
 import '../styles/landing-fonts.css';
 
@@ -17,6 +24,17 @@ export function LandingPage() {
 
   return (
     <div className="landing" id="top">
+      <SeoHead
+        title={DEFAULT_TITLE}
+        description={DEFAULT_DESCRIPTION}
+        path="/"
+        noBrandSuffix
+        jsonLd={[
+          organizationJsonLd(),
+          websiteJsonLd(),
+          softwareApplicationJsonLd(),
+        ]}
+      />
       <LandingNavbar />
 
       <HeroAutoApply />

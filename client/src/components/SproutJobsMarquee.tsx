@@ -165,15 +165,15 @@ export function SproutJobsMarquee() {
                 />
               </svg>
             </span>
-            <span>Millions of Jobs, One Platform</span>
+            <span>Naukri jobs, one co-pilot</span>
           </div>
           <h2 id="sprout-title" className="sprout-heading">
-            <span>10+ million jobs worldwide, </span>
-            <span className="sprout-heading-muted">all in one place.</span>
+            <span>Scan Naukri matches from your preferences, </span>
+            <span className="sprout-heading-muted">assist Easy Apply, track in Cosmo.</span>
           </h2>
           <p className="sprout-description">
-            Discover opportunities from top companies across every industry —
-            updated daily on Cosmo.
+            Cosmo focuses on Naukri Easy Apply assistance and syncing applications
+            to your dashboard—so your search stays organized.
           </p>
         </header>
 

@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import { Check, Sparkles, X } from 'lucide-react';
 
 const FEATURES = [
-  '4× Faster Fills',
-  '1,000+ Apps / Night',
-  'Browser Agent, No Manual Forms',
-  'Works on Greenhouse, Workday, Ashby & more',
+  'Preference-based Naukri scans',
+  'Human-paced Easy Apply assists',
+  'Safety caps on daily volume',
+  'Sync applies to your Cosmo dashboard',
 ] as const;
 
 const PROMO_ART = '/hero-promo-card.png?v=10';
@@ -98,7 +98,7 @@ export function HeroAutoApply() {
               <img
                 className="hero-agent__promo-img"
                 src={PROMO_ART}
-                alt="AutoApply Agent — applies to jobs while you relax"
+                alt="Cosmo Naukri co-pilot — assist Easy Apply and sync to your dashboard"
                 width={700}
                 height={178}
                 decoding="async"

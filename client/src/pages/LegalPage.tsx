@@ -4,22 +4,36 @@ import privacyMarkdown from '../../../privacy-policy.md?raw';
 import termsMarkdown from '../../../terms.md?raw';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { LandingNavbar } from '../components/LandingNavbar';
+import { SeoHead } from '../components/SeoHead';
+import { breadcrumbJsonLd, webPageJsonLd } from '../lib/jsonLd';
 
 type LegalKind = 'privacy' | 'terms';
 
 const DOCS: Record<
   LegalKind,
-  { title: string; markdown: string; updated: string }
+  {
+    title: string;
+    markdown: string;
+    updated: string;
+    path: string;
+    description: string;
+  }
 > = {
   privacy: {
     title: 'Privacy Policy',
     markdown: privacyMarkdown,
     updated: 'July 24, 2026',
+    path: '/privacy',
+    description:
+      'How Cosmovai and Cosmo Job Assistant collect, use, and protect your data when you sync Naukri applications and use the co-pilot.',
   },
   terms: {
     title: 'Terms of Service',
     markdown: termsMarkdown,
     updated: 'July 24, 2026',
+    path: '/terms',
+    description:
+      'Terms of Service for Cosmo Job Assistant and the Cosmovai dashboard, including subscriptions and acceptable use.',
   },
 };
 
@@ -181,6 +195,22 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
 
   return (
     <div className="landing legal-page">
+      <SeoHead
+        title={doc.title}
+        description={doc.description}
+        path={doc.path}
+        jsonLd={[
+          webPageJsonLd({
+            name: doc.title,
+            description: doc.description,
+            path: doc.path,
+          }),
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: doc.title, path: doc.path },
+          ]),
+        ]}
+      />
       <LandingNavbar />
       <main className="legal-main">
         <div className="legal-card">

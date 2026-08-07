@@ -4,6 +4,7 @@ import { Shield } from 'lucide-react';
 import { login } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader, CosmosLogo } from '../components/CosmosLogo';
+import { NoIndexHead } from '../components/NoIndexHead';
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ export function AdminLoginPage() {
 
   return (
     <div className="admin-login">
+      <NoIndexHead title="Admin login" path="/admin/login" />
       <div className="admin-login__card">
         <div className="admin-login__brand">
           <CosmosLogo size={32} />

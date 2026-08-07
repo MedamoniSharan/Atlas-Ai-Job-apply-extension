@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { HelmetProvider } from 'react-helmet-async';
 import { AppLayout } from './App';
 import { AdminLayout } from './admin/AdminLayout';
 import { AdminOverviewPage } from './admin/AdminOverviewPage';
@@ -21,6 +22,10 @@ import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LegalPage } from './pages/LegalPage';
+import { SupportPage } from './pages/SupportPage';
+import { FaqPage } from './pages/FaqPage';
+import { BlogIndexPage } from './pages/BlogIndexPage';
+import { BlogPostPage } from './pages/BlogPostPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { googleClientId } from './lib/googleAuth';
 import './styles.css';
@@ -38,40 +43,46 @@ function RedirectToCodexCareer() {
 }
 
 const app = (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<AuthPage mode="login" />} />
-        <Route path="/register" element={<AuthPage mode="register" />} />
-        <Route path="/privacy" element={<LegalPage kind="privacy" />} />
-        <Route path="/terms" element={<LegalPage kind="terms" />} />
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/applications" element={<ApplicationsPage />} />
-          <Route path="/get-extension" element={<GetStartedPage />} />
-          <Route
-            path="/get-started"
-            element={<Navigate to="/get-extension" replace />}
-          />
-          <Route path="/browse" element={<RedirectToCodexCareer />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/tracker" element={<TrackerPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-        </Route>
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminOverviewPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
-          <Route path="payments" element={<AdminPaymentsPage />} />
-          <Route path="plans" element={<AdminPlansPage />} />
-          <Route path="audit" element={<AdminAuditPage />} />
-        </Route>
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </BrowserRouter>
-  </QueryClientProvider>
+  <HelmetProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/register" element={<AuthPage mode="register" />} />
+          <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+          <Route path="/terms" element={<LegalPage kind="terms" />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/blog" element={<BlogIndexPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/applications" element={<ApplicationsPage />} />
+            <Route path="/get-extension" element={<GetStartedPage />} />
+            <Route
+              path="/get-started"
+              element={<Navigate to="/get-extension" replace />}
+            />
+            <Route path="/browse" element={<RedirectToCodexCareer />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/tracker" element={<TrackerPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+            <Route path="payments" element={<AdminPaymentsPage />} />
+            <Route path="plans" element={<AdminPlansPage />} />
+            <Route path="audit" element={<AdminAuditPage />} />
+          </Route>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </HelmetProvider>
 );
 
 createRoot(document.getElementById('root')!).render(
