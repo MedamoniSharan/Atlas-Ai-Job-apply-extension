@@ -490,6 +490,14 @@ export async function fetchAdminMetrics(params: {
       revenueYtdPaise: number;
       failedPayments: number;
       churnCancels: number;
+      jobsScanned: number;
+      jobsMatched: number;
+      jobsApplied: number;
+      scanSessions: number;
+      jobsScannedPeriod: number;
+      jobsMatchedPeriod: number;
+      jobsAppliedPeriod: number;
+      scanSessionsPeriod: number;
     };
     series: {
       revenueDaily: Array<{ date: string; amountPaise: number; count: number }>;
@@ -539,7 +547,7 @@ export async function fetchAdminUsers(params: {
   if (params.role) search.set('role', params.role);
   if (params.status) search.set('status', params.status);
   search.set('page', String(params.page ?? 1));
-  search.set('limit', String(params.limit ?? 20));
+  search.set('limit', String(params.limit ?? 10));
   return request<{
     items: Array<{
       id: string;

@@ -36,6 +36,7 @@ PAYMENTS_TABLE = os.environ.get("PAYMENTS_TABLE", "CosmoPayments")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE", "CosmoSubscriptions")
 PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "CosmoAdminAudit")
+SCAN_SESSIONS_TABLE = os.environ.get("SCAN_SESSIONS_TABLE", "CosmoScanSessions")
 INVOICES_BUCKET = os.environ.get("INVOICES_BUCKET", "cosmo-invoices")
 JWT_ACCESS_SECRET = os.environ.get("JWT_ACCESS_SECRET", "dev-access-secret-change-me")
 IMPERSONATION_EXPIRES = 30 * 60
@@ -73,6 +74,7 @@ payments_tbl = ddb.Table(PAYMENTS_TABLE)
 subs_tbl = ddb.Table(SUBSCRIPTIONS_TABLE)
 plans_tbl = ddb.Table(PLAN_CONFIGS_TABLE)
 audit_tbl = ddb.Table(AUDIT_TABLE)
+scan_sessions_tbl = ddb.Table(SCAN_SESSIONS_TABLE)
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -300,6 +302,47 @@ def public_user(u: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def empty_job_stats() -> Dict[str, int]:
+    return {"sessions": 0, "scanned": 0, "matched": 0, "applied": 0}
+
+
+def sum_job_stats(
+    items: List[Dict[str, Any]],
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+) -> Dict[str, int]:
+    totals = empty_job_stats()
+    for item in items:
+        if since is not None or until is not None:
+            started = parse_iso(item.get("startedAt"))
+            if not started:
+                continue
+            if since is not None and started < since:
+                continue
+            if until is not None and started >= until:
+                continue
+        totals["sessions"] += 1
+        totals["scanned"] += as_int(item.get("scanned"))
+        totals["matched"] += as_int(item.get("matched"))
+        totals["applied"] += as_int(item.get("applied"))
+    return totals
+
+
+def user_scan_sessions(uid: str) -> List[Dict[str, Any]]:
+    items, start = [], None
+    while True:
+        kwargs: Dict[str, Any] = {
+            "KeyConditionExpression": Key("userId").eq(uid),
+        }
+        if start:
+            kwargs["ExclusiveStartKey"] = start
+        res = scan_sessions_tbl.query(**kwargs)
+        items.extend(res.get("Items") or [])
+        start = res.get("LastEvaluatedKey")
+        if not start:
+            return items
+
+
 def write_audit(admin_id: str, action: str, target_type: str, target_id: Optional[str] = None,
                 before: Any = None, after: Any = None, ip: Optional[str] = None) -> None:
     audit_tbl.put_item(Item={
@@ -406,6 +449,10 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
         grain, label, rk = "month", str(year), "year"
 
     users, payments, subs = scan_all(users_tbl), scan_all(payments_tbl), scan_all(subs_tbl)
+    try:
+        scan_sessions = scan_all(scan_sessions_tbl)
+    except Exception:
+        scan_sessions = []
     day7 = now - timedelta(days=7)
 
     def in_p(iso: Optional[str]) -> bool:
@@ -441,6 +488,9 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
         if in_p(p.get("createdAt")):
             outcomes[p.get("status") or "?"] = outcomes.get(p.get("status") or "?", 0) + 1
 
+    job_all = sum_job_stats(scan_sessions)
+    job_period = sum_job_stats(scan_sessions, since=since, until=until)
+
     m = umap([p.get("userId") for p in payments] + [s.get("userId") for s in subs])
     recent = sorted([p for p in payments if p.get("status") == "paid"], key=lambda x: x.get("createdAt") or "", reverse=True)[:8]
     week = now + timedelta(days=7)
@@ -463,6 +513,14 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
             "revenueMtdPaise": rev, "revenueYtdPaise": rev,
             "failedPayments": sum(1 for p in payments if p.get("status") == "failed" and in_p(p.get("createdAt"))),
             "churnCancels": sum(1 for s in subs if s.get("status") == "cancelled" and in_p(s.get("cancelledAt"))),
+            "jobsScanned": job_all["scanned"],
+            "jobsMatched": job_all["matched"],
+            "jobsApplied": job_all["applied"],
+            "scanSessions": job_all["sessions"],
+            "jobsScannedPeriod": job_period["scanned"],
+            "jobsMatchedPeriod": job_period["matched"],
+            "jobsAppliedPeriod": job_period["applied"],
+            "scanSessionsPeriod": job_period["sessions"],
         },
         "series": {
             "revenueDaily": [{"date": d, **v} for d, v in sorted(rev_map.items())],
@@ -493,7 +551,7 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
 
 def list_users(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
     q = qs(event)
-    page, limit = page_limit(q)
+    page, limit = page_limit(q, 10)
     needle = (q.get("q") or "").strip().lower()
     filtered = []
     for u in scan_all(users_tbl):
@@ -518,11 +576,16 @@ def get_user_detail(event: Dict[str, Any], _aid: str, uid: str, message: str = "
         return err(event, "User not found", 404, "NOT_FOUND")
     subs, pays = user_subs(uid, 5), user_payments(uid, 20)
     sub = subs[0] if subs else None
+    try:
+        job_stats = sum_job_stats(user_scan_sessions(uid))
+    except Exception:
+        job_stats = empty_job_stats()
     data = public_user(user)
     data.update({
         "preferences": user.get("preferences"),
         "preferencesCompletedAt": user.get("preferencesCompletedAt"),
         "razorpayCustomerId": user.get("razorpayCustomerId"),
+        "jobStats": job_stats,
         "subscription": ({
             "id": sub.get("subscriptionId"), "tier": sub.get("tier"), "status": sub.get("status"),
             "source": sub.get("source"), "cancelAtPeriodEnd": sub.get("cancelAtPeriodEnd"),

@@ -22,6 +22,7 @@ import {
   SubscriptionModel,
 } from '../billing/subscription.model';
 import { ApplicationModel } from '../applications/application.model';
+import { ScanSessionModel } from '../scanSessions/scanSession.model';
 import {
   getPaidPlanAmount,
   invalidatePlanCache,
@@ -166,6 +167,8 @@ export async function getMetrics(query: AdminMetricsQuery) {
     recentPayments,
     expiringSoon,
     haltedSubs,
+    jobTotalsAll,
+    jobTotalsPeriod,
   ] = await Promise.all([
     UserModel.countDocuments(),
     UserModel.countDocuments({ createdAt: { $gte: day7 } }),
@@ -248,8 +251,57 @@ export async function getMetrics(query: AdminMetricsQuery) {
       .limit(8)
       .populate('userId', 'name email')
       .lean(),
+    ScanSessionModel.aggregate<{
+      sessions: number;
+      scanned: number;
+      matched: number;
+      applied: number;
+    }>([
+      {
+        $group: {
+          _id: null,
+          sessions: { $sum: 1 },
+          scanned: { $sum: '$scanned' },
+          matched: { $sum: '$matched' },
+          applied: { $sum: '$applied' },
+        },
+      },
+    ]),
+    ScanSessionModel.aggregate<{
+      sessions: number;
+      scanned: number;
+      matched: number;
+      applied: number;
+    }>([
+      {
+        $match: {
+          startedAt: { $gte: period.since, $lt: period.until },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          sessions: { $sum: 1 },
+          scanned: { $sum: '$scanned' },
+          matched: { $sum: '$matched' },
+          applied: { $sum: '$applied' },
+        },
+      },
+    ]),
   ]);
 
+  const jobAll = jobTotalsAll[0] ?? {
+    sessions: 0,
+    scanned: 0,
+    matched: 0,
+    applied: 0,
+  };
+  const jobPeriod = jobTotalsPeriod[0] ?? {
+    sessions: 0,
+    scanned: 0,
+    matched: 0,
+    applied: 0,
+  };
   const signupsSeries = await UserModel.aggregate<{
     _id: string;
     count: number;
@@ -315,6 +367,14 @@ export async function getMetrics(query: AdminMetricsQuery) {
       revenueYtdPaise: revenuePeriodPaise,
       failedPayments,
       churnCancels: cancelledSubs,
+      jobsScanned: jobAll.scanned,
+      jobsMatched: jobAll.matched,
+      jobsApplied: jobAll.applied,
+      scanSessions: jobAll.sessions,
+      jobsScannedPeriod: jobPeriod.scanned,
+      jobsMatchedPeriod: jobPeriod.matched,
+      jobsAppliedPeriod: jobPeriod.applied,
+      scanSessionsPeriod: jobPeriod.sessions,
     },
     series: {
       revenueDaily: revenuePaid.map((r) => ({
@@ -445,12 +505,36 @@ export async function getUser(userId: string) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  const [subscription, payments] = await Promise.all([
+  const [subscription, payments, jobTotals] = await Promise.all([
     SubscriptionModel.findOne({ userId })
       .sort({ createdAt: -1 })
       .lean(),
     PaymentModel.find({ userId }).sort({ createdAt: -1 }).limit(20).lean(),
+    ScanSessionModel.aggregate<{
+      sessions: number;
+      scanned: number;
+      matched: number;
+      applied: number;
+    }>([
+      { $match: { userId: user._id } },
+      {
+        $group: {
+          _id: null,
+          sessions: { $sum: 1 },
+          scanned: { $sum: '$scanned' },
+          matched: { $sum: '$matched' },
+          applied: { $sum: '$applied' },
+        },
+      },
+    ]),
   ]);
+
+  const jobs = jobTotals[0] ?? {
+    sessions: 0,
+    scanned: 0,
+    matched: 0,
+    applied: 0,
+  };
 
   return {
     id: user._id.toString(),
@@ -466,6 +550,12 @@ export async function getUser(userId: string) {
     preferencesCompletedAt:
       user.preferencesCompletedAt?.toISOString?.() ?? null,
     razorpayCustomerId: user.razorpayCustomerId ?? null,
+    jobStats: {
+      sessions: jobs.sessions,
+      scanned: jobs.scanned,
+      matched: jobs.matched,
+      applied: jobs.applied,
+    },
     subscription: subscription
       ? {
           id: subscription._id.toString(),

@@ -36,6 +36,12 @@ type UserDetail = {
   plan: string;
   planExpiresAt: string | null;
   subscription: { id: string; status: string; tier: string } | null;
+  jobStats?: {
+    sessions: number;
+    scanned: number;
+    matched: number;
+    applied: number;
+  };
   payments: Array<{
     id: string;
     plan: string;
@@ -61,7 +67,7 @@ export function AdminUsersPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'users', search, page],
     queryFn: async () => {
-      const res = await fetchAdminUsers({ q: search || undefined, page });
+      const res = await fetchAdminUsers({ q: search || undefined, page, limit: 10 });
       if (!res.success) throw new Error(res.message);
       return res.data;
     },
@@ -368,6 +374,27 @@ export function AdminUsersPage() {
                       {detail.data.subscription
                         ? `${detail.data.subscription.tier} · ${detail.data.subscription.status}`
                         : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Jobs scanned</dt>
+                    <dd>
+                      {(detail.data.jobStats?.scanned ?? 0).toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Jobs matched</dt>
+                    <dd>
+                      {(detail.data.jobStats?.matched ?? 0).toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Jobs applied</dt>
+                    <dd>
+                      {(detail.data.jobStats?.applied ?? 0).toLocaleString()}
+                      {(detail.data.jobStats?.sessions ?? 0) > 0
+                        ? ` · ${detail.data.jobStats!.sessions} sessions`
+                        : ''}
                     </dd>
                   </div>
                 </dl>

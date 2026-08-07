@@ -178,9 +178,28 @@ export function AdminOverviewPage() {
           <em>Selected period total</em>
         </div>
         <div className="admin-kpi">
-          <span>Failed / churn</span>
-          <strong>{kpis.failedPayments}</strong>
-          <em>{kpis.churnCancels} cancels in period</em>
+          <span>Jobs scanned</span>
+          <strong>{(kpis.jobsScanned ?? 0).toLocaleString()}</strong>
+          <em>
+            {(kpis.jobsScannedPeriod ?? 0).toLocaleString()} in {periodLabel}
+            {(kpis.scanSessions ?? 0) > 0
+              ? ` · ${kpis.scanSessions.toLocaleString()} sessions`
+              : ''}
+          </em>
+        </div>
+        <div className="admin-kpi">
+          <span>Jobs matched</span>
+          <strong>{(kpis.jobsMatched ?? 0).toLocaleString()}</strong>
+          <em>
+            {(kpis.jobsMatchedPeriod ?? 0).toLocaleString()} in {periodLabel}
+          </em>
+        </div>
+        <div className="admin-kpi">
+          <span>Jobs applied</span>
+          <strong>{(kpis.jobsApplied ?? 0).toLocaleString()}</strong>
+          <em>
+            {(kpis.jobsAppliedPeriod ?? 0).toLocaleString()} in {periodLabel}
+          </em>
         </div>
       </div>
 

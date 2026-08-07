@@ -7,7 +7,7 @@ export const adminUsersQuerySchema = z.object({
   role: z.enum(['user', 'admin']).optional(),
   status: z.enum(['active', 'suspended']).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export type AdminUsersQuery = z.infer<typeof adminUsersQuerySchema>;
