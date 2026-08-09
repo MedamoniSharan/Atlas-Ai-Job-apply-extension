@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Settings2 } from 'lucide-react';
+import { Search, Settings2, X } from 'lucide-react';
 import type { BoardPrefs, ColumnId, SwimlaneMode } from './trackerColumns';
 
 type TrackerToolbarProps = {
@@ -43,29 +43,55 @@ export function TrackerToolbar({
   onClearSelection,
   deleteBusy = false,
 }: TrackerToolbarProps) {
+  const filtersActive =
+    Boolean(q) || platform !== 'all' || salaryFilter !== 'all';
+
   return (
     <div className="tracker-toolbar">
-      <div className="tracker-filters">
-        <p className="tracker__sub">
-          {prefs.mode === 'advanced' ? 'Advanced' : 'Simple'}
-          {total ? (
-            <>
-              {' '}
-              <span className="sidebar__badge tracker__count" aria-label={`${filteredCount} of ${total}`}>
-                {filteredCount === total ? filteredCount : `${filteredCount}/${total}`}
+      <div className="tracker-toolbar__top">
+        <div className="tracker-toolbar__title-block">
+          <h2 className="tracker-toolbar__title">Pipeline</h2>
+          <p className="tracker-toolbar__meta">
+            <span className="tracker-toolbar__mode">
+              {prefs.mode === 'advanced' ? 'Advanced' : 'Simple'} board
+            </span>
+            {total > 0 ? (
+              <span className="tracker-toolbar__count">
+                {filteredCount === total
+                  ? `${total} job${total === 1 ? '' : 's'}`
+                  : `${filteredCount} of ${total}`}
               </span>
-            </>
-          ) : null}
-        </p>
+            ) : null}
+          </p>
+        </div>
 
-        <input
-          className="tracker-filters__search"
-          type="search"
-          placeholder="Search…"
-          value={q}
-          onChange={(e) => onSearch(e.target.value)}
-          aria-label="Search applications"
-        />
+        <div className="tracker-toolbar__actions">
+          <button
+            type="button"
+            className="tracker-toolbar__icon-btn"
+            onClick={onOpenSettings}
+            aria-label="Board settings"
+            title="Board settings"
+          >
+            <Settings2 size={16} strokeWidth={2.1} aria-hidden />
+          </button>
+          <Link className="tracker-toolbar__link" to="/dashboard">
+            Dashboard
+          </Link>
+        </div>
+      </div>
+
+      <div className="tracker-filters">
+        <label className="tracker-filters__search">
+          <Search size={15} strokeWidth={2} aria-hidden />
+          <input
+            type="search"
+            placeholder="Search title or company…"
+            value={q}
+            onChange={(e) => onSearch(e.target.value)}
+            aria-label="Search applications"
+          />
+        </label>
 
         <select
           className="tracker-filters__select"
@@ -107,39 +133,25 @@ export function TrackerToolbar({
           <option value="location">By location</option>
         </select>
 
-        {(q || platform !== 'all' || salaryFilter !== 'all') && (
+        {filtersActive ? (
           <button
             type="button"
-            className="dash-pill dash-pill--clear"
+            className="tracker-filters__clear"
             onClick={() => {
               onSearch('');
               onPlatform('all');
               onSalaryFilter('all');
             }}
           >
+            <X size={14} strokeWidth={2.2} aria-hidden />
             Clear
           </button>
-        )}
-
-        <div className="tracker-toolbar__right">
-          <button
-            type="button"
-            className="dash-btn dash-btn--ghost tracker-toolbar__icon"
-            onClick={onOpenSettings}
-            aria-label="Board settings"
-            title="Board settings"
-          >
-            <Settings2 size={15} strokeWidth={2.2} aria-hidden />
-          </button>
-          <Link className="dash-btn dash-btn--ghost" to="/dashboard">
-            Dashboard
-          </Link>
-        </div>
+        ) : null}
       </div>
 
       {selectedCount > 0 ? (
         <div className="tracker-bulk" role="status">
-          <span>
+          <span className="tracker-bulk__label">
             <strong>{selectedCount}</strong> selected
           </span>
           <label className="tracker-bulk__move">
@@ -166,7 +178,7 @@ export function TrackerToolbar({
           </label>
           <button
             type="button"
-            className="dash-btn dash-btn--ghost tracker-bulk__delete"
+            className="tracker-bulk__btn tracker-bulk__btn--danger"
             onClick={onBulkDelete}
             disabled={deleteBusy}
           >
@@ -174,7 +186,7 @@ export function TrackerToolbar({
           </button>
           <button
             type="button"
-            className="dash-btn dash-btn--ghost"
+            className="tracker-bulk__btn"
             onClick={onClearSelection}
           >
             Clear

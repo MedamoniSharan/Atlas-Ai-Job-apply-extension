@@ -46,9 +46,11 @@ import {
   closeSessionComplete,
 } from '../core/botRunner';
 import {
-  allowExtraTab,
   clearAllowedExtraTab,
+  ensureNaukriWorkTab,
+  getActiveWorkTabId,
   installTabSpamGuard,
+  setActiveWorkTabId,
 } from '../core/singleTab';
 import {
   detectBrowserFamily,
@@ -58,10 +60,12 @@ import {
 /** Ensure `chrome.*` exists before any listener registration (Firefox may only expose `browser`). */
 ensureChromeNamespace();
 
-/** Tracks an opened Naukri login tab so we can re-verify when it closes. */
+/**
+ * Naukri login happens in the same work tab (no second tab).
+ * We re-check login when the tab leaves the login URL or the user presses Confirm.
+ */
 let pendingNaukriLogin: {
-  loginTabId: number;
-  naukriTabId: number;
+  workTabId: number;
 } | null = null;
 
 function waitMs(ms: number) {
@@ -122,12 +126,24 @@ async function reverifyAfterLoginTabClosed(naukriTabId: number): Promise<void> {
   }
 }
 
+function isNaukriLoginUrl(url: string | undefined): boolean {
+  return Boolean(url && /naukri\.com\/nlogin|naukri\.com\/.*login/i.test(url));
+}
+
 chrome.tabs.onRemoved.addListener((tabId) => {
   clearAllowedExtraTab(tabId);
-  if (!pendingNaukriLogin || pendingNaukriLogin.loginTabId !== tabId) return;
-  const naukriTabId = pendingNaukriLogin.naukriTabId;
+  if (pendingNaukriLogin?.workTabId === tabId) {
+    pendingNaukriLogin = null;
+  }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!pendingNaukriLogin || pendingNaukriLogin.workTabId !== tabId) return;
+  const url = changeInfo.url ?? tab.url;
+  if (!url || isNaukriLoginUrl(url)) return;
+  // Left login page in the same tab — re-verify session.
   pendingNaukriLogin = null;
-  void reverifyAfterLoginTabClosed(naukriTabId);
+  void reverifyAfterLoginTabClosed(tabId);
 });
 
 installTabSpamGuard();
@@ -562,24 +578,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             typeof message.loginUrl === 'string' && message.loginUrl
               ? message.loginUrl
               : 'https://www.naukri.com/nlogin/login';
-          const naukriTabId =
+          const preferredId =
             typeof message.naukriTabId === 'number'
               ? message.naukriTabId
-              : sender.tab?.id;
-          const created = await chrome.tabs.create({
-            url: loginUrl,
-            active: true,
-          });
-          if (created.id != null) {
-            allowExtraTab(created.id);
+              : sender.tab?.id ?? getActiveWorkTabId();
+
+          let workTabId: number | null = preferredId ?? null;
+          if (workTabId != null) {
+            try {
+              await chrome.tabs.update(workTabId, {
+                url: loginUrl,
+                active: true,
+              });
+              setActiveWorkTabId(workTabId);
+            } catch {
+              workTabId = null;
+            }
           }
-          if (created.id != null && naukriTabId != null) {
-            pendingNaukriLogin = {
-              loginTabId: created.id,
-              naukriTabId,
-            };
+          if (workTabId == null) {
+            // No existing tab — open one work tab only (never a second login tab).
+            const tab = await ensureNaukriWorkTab({
+              url: loginUrl,
+              active: true,
+            });
+            workTabId = tab.id ?? null;
           }
-          sendResponse({ ok: true, loginTabId: created.id });
+
+          if (workTabId != null) {
+            pendingNaukriLogin = { workTabId };
+            setActiveWorkTabId(workTabId);
+          }
+          sendResponse({ ok: true, loginTabId: workTabId });
           break;
         }
         default:

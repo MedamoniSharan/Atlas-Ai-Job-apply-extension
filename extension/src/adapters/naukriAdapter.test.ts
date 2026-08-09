@@ -229,7 +229,7 @@ describe('NaukriAdapter', () => {
         <div class="rating"><span class="main-2">3.3</span></div>
         <a href="/reviews">718 Reviews</a>
       </div>
-      <img class="logoImage" alt="companyLogo" src="https://img.naukimg.com/logo.png" />
+      <img class="logoImage" alt="companyLogo" src="https://img.naukimg.com/logo_images/groups/v1/468918.gif" />
       <span class="expwdth">0 - 1 years</span>
       <span class="sal">3-6 Lacs P.A.</span>
       <div class="loc"><span>Hyderabad</span></div>
@@ -292,7 +292,7 @@ describe('NaukriAdapter', () => {
     expect(job?.education).toMatch(/B\.Tech/i);
     expect(job?.description).toMatch(/Spring Boot/i);
     expect(job?.aboutCompany).toMatch(/Moglix/i);
-    expect(job?.companyLogo).toContain('naukimg.com');
+    expect(job?.companyLogo).toContain('logo_images/groups');
   });
   it('skips company-site apply jobs from search results', () => {
     const adapter = new NaukriAdapter();

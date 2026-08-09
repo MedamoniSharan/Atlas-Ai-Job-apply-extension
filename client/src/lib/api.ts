@@ -3,6 +3,9 @@ import type {
   ApiResponse,
   Application,
   AuthTokens,
+  CompaniesListResponse,
+  CompanyDetail,
+  CompanyJobsListResponse,
   JobPreferences,
   OnboardingStatus,
   ScanStats,
@@ -239,6 +242,41 @@ export async function fetchApplications(params: ApplicationsQuery = {}) {
     limit: number;
     totalPages: number;
   }>(`/api/v1/applications?${search.toString()}`);
+}
+
+export async function fetchCompanies(params: {
+  page?: number;
+  limit?: number;
+  q?: string;
+} = {}) {
+  const search = new URLSearchParams();
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? 24));
+  if (params.q?.trim()) search.set('q', params.q.trim());
+  return request<CompaniesListResponse>(
+    `/api/v1/companies?${search.toString()}`,
+    {},
+    false
+  );
+}
+
+export async function fetchCompany(key: string) {
+  return request<CompanyDetail>(
+    `/api/v1/companies/${encodeURIComponent(key)}`
+  );
+}
+
+export async function fetchCompanyJobs(
+  key: string,
+  params: { page?: number; limit?: number; q?: string } = {}
+) {
+  const search = new URLSearchParams();
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? 24));
+  if (params.q?.trim()) search.set('q', params.q.trim());
+  return request<CompanyJobsListResponse>(
+    `/api/v1/companies/${encodeURIComponent(key)}/jobs?${search.toString()}`
+  );
 }
 
 export type ApplicationStats = {

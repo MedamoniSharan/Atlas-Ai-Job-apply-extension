@@ -1,4 +1,4 @@
-import { StrictMode, useEffect } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -17,6 +17,8 @@ import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
+import { CompaniesPage } from './pages/CompaniesPage';
+import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -33,14 +35,6 @@ import './admin/admin.css';
 
 const queryClient = new QueryClient();
 const googleId = googleClientId();
-const CODEX_CAREER_URL = 'https://codexcareer.com';
-
-function RedirectToCodexCareer() {
-  useEffect(() => {
-    window.location.replace(CODEX_CAREER_URL);
-  }, []);
-  return null;
-}
 
 const app = (
   <HelmetProvider>
@@ -60,12 +54,14 @@ const app = (
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/applications" element={<ApplicationsPage />} />
+            <Route path="/companies" element={<CompaniesPage />} />
+            <Route path="/companies/:companyKey" element={<CompanyDetailPage />} />
             <Route path="/get-extension" element={<GetStartedPage />} />
             <Route
               path="/get-started"
               element={<Navigate to="/get-extension" replace />}
             />
-            <Route path="/browse" element={<RedirectToCodexCareer />} />
+            <Route path="/browse" element={<Navigate to="/companies" replace />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/tracker" element={<TrackerPage />} />
             <Route path="/profile" element={<ProfilePage />} />

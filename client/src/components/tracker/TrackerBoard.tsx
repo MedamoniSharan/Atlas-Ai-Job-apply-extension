@@ -106,7 +106,8 @@ export function TrackerBoard({
               onDropColumn(col.id);
             }}
           >
-            <div>
+            <span className="tracker-col-head__dot" aria-hidden />
+            <div className="tracker-col-head__copy">
               <h2>{col.title}</h2>
               <p>{col.hint}</p>
             </div>

@@ -84,6 +84,7 @@ applicationSchema.index(
   { unique: true, partialFilterExpression: { externalJobId: { $type: 'string' } } }
 );
 applicationSchema.index({ userId: 1, createdAt: -1 });
+applicationSchema.index({ company: 1 });
 
 export const ApplicationModel = mongoose.model<IApplication>(
   'Application',

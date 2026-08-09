@@ -18,5 +18,5 @@ alwaysApply: true
 
 - Co-pilot / scan / apply must reuse **one** Naukri work tab (`ensureNaukriWorkTab`).
 - Navigate jobs with `chrome.tabs.update` on that tab — never `chrome.tabs.create` per job.
-- Block `target=_blank` / `window.open` spam; close child tabs opened from the work tab.
-- Login tab is the only intentional extra tab, and must be allow-listed.
+- Naukri login also uses that same work tab (`OPEN_NAUKRI_LOGIN` → `tabs.update`) — never a second login tab.
+- Block `target=_blank` / `window.open` spam; close child / duplicate Naukri tabs opened from the work tab (`closeExtraNaukriTabs`).

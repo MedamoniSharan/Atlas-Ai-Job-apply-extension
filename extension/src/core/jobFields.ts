@@ -1,4 +1,5 @@
 import type { JobPayload } from '@cosmo/shared';
+import { pickBestCompanyLogo, sanitizeAboutCompany } from '@cosmo/shared';
 import type { SearchResultJob } from '../adapters/naukriAdapter';
 import type { ApplyQueueItem } from './storageManager';
 
@@ -39,7 +40,10 @@ export function mergeJobFields(
     location: preferText(primary?.location, fallback?.location),
     url: primary?.url || fallback?.url,
     externalJobId: primary?.externalJobId || fallback?.externalJobId,
-    companyLogo: primary?.companyLogo || fallback?.companyLogo,
+    companyLogo: pickBestCompanyLogo(
+      primary?.companyLogo,
+      fallback?.companyLogo
+    ),
     description: preferText(primary?.description, fallback?.description),
     experience: preferText(
       primary?.experience,
@@ -66,7 +70,11 @@ export function mergeJobFields(
     ),
     roleCategory: preferText(primary?.roleCategory, fallback?.roleCategory),
     education: preferText(primary?.education, fallback?.education),
-    aboutCompany: preferText(primary?.aboutCompany, fallback?.aboutCompany),
+    aboutCompany:
+      sanitizeAboutCompany(
+        preferText(primary?.aboutCompany, fallback?.aboutCompany),
+        { maxLen: 2000 }
+      ) || preferText(primary?.aboutCompany, fallback?.aboutCompany),
     status: 'detected',
     ...extras,
   };

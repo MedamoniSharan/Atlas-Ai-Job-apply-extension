@@ -1,7 +1,7 @@
 import { ArrowRight, Puzzle } from 'lucide-react';
 import { CHROME_EXTENSION_URL } from '../lib/chromeExtension';
 
-function ChromeIcon({ size = 18 }: { size?: number }) {
+export function ChromeIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       width={size}

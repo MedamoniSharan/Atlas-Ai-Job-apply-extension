@@ -52,6 +52,7 @@ import {
   ensureNaukriWorkTab,
   installTabSpamGuard,
   setActiveWorkTabId,
+  closeExtraNaukriTabs,
 } from './singleTab';
 
 function normalizeUrl(url: string): string {
@@ -68,7 +69,7 @@ async function waitForTabComplete(tabId: number, timeoutMs = 30000) {
   while (Date.now() - start < timeoutMs) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.status === 'complete') return tab;
-    await wait(400);
+    await wait(250);
   }
   return chrome.tabs.get(tabId);
 }
@@ -90,6 +91,33 @@ async function sendToTab<T>(
   throw lastError instanceof Error
     ? lastError
     : new Error('Failed to message content script');
+}
+
+/**
+ * Scan only: wait until job cards exist (or timeout). No human pacing.
+ * Tight poll — exits as soon as cards appear.
+ */
+async function waitForSearchListReady(
+  tabId: number,
+  timeoutMs = 800
+): Promise<number> {
+  const end = Date.now() + timeoutMs;
+  let count = 0;
+  while (Date.now() < end) {
+    try {
+      const scrape = await sendToTab<{ jobs?: SearchResultJob[] }>(
+        tabId,
+        { type: 'RUN_SCAN_SCRAPE' },
+        1
+      );
+      count = scrape.jobs?.length ?? 0;
+      if (count > 0) return count;
+    } catch {
+      /* content script may still be injecting */
+    }
+    await wait(50);
+  }
+  return count;
 }
 
 /** Apply Naukri filters first (no humanPace slowdown). Then scan/apply. */
@@ -129,7 +157,7 @@ async function applyNaukriPreferenceFilters(
       active: !stealth,
     });
     await waitForTabComplete(tabId);
-    await wait(2500);
+    await waitForSearchListReady(tabId);
     if (!(await ensureNaukriLoggedIn(tabId))) return false;
 
     for (let i = 0; i < 2; i++) {
@@ -144,7 +172,7 @@ async function applyNaukriPreferenceFilters(
         active: !stealth,
       });
       await waitForTabComplete(tabId);
-      await wait(2000);
+      await waitForSearchListReady(tabId);
     }
   }
 
@@ -213,7 +241,7 @@ async function applyNaukriPreferenceFilters(
         `All Filters attempt ${attempt + 1}: ${(result.skipped ?? []).join('; ') || 'panel not ready'}`,
         'warn'
       );
-      await wait(1500);
+      await wait(100);
     } catch (error) {
       await appendCopilotLog(
         `All Filters click error: ${
@@ -221,7 +249,7 @@ async function applyNaukriPreferenceFilters(
         }`,
         'warn'
       );
-      await wait(1200);
+      await wait(100);
     }
   }
 
@@ -265,8 +293,9 @@ async function applyNaukriPreferenceFilters(
     );
   }
 
-  await wait(2000);
+  // Filters refresh the SRP — continue as soon as cards exist (no pace delay).
   await waitForTabComplete(tabId);
+  await waitForSearchListReady(tabId);
   return true;
 }
 
@@ -447,7 +476,7 @@ async function goBackToList(
     });
     return;
   }
-  await wait(options?.maxNavMs ?? 500);
+  await wait(options?.maxNavMs ?? 0);
 }
 
 type EasyApplyResult = {
@@ -1059,7 +1088,7 @@ async function goToNextSearchPage(
   ).catch(() => ({ ok: false, reason: 'Could not open next page' }));
 
   await waitForTabComplete(tabId).catch(() => undefined);
-  await wait(1800);
+  await waitForSearchListReady(tabId);
   let after = (await chrome.tabs.get(tabId)).url || '';
 
   if (clicked.ok && after !== before) {
@@ -1083,7 +1112,7 @@ async function goToNextSearchPage(
   }
   await chrome.tabs.update(tabId, { url: nextUrl, active: true });
   await waitForTabComplete(tabId);
-  await wait(2000);
+  await waitForSearchListReady(tabId);
   after = (await chrome.tabs.get(tabId)).url || '';
   if (after === before) {
     return { ok: false, reason: 'Next page navigation did not stick' };
@@ -1132,7 +1161,7 @@ async function collectPreferenceMatches(opts: {
       !/naukri\.com/i.test(tabInfo.url) ||
       /job-listings/i.test(tabInfo.url)
     ) {
-      await goBackToList(tabId, searchUrl, stealth);
+      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 0 });
       if (!(await ensureNaukriLoggedIn(tabId))) break;
     }
 
@@ -1146,8 +1175,7 @@ async function collectPreferenceMatches(opts: {
       await sendToTab(tabId, { type: 'SCROLL_SEARCH_RESULTS' }).catch(
         () => undefined
       );
-      // Fast scan — no humanPace slowdown while browsing the list.
-      await wait(450);
+      // No settle delay while scanning — scrape immediately after scroll.
     }
 
     const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tabId, {
@@ -1520,10 +1548,10 @@ export async function runBot(handlers: BotHandlers): Promise<{
       return { ok: false, message: 'No tab.' };
     }
     setActiveWorkTabId(tab.id);
+    await closeExtraNaukriTabs(tab.id);
 
     await waitForTabComplete(tab.id);
-    // Fast settle after opening search — human pacing starts only at apply.
-    await wait(700);
+    await waitForSearchListReady(tab.id);
 
     if (await checkBlockOnTab(tab.id)) {
       return { ok: false, message: 'Naukri block detected.' };
@@ -1563,7 +1591,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
       if (qi > 0) {
         await chrome.tabs.update(tab.id, { url: searchUrl, active: !stealth });
         await waitForTabComplete(tab.id);
-        await wait(1500);
+        await waitForSearchListReady(tab.id);
         if (!(await ensureNaukriLoggedIn(tab.id))) break;
       }
 

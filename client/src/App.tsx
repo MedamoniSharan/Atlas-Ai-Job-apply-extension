@@ -8,18 +8,17 @@ import {
 } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BarChart3,
   Briefcase,
+  Building2,
   CircleHelp,
-  ExternalLink,
+  CircleUser,
+  Columns3,
   LayoutDashboard,
   LogOut,
   Menu,
-  Puzzle,
   Search,
-  Settings,
+  Settings2,
   Shield,
-  User,
 } from 'lucide-react';
 import { useAuthStore } from './store/authStore';
 import { useOnboardingStatus } from './hooks/useOnboardingStatus';
@@ -29,9 +28,11 @@ import {
   fetchBillingMe,
   logout,
 } from './lib/api';
+import { ChromeIcon } from './components/ChromeInstallCta';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
 import { NoIndexHead } from './components/NoIndexHead';
 import { ShimmerButton } from './components/ui/ShimmerButton';
+import { PublicCompaniesPage } from './pages/CompaniesPage';
 
 export type ShellOutletContext = {
   search: string;
@@ -89,6 +90,7 @@ function pageTitle(pathname: string): string {
   }
   if (pathname.startsWith('/tracker')) return 'Tracker';
   if (pathname.startsWith('/profile')) return 'Profile';
+  if (pathname.startsWith('/companies')) return 'Companies';
   if (pathname.startsWith('/applications')) return 'Applications';
   if (pathname.startsWith('/dashboard')) return 'Dashboard';
   return 'Dashboard';
@@ -162,6 +164,15 @@ export function AppLayout() {
   }
 
   if (!accessToken) {
+    if (
+      location.pathname === '/companies' ||
+      location.pathname === '/companies/'
+    ) {
+      return <PublicCompaniesPage />;
+    }
+    if (location.pathname.startsWith('/companies/')) {
+      return <Navigate to="/login?next=%2Fdashboard" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 
@@ -175,13 +186,15 @@ export function AppLayout() {
   const title = pageTitle(location.pathname);
   const showHeaderSearch =
     location.pathname.startsWith('/dashboard') ||
-    location.pathname.startsWith('/applications');
+    location.pathname.startsWith('/applications') ||
+    location.pathname === '/companies';
 
   function onSearchSubmit(e: FormEvent) {
     e.preventDefault();
     if (
       !location.pathname.startsWith('/dashboard') &&
-      !location.pathname.startsWith('/applications')
+      !location.pathname.startsWith('/applications') &&
+      location.pathname !== '/companies'
     ) {
       navigate('/dashboard');
     }
@@ -223,35 +236,37 @@ export function AppLayout() {
               </span>
             ) : null}
           </NavLink>
+          <NavLink
+            to="/companies"
+            className="sidebar__link"
+            aria-label="Companies, New"
+          >
+            <span className="sidebar__icon" aria-hidden>
+              <Building2 size={18} strokeWidth={1.9} className="icon-motion" />
+            </span>
+            <span className="sidebar__label">Companies</span>
+            <span className="capsule-hiring-badge" aria-hidden>
+              New
+            </span>
+          </NavLink>
           <NavLink to="/tracker" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <BarChart3 size={18} strokeWidth={1.9} className="icon-motion" />
+              <Columns3 size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Tracker
           </NavLink>
-          <a
-            href="https://codexcareer.com"
-            className="sidebar__link"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="sidebar__icon" aria-hidden>
-              <ExternalLink size={18} strokeWidth={1.9} className="icon-motion" />
-            </span>
-            All jobs
-          </a>
         </nav>
 
         <nav className="sidebar__nav sidebar__nav--secondary">
           <NavLink to="/profile" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <User size={18} strokeWidth={1.9} className="icon-motion" />
+              <CircleUser size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Profile
           </NavLink>
           <NavLink to="/settings" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <Settings size={18} strokeWidth={1.9} className="icon-motion" />
+              <Settings2 size={18} strokeWidth={1.9} className="icon-motion" />
             </span>
             Settings
           </NavLink>
@@ -265,7 +280,7 @@ export function AppLayout() {
           ) : null}
           <NavLink to="/get-extension" className="sidebar__link">
             <span className="sidebar__icon" aria-hidden>
-              <Puzzle size={18} strokeWidth={1.9} className="icon-motion" />
+              <ChromeIcon size={18} />
             </span>
             Get extension
           </NavLink>
@@ -377,10 +392,18 @@ export function AppLayout() {
               </span>
               <input
                 type="search"
-                placeholder="Search by title, company…"
+                placeholder={
+                  location.pathname === '/companies'
+                    ? 'Search companies…'
+                    : 'Search by title, company…'
+                }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search applications"
+                aria-label={
+                  location.pathname === '/companies'
+                    ? 'Search companies'
+                    : 'Search applications'
+                }
               />
             </form>
           ) : (
@@ -396,7 +419,7 @@ export function AppLayout() {
               aria-label="Get extension"
               title="Get extension"
             >
-              <CircleHelp size={18} strokeWidth={1.8} className="icon-motion" aria-hidden />
+              <ChromeIcon size={18} />
             </NavLink>
           </div>
         </header>

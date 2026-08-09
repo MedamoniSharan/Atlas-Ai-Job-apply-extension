@@ -1,6 +1,8 @@
 import type { JobPayload, JobPreferences } from '@cosmo/shared';
 import {
   compactMatchText,
+  pickBestCompanyLogo,
+  sanitizeAboutCompany,
   sanitizeJobMetaFields,
   stripEmbeddedLabels,
 } from '@cosmo/shared';
@@ -284,6 +286,48 @@ function absoluteUrl(src?: string | null): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function collectImgLogoCandidates(img: Element): string[] {
+  const el = img as HTMLImageElement;
+  const out: string[] = [];
+  for (const attr of ['src', 'data-src', 'data-lazy-src', 'data-original']) {
+    const v = absoluteUrl(el.getAttribute(attr) || (attr === 'src' ? el.src : null));
+    if (v) out.push(v);
+  }
+  const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
+  if (srcset) {
+    for (const part of srcset.split(',')) {
+      const candidate = absoluteUrl(part.trim().split(/\s+/)[0]);
+      if (candidate) out.push(candidate);
+    }
+  }
+  return out;
+}
+
+/** Prefer real employer logos from card / JD DOM; drop Naukri placeholders. */
+function extractCompanyLogo(root: ParentNode = document): string | undefined {
+  const selectors = [
+    'img.logoImage',
+    'img[alt="companyLogo"]',
+    'img[alt*="Company Logo" i]',
+    '[class*="comp-logo"] img',
+    '[class*="company-logo"] img',
+    '[class*="companyLogo"] img',
+    '.imagewrap img',
+    '[class*="jd-header"] img',
+    'img[src*="logo_images/groups"]',
+    'img[src*="/logo/get/"]',
+    'img[data-src*="logo_images/groups"]',
+    'img[data-src*="/logo/get/"]',
+  ];
+  const candidates: string[] = [];
+  for (const selector of selectors) {
+    for (const img of Array.from(root.querySelectorAll(selector))) {
+      candidates.push(...collectImgLogoCandidates(img));
+    }
+  }
+  return pickBestCompanyLogo(...candidates);
 }
 
 function firstMatchingText(
@@ -631,14 +675,14 @@ function scrapeFullDescription(doc: Document): string | undefined {
 
 function scrapeAboutCompany(doc: Document): string | undefined {
   expandJobDetailSections(doc);
-  return (
+  const raw =
     sectionByHeading(doc, /^about (the )?company$/i, 4000) ||
     cleanText(
       doc.querySelector(
-        '[class*="about-company"], [class*="comp-detail"], [class*="company-info"]'
+        '[class*="about-company"], [class*="comp-detail"], [class*="company-info"], [class*="companyInfo"]'
       )?.textContent
-    )?.slice(0, 4000)
-  );
+    )?.slice(0, 4000);
+  return sanitizeAboutCompany(raw, { maxLen: 2000 }) || raw?.slice(0, 2000);
 }
 
 /** Naukri labels for employer-site / external apply (not in-platform Easy Apply). */
@@ -2049,11 +2093,7 @@ export class NaukriAdapter implements PlatformAdapter {
       doc.querySelector('[data-job-id]')?.getAttribute('data-job-id') ??
       jobIdFromUrl(href);
 
-    const logoEl =
-      (doc.querySelector(
-        'img.logoImage, img[alt="companyLogo"], img[alt*="Company Logo" i], [class*="jd-header"] img, [class*="company-logo"] img, [class*="comp-logo"] img'
-      ) as HTMLImageElement | null) ?? null;
-    const companyLogo = absoluteUrl(logoEl?.getAttribute('src') || logoEl?.src);
+    const companyLogo = extractCompanyLogo(doc);
 
     const experience =
       firstMatchingText(doc, [
@@ -2204,10 +2244,7 @@ export class NaukriAdapter implements PlatformAdapter {
           0,
           2000
         ) || undefined;
-      const logoEl = root.querySelector(
-        'img.logoImage, img[alt="companyLogo"], .imagewrap img'
-      ) as HTMLImageElement | null;
-      const companyLogo = absoluteUrl(logoEl?.src);
+      const companyLogo = extractCompanyLogo(root);
       const rating =
         cleanText(root.querySelector('.rating .main-2')?.textContent) ||
         undefined;

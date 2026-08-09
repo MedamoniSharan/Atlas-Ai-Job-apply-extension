@@ -1789,10 +1789,11 @@ export function mountCopilotPanel() {
       },
       (res) => {
         if (chrome.runtime.lastError || !res?.ok) {
-          window.open(loginUrl, '_blank', 'noopener,noreferrer');
+          // Same tab only — never open a second window/tab.
+          window.location.assign(loginUrl);
         }
         loginHelp.textContent =
-          'Login tab opened. Sign in there — when you close it, Cosmo re-checks login. Or press Confirm here.';
+          'Sign in on this tab. After login, Cosmo continues here — or press Confirm.';
       }
     );
   });

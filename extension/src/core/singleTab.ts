@@ -1,12 +1,13 @@
 /**
  * Strict single-tab policy for Cosmo automation.
- * Reuse one Naukri work tab; close child tabs spawned by target=_blank / window.open.
+ * Reuse one Naukri work tab; never open a second work tab.
+ * Close child tabs spawned by target=_blank / window.open while co-pilot runs.
  */
 
 import { getCopilotState } from './copilotState';
 
 let activeWorkTabId: number | null = null;
-/** Tabs Cosmo intentionally opened (e.g. Naukri login) — never auto-close. */
+/** Tabs Cosmo intentionally opened (legacy allow-list; prefer zero extras). */
 const allowedExtraTabIds = new Set<number>();
 let guardInstalled = false;
 
@@ -28,6 +29,27 @@ export function clearAllowedExtraTab(tabId: number): void {
 
 const NAUKRI_TAB_URLS = ['https://www.naukri.com/*', 'https://naukri.com/*'];
 
+function isNaukriUrl(url: string | undefined): boolean {
+  return Boolean(url && /naukri\.com/i.test(url));
+}
+
+/** Close every Naukri tab except the work tab (and allow-listed extras). */
+export async function closeExtraNaukriTabs(
+  keepTabId: number | null = activeWorkTabId
+): Promise<void> {
+  const tabs = await chrome.tabs.query({ url: NAUKRI_TAB_URLS });
+  for (const tab of tabs) {
+    if (tab.id == null) continue;
+    if (keepTabId != null && tab.id === keepTabId) continue;
+    if (allowedExtraTabIds.has(tab.id)) continue;
+    try {
+      await chrome.tabs.remove(tab.id);
+    } catch {
+      /* already closed */
+    }
+  }
+}
+
 /** Find an existing Naukri tab or create one — never spawn a second work tab. */
 export async function ensureNaukriWorkTab(opts: {
   url: string;
@@ -43,6 +65,7 @@ export async function ensureNaukriWorkTab(opts: {
           url: opts.url,
           active: opts.active,
         });
+        await closeExtraNaukriTabs(existing.id);
         return chrome.tabs.get(existing.id);
       }
     } catch {
@@ -58,6 +81,7 @@ export async function ensureNaukriWorkTab(opts: {
       url: opts.url,
       active: opts.active,
     });
+    await closeExtraNaukriTabs(reusable.id);
     return chrome.tabs.get(reusable.id);
   }
 
@@ -83,6 +107,7 @@ function onTabCreated(tab: chrome.tabs.Tab): void {
   void (async () => {
     if (tab.id == null) return;
     if (allowedExtraTabIds.has(tab.id)) return;
+    if (tab.id === activeWorkTabId) return;
 
     const state = await getCopilotState();
     if (!state.running || activeWorkTabId == null) return;
@@ -93,21 +118,21 @@ function onTabCreated(tab: chrome.tabs.Tab): void {
       return;
     }
 
-    // URL / opener often populate after create — re-check briefly.
+    // URL / opener often populate after create — re-check and close Naukri dupes.
     const id = tab.id;
-    setTimeout(() => {
-      void (async () => {
-        if (allowedExtraTabIds.has(id) || id === activeWorkTabId) return;
-        try {
-          const fresh = await chrome.tabs.get(id);
-          if (fresh.openerTabId === activeWorkTabId) {
-            await closeIfSpamTab(id);
-          }
-        } catch {
-          /* ignore */
+    const check = async () => {
+      if (allowedExtraTabIds.has(id) || id === activeWorkTabId) return;
+      try {
+        const fresh = await chrome.tabs.get(id);
+        if (fresh.openerTabId === activeWorkTabId || isNaukriUrl(fresh.url)) {
+          await closeIfSpamTab(id);
         }
-      })();
-    }, 400);
+      } catch {
+        /* ignore */
+      }
+    };
+    setTimeout(() => void check(), 150);
+    setTimeout(() => void check(), 500);
   })();
 }
 

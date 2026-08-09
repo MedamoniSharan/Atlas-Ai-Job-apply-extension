@@ -10,6 +10,7 @@ import { errorHandler, asyncHandler } from './middleware/errorHandler';
 import { authRouter } from './features/auth/auth.routes';
 import { eventsRouter } from './features/events/events.routes';
 import { applicationsRouter } from './features/applications/applications.routes';
+import { companiesRouter } from './features/companies/companies.routes';
 import { healthRouter } from './features/health/health.routes';
 import { onboardingRouter } from './features/onboarding/onboarding.routes';
 import { preferencesRouter } from './features/preferences/preferences.routes';
@@ -75,6 +76,7 @@ export function createApp() {
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/events', eventsRouter);
   app.use('/api/v1/applications', applicationsRouter);
+  app.use('/api/v1/companies', companiesRouter);
   app.use('/api/v1/onboarding', onboardingRouter);
   app.use('/api/v1/preferences', preferencesRouter);
   app.use('/api/v1/billing', billingRouter);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type MutableRefObject } from 'react';
 import type { Application } from '@cosmo/shared';
-import { MoreHorizontal } from 'lucide-react';
+import { MapPin, MoreHorizontal } from 'lucide-react';
 import type { ColumnId } from './trackerColumns';
 import {
   ALL_COLUMNS,
@@ -24,7 +24,8 @@ type TrackerCardProps = {
 };
 
 function TrackerLogo({ app }: { app: Application }) {
-  if (app.companyLogo) {
+  const [failed, setFailed] = useState(false);
+  if (app.companyLogo && !failed) {
     return (
       <img
         className="tracker-card__logo"
@@ -32,6 +33,7 @@ function TrackerLogo({ app }: { app: Application }) {
         alt=""
         loading="lazy"
         referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
       />
     );
   }
@@ -58,6 +60,7 @@ export function TrackerCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const col = columnFor(app);
+  const when = relativeTime(app.appliedAt ?? app.createdAt);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -90,77 +93,98 @@ export function TrackerCard({
       tabIndex={0}
       title={`${app.company} — ${app.title}`}
     >
-      <label
-        className="tracker-card__check"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={(e) =>
-            onToggleSelect(app.id, (e.nativeEvent as MouseEvent).shiftKey)
-          }
+      <header className="tracker-card__top">
+        <label
+          className="tracker-card__check"
           onClick={(e) => e.stopPropagation()}
-          aria-label={`Select ${app.title}`}
-        />
-      </label>
-
-      <TrackerLogo app={app} />
-
-      <div className="tracker-card__heading">
-        <h3 className="tracker-card__company">{app.company}</h3>
-        <p className="tracker-card__title">{app.title}</p>
-      </div>
-
-      <time dateTime={app.appliedAt ?? app.createdAt}>
-        {relativeTime(app.appliedAt ?? app.createdAt)}
-      </time>
-
-      <div
-        className="tracker-card__menu"
-        ref={menuRef}
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          className="tracker-card__menu-btn"
-          aria-label="Move to"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          <MoreHorizontal size={14} strokeWidth={2.2} aria-hidden />
-        </button>
-        {menuOpen ? (
-          <div className="tracker-card__menu-pop" role="menu">
-            {ALL_COLUMNS.filter((c) => c.id !== col).map((c) => (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) =>
+              onToggleSelect(app.id, (e.nativeEvent as MouseEvent).shiftKey)
+            }
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${app.title}`}
+          />
+        </label>
+
+        <TrackerLogo app={app} />
+
+        <div className="tracker-card__heading">
+          <h3 className="tracker-card__company">{app.company}</h3>
+          <p className="tracker-card__title">{app.title}</p>
+        </div>
+
+        <div
+          className="tracker-card__menu"
+          ref={menuRef}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="tracker-card__menu-btn"
+            aria-label="Move to"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <MoreHorizontal size={15} strokeWidth={2.2} aria-hidden />
+          </button>
+          {menuOpen ? (
+            <div className="tracker-card__menu-pop" role="menu">
+              {ALL_COLUMNS.filter((c) => c.id !== col).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onMove(app.id, c.id);
+                  }}
+                >
+                  Move to {c.title}
+                </button>
+              ))}
               <button
-                key={c.id}
                 type="button"
                 role="menuitem"
+                className="tracker-card__menu-danger"
                 onClick={() => {
                   setMenuOpen(false);
-                  onMove(app.id, c.id);
+                  onDelete(app.id);
                 }}
               >
-                Move to {c.title}
+                Delete
               </button>
-            ))}
-            <button
-              type="button"
-              role="menuitem"
-              className="tracker-card__menu-danger"
-              onClick={() => {
-                setMenuOpen(false);
-                onDelete(app.id);
-              }}
-            >
-              Delete
-            </button>
-          </div>
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      {density !== 'compact' && (app.location || app.salary) ? (
+        <div className="tracker-card__meta">
+          {app.location ? (
+            <span className="tracker-card__chip">
+              <MapPin size={12} strokeWidth={2.2} aria-hidden />
+              {app.location}
+            </span>
+          ) : null}
+          {app.salary ? (
+            <span className="tracker-card__chip tracker-card__chip--salary">
+              {app.salary}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      <footer className="tracker-card__foot">
+        <time dateTime={app.appliedAt ?? app.createdAt}>{when}</time>
+        {app.platform ? (
+          <span className="tracker-card__platform">{app.platform}</span>
         ) : null}
-      </div>
+      </footer>
     </article>
   );
 }

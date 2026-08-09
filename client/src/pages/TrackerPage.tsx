@@ -327,13 +327,12 @@ export function TrackerPage() {
       )}
 
       {!isLoading && total === 0 && (
-        <div className="dash-callout">
-          <div>
-            <h3>No applications yet</h3>
-            <p>
-              Start the Naukri co-pilot to fill your Tracker board columns.
-            </p>
-          </div>
+        <div className="tracker-empty">
+          <h3>Your pipeline is empty</h3>
+          <p>
+            Run the Naukri co-pilot to match jobs — they will land here so you
+            can drag them through Applied, Interview, and Offer.
+          </p>
           <Link className="dash-btn dash-btn--primary" to="/dashboard">
             Back to Dashboard
           </Link>
@@ -341,11 +340,9 @@ export function TrackerPage() {
       )}
 
       {total > 0 && filteredItems.length === 0 && (
-        <div className="dash-callout">
-          <div>
-            <h3>No matching cards</h3>
-            <p>Try clearing search or filters.</p>
-          </div>
+        <div className="tracker-empty">
+          <h3>No matching cards</h3>
+          <p>Try clearing search or filters.</p>
         </div>
       )}
 

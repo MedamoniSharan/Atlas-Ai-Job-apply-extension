@@ -25,7 +25,7 @@ async function waitForTabComplete(tabId: number, timeoutMs = 25000) {
   while (Date.now() - start < timeoutMs) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.status === 'complete') return tab;
-    await wait(400);
+    await wait(250);
   }
   return chrome.tabs.get(tabId);
 }
@@ -41,12 +41,36 @@ async function sendToTab<T>(
       return (await chrome.tabs.sendMessage(tabId, message)) as T;
     } catch (error) {
       lastError = error;
-      await wait(500);
+      await wait(400);
     }
   }
   throw lastError instanceof Error
     ? lastError
     : new Error('Failed to message content script');
+}
+
+/** Poll until SRP job cards exist — scan only, no pacing delay. */
+async function waitForSearchListReady(
+  tabId: number,
+  timeoutMs = 800
+): Promise<number> {
+  const end = Date.now() + timeoutMs;
+  let count = 0;
+  while (Date.now() < end) {
+    try {
+      const scrape = await sendToTab<{ jobs?: SearchResultJob[] }>(
+        tabId,
+        { type: 'RUN_SCAN_SCRAPE' },
+        1
+      );
+      count = scrape.jobs?.length ?? 0;
+      if (count > 0) return count;
+    } catch {
+      /* injecting */
+    }
+    await wait(50);
+  }
+  return count;
 }
 
 export type ScanResult = {
@@ -111,7 +135,7 @@ export async function runScan(options: {
   setActiveWorkTabId(tab.id);
 
   await waitForTabComplete(tab.id);
-  await wait(2500);
+  await waitForSearchListReady(tab.id);
 
   const login = await sendToTab<{
     loggedIn: boolean;
@@ -139,11 +163,11 @@ export async function runScan(options: {
     if (!searchUrlHasPreferenceFilters(tabInfo.url || '', prefs)) {
       await chrome.tabs.update(tab.id, { url: searchUrl, active: true });
       await waitForTabComplete(tab.id);
-      await wait(1500);
+      await waitForSearchListReady(tab.id);
     }
     await sendToTab(tab.id, { type: 'APPLY_PREFERENCE_FILTERS', prefs });
-    await wait(1800);
     await waitForTabComplete(tab.id);
+    await waitForSearchListReady(tab.id);
   } catch {
     /* filters are best-effort; URL params still apply */
   }

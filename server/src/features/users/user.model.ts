@@ -30,8 +30,8 @@ const preferencesSchema = new Schema(
     keywords: { type: [String], default: [] },
     locations: { type: [String], default: [] },
     experienceMin: { type: Number, default: 0 },
-    experienceMax: { type: Number, default: 30 },
-    minSalaryLpa: { type: Number },
+    experienceMax: { type: Number, default: 5 },
+    minSalaryLpa: { type: Number, default: 2 },
     workMode: {
       type: String,
       enum: ['any', 'office', 'hybrid', 'remote'],

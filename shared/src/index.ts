@@ -1,6 +1,7 @@
 export * from './admin';
 export * from './api';
 export * from './applySafety';
+export * from './companies';
 export * from './events';
 export * from './jobMeta';
 export * from './models';

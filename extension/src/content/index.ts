@@ -20,6 +20,61 @@ ensureChromeNamespace();
 const naukri = new NaukriAdapter();
 let lastFingerprint = '';
 let applyClickBound = false;
+let copilotRunning = false;
+
+function refreshCopilotRunningFlag(): void {
+  void chrome.storage.local.get(['copilotState'], (res) => {
+    copilotRunning = Boolean(
+      (res as { copilotState?: { running?: boolean } })?.copilotState?.running
+    );
+  });
+}
+
+/**
+ * While Cosmo co-pilot is running, keep all Naukri navigations in this tab —
+ * never spawn window.open / target=_blank tabs.
+ */
+function installSameTabNavigationGuard(): void {
+  refreshCopilotRunningFlag();
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.copilotState) return;
+    const next = changes.copilotState.newValue as
+      | { running?: boolean }
+      | undefined;
+    copilotRunning = Boolean(next?.running);
+  });
+
+  const previousOpen = window.open.bind(window);
+  window.open = ((
+    url?: string | URL | undefined,
+    target?: string,
+    features?: string
+  ) => {
+    if (
+      copilotRunning &&
+      url != null &&
+      String(url) &&
+      String(url) !== 'about:blank'
+    ) {
+      window.location.assign(String(url));
+      return window;
+    }
+    return previousOpen(url, target, features);
+  }) as typeof window.open;
+
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (!copilotRunning) return;
+      const a = (e.target as HTMLElement | null)?.closest('a');
+      if (!a || a.target !== '_blank') return;
+      a.setAttribute('target', '_self');
+    },
+    true
+  );
+}
+
+installSameTabNavigationGuard();
 
 function fingerprint(job: Partial<JobPayload>): string {
   return `${job.title}|${job.company}|${job.url ?? ''}|${job.status ?? ''}`;
@@ -363,13 +418,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           typeof message?.focusLocation === 'string'
             ? message.focusLocation
             : null;
-        // 1) Open All Filters  2) tick prefs  3) reconfirm — then bot scans.
-        let result = await applyPreferenceFiltersAsync(document, prefs, 550, {
+        // 1) Open All Filters  2) tick prefs  3) reconfirm — then bot scans (no slowdown).
+        let result = await applyPreferenceFiltersAsync(document, prefs, 200, {
           focusLocation,
         });
-        for (let attempt = 0; attempt < 12 && !result.ready; attempt++) {
-          await new Promise((r) => setTimeout(r, 800));
-          result = await applyPreferenceFiltersAsync(document, prefs, 550, {
+        for (let attempt = 0; attempt < 6 && !result.ready; attempt++) {
+          await new Promise((r) => setTimeout(r, 120));
+          result = await applyPreferenceFiltersAsync(document, prefs, 200, {
             focusLocation,
           });
         }
@@ -397,13 +452,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
 
         if (result.ready && !result.confirmed) {
-          await new Promise((r) => setTimeout(r, 700));
-          result = await applyPreferenceFiltersAsync(document, prefs, 550, {
+          result = await applyPreferenceFiltersAsync(document, prefs, 200, {
             focusLocation,
           });
         }
 
-        await new Promise((r) => setTimeout(r, 1500));
         const report = confirmPreferenceFilters(
           document,
           prefs,
@@ -442,11 +495,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id]'
         ).length;
         const step = Math.max(480, Math.floor(window.innerHeight * 0.85));
-        window.scrollBy({ top: step, behavior: 'smooth' });
-        await new Promise((r) => setTimeout(r, 1200));
-        // Nudge again so lazy-loaded cards appear.
-        window.scrollBy({ top: Math.floor(step * 0.4), behavior: 'smooth' });
-        await new Promise((r) => setTimeout(r, 900));
+        // Instant scroll while scanning — no smooth/slow animation waits.
+        window.scrollBy(0, step);
+        window.scrollBy(0, Math.floor(step * 0.4));
         const after = document.querySelectorAll(
           '.srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, div.row[data-job-id]'
         ).length;

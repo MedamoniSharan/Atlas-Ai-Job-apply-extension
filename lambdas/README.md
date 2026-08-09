@@ -75,6 +75,8 @@ Route map (ANY → Lambda proxy):
 | ANY | `/api/v1/events/{proxy+}` | cosmo-events |
 | ANY | `/api/v1/applications` | cosmo-applications |
 | ANY | `/api/v1/applications/{proxy+}` | cosmo-applications |
+| ANY | `/api/v1/companies` | cosmo-companies |
+| ANY | `/api/v1/companies/{proxy+}` | cosmo-companies |
 | ANY | `/api/v1/scan-sessions` | cosmo-scan-sessions |
 | ANY | `/api/v1/scan-sessions/{proxy+}` | cosmo-scan-sessions |
 | ANY | `/api/v1/billing/{proxy+}` | cosmo-billing |
