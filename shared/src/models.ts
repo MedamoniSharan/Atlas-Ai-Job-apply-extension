@@ -127,7 +127,7 @@ export const jobPreferencesSchema = z.object({
   minSalaryLpa: z.number().min(0).max(500).optional(),
   workMode: workModeSchema.default('any'),
   autoScanEnabled: z.boolean().default(true),
-  autoApplyEnabled: z.boolean().default(false),
+  autoApplyEnabled: z.boolean().default(true),
 });
 
 export type JobPreferences = z.infer<typeof jobPreferencesSchema>;
@@ -166,7 +166,7 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   minSalaryLpa: 2,
   workMode: 'any',
   autoScanEnabled: true,
-  autoApplyEnabled: false,
+  autoApplyEnabled: true,
 };
 
 export function preferencesAreComplete(prefs: JobPreferences | null | undefined): boolean {

@@ -19,7 +19,7 @@ function normalizePreferences(
     minSalaryLpa: raw?.minSalaryLpa ?? DEFAULT_JOB_PREFERENCES.minSalaryLpa,
     workMode: raw?.workMode ?? 'any',
     autoScanEnabled: raw?.autoScanEnabled ?? true,
-    autoApplyEnabled: raw?.autoApplyEnabled ?? false,
+    autoApplyEnabled: raw?.autoApplyEnabled ?? true,
   };
 }
 

@@ -10,5 +10,5 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   minSalaryLpa: 2,
   workMode: 'any',
   autoScanEnabled: true,
-  autoApplyEnabled: false,
+  autoApplyEnabled: true,
 };

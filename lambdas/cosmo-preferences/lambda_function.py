@@ -39,7 +39,7 @@ DEFAULT_PREFS = {
     "minSalaryLpa": 2,
     "workMode": "any",
     "autoScanEnabled": True,
-    "autoApplyEnabled": False,
+    "autoApplyEnabled": True,
 }
 
 dynamodb = boto3.resource("dynamodb")
@@ -176,7 +176,7 @@ def normalize_prefs(raw: Any) -> Dict[str, Any]:
         "minSalaryLpa": raw.get("minSalaryLpa") if raw.get("minSalaryLpa") is not None else 2,
         "workMode": raw.get("workMode") or "any",
         "autoScanEnabled": bool(raw.get("autoScanEnabled", True)),
-        "autoApplyEnabled": bool(raw.get("autoApplyEnabled", False)),
+        "autoApplyEnabled": bool(raw.get("autoApplyEnabled", True)),
     }
 
 

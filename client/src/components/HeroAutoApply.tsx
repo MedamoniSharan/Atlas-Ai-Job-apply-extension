@@ -74,6 +74,20 @@ export function HeroAutoApply() {
               </li>
             ))}
           </ul>
+          <a
+            className="hero-agent__producthunt"
+            href="https://www.producthunt.com/products/cosmo-job-assistant?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-cosmo-job-assistant"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img
+              alt="Cosmo Job Assistant - Naukri co-pilot match jobs & assist Easy Apply | Product Hunt"
+              width={250}
+              height={54}
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1213111&theme=light&t=1786299596221"
+              decoding="async"
+            />
+          </a>
         </div>
 
         <div className="hero-agent__visual">

@@ -38,7 +38,7 @@ const preferencesSchema = new Schema(
       default: 'any',
     },
     autoScanEnabled: { type: Boolean, default: true },
-    autoApplyEnabled: { type: Boolean, default: false },
+    autoApplyEnabled: { type: Boolean, default: true },
   },
   { _id: false }
 );

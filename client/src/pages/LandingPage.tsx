@@ -6,6 +6,7 @@ import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { PricingPlans } from '../components/PricingPlans';
 import { SeoHead } from '../components/SeoHead';
 import { SproutJobsMarquee } from '../components/SproutJobsMarquee';
+import { TestimonialMasonry } from '../components/TestimonialMasonry';
 import { TrustedCompanyMarquee } from '../components/TrustedCompanyMarquee';
 import {
   organizationJsonLd,
@@ -44,6 +45,8 @@ export function LandingPage() {
       <SproutJobsMarquee />
 
       <JobSearchSteps />
+
+      <TestimonialMasonry />
 
       <PricingPlans />
 
