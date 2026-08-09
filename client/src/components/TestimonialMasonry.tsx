@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Quote } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 type Testimonial = {
   id: string;
@@ -147,8 +147,11 @@ export function TestimonialMasonry() {
   });
 
   return (
-    <section className="testimonials" aria-label="Customer testimonials">
+    <section className="testimonials" aria-labelledby="testimonials-heading">
       <div className="testimonials__inner">
+        <h2 id="testimonials-heading" className="testimonials__title">
+          What people are saying about Cosmo
+        </h2>
         <div className="testimonials__nav" aria-label="Testimonial pages">
           <button
             type="button"
@@ -201,11 +204,6 @@ export function TestimonialMasonry() {
             </div>
           ))}
         </div>
-
-        <p className="testimonials__footnote">
-          <Quote size={14} aria-hidden="true" />
-          <span>What people are saying about Cosmo</span>
-        </p>
       </div>
     </section>
   );
