@@ -7372,11 +7372,16 @@ textarea {
   }
 }
 
-/* React Bits TextLoop (CSS stand-in for Tailwind utilities) */
+/* Landing TextLoop ribbon */
 .text-loop {
   position: relative;
   width: 100%;
   overflow: visible;
+  opacity: 0;
+}
+
+.text-loop--ready {
+  opacity: 1;
 }
 
 .text-loop__svg {

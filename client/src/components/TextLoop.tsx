@@ -1,6 +1,5 @@
 import {
   type CSSProperties,
-  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -86,7 +85,7 @@ const buildPath = (
 };
 
 export default function TextLoop({
-  text = 'React ✦ Bits',
+  text = 'Cosmo',
   shape = 'wave',
   path,
   speed = 90,
@@ -113,6 +112,7 @@ export default function TextLoop({
   const tailRef = useRef<SVGTextPathElement | null>(null);
 
   const [metrics, setMetrics] = useState<Metrics>({ length: 0, reps: 1 });
+  const ready = metrics.length > 0;
 
   const rawId = useId();
   const pathId = `text-loop-${rawId.replace(/:/g, '')}`;
@@ -143,6 +143,7 @@ export default function TextLoop({
     if (!pathEl || !measureEl) return undefined;
 
     let cancelled = false;
+    let raf = 0;
 
     const measure = () => {
       if (cancelled) return;
@@ -154,25 +155,36 @@ export default function TextLoop({
       } catch {
         return;
       }
-      if (!length) return;
+      if (!length || !unitWidth) return;
 
-      const reps = unitWidth > 0 ? Math.max(1, Math.round(length / unitWidth)) : 1;
+      // Fill ~one path length. textLength={length} then only nudges spacing —
+      // packing 2× (or even ceil+1) crushed "Naukri Auto Apply ✦" on reload.
+      const reps = Math.max(2, Math.round(length / unitWidth));
       setMetrics((prev) =>
         prev.length === length && prev.reps === reps ? prev : { length, reps }
       );
     };
 
-    measure();
+    const run = () => {
+      measure();
+      raf = requestAnimationFrame(measure);
+    };
+
     if (typeof document !== 'undefined' && document.fonts?.ready) {
-      document.fonts.ready.then(measure).catch(() => {});
+      document.fonts.ready.then(() => {
+        if (!cancelled) run();
+      }).catch(run);
+    } else {
+      run();
     }
 
     return () => {
       cancelled = true;
+      cancelAnimationFrame(raf);
     };
   }, [d, unit, fontSize, fontWeight, letterSpacing]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const { length } = metrics;
     const head = headRef.current;
     const tail = tailRef.current;
@@ -180,10 +192,11 @@ export default function TextLoop({
 
     const apply = (offset: number) => {
       const partner = offset >= 0 ? offset - length : offset + length;
-      head.setAttribute('startOffset', String(offset));
-      tail.setAttribute('startOffset', String(partner));
+      head.setAttribute('startOffset', `${offset}`);
+      tail.setAttribute('startOffset', `${partner}`);
     };
 
+    // Set partner offset before first paint so both paths never stack at 0.
     apply(0);
 
     const prefersReduced =
@@ -219,12 +232,12 @@ export default function TextLoop({
   }, [metrics, speed, direction, pauseOnHover]);
 
   const loopText = unit.repeat(metrics.reps);
-  const fitLength = metrics.length || undefined;
+  const fitLength = ready ? metrics.length : undefined;
 
   return (
     <div
       ref={rootRef}
-      className={`text-loop ${className}`.trim()}
+      className={`text-loop${ready ? ' text-loop--ready' : ''} ${className}`.trim()}
       style={style}
     >
       <svg
@@ -254,41 +267,45 @@ export default function TextLoop({
           {unit}
         </text>
 
-        <text
-          className="text-loop__copy"
-          style={textStyle}
-          fill={color}
-          dominantBaseline="central"
-          aria-hidden="true"
-        >
-          <textPath
-            ref={headRef}
-            href={`#${pathId}`}
-            startOffset={0}
-            textLength={fitLength}
-            lengthAdjust="spacing"
-          >
-            {loopText}
-          </textPath>
-        </text>
+        {ready ? (
+          <>
+            <text
+              className="text-loop__copy"
+              style={textStyle}
+              fill={color}
+              dominantBaseline="central"
+              aria-hidden="true"
+            >
+              <textPath
+                ref={headRef}
+                href={`#${pathId}`}
+                startOffset={0}
+                textLength={fitLength}
+                lengthAdjust="spacing"
+              >
+                {loopText}
+              </textPath>
+            </text>
 
-        <text
-          className="text-loop__copy"
-          style={textStyle}
-          fill={color}
-          dominantBaseline="central"
-          aria-hidden="true"
-        >
-          <textPath
-            ref={tailRef}
-            href={`#${pathId}`}
-            startOffset={0}
-            textLength={fitLength}
-            lengthAdjust="spacing"
-          >
-            {loopText}
-          </textPath>
-        </text>
+            <text
+              className="text-loop__copy"
+              style={textStyle}
+              fill={color}
+              dominantBaseline="central"
+              aria-hidden="true"
+            >
+              <textPath
+                ref={tailRef}
+                href={`#${pathId}`}
+                startOffset={-metrics.length}
+                textLength={fitLength}
+                lengthAdjust="spacing"
+              >
+                {loopText}
+              </textPath>
+            </text>
+          </>
+        ) : null}
       </svg>
     </div>
   );
