@@ -17,7 +17,12 @@ import {
   getCachedPreferences,
   DEFAULT_API,
 } from '../core/storageManager';
-import { resolveApiBase, injectedWebOrigins, googleLoginUrl } from '../core/allowedApiBases';
+import {
+  resolveApiBase,
+  resolveWebBase,
+  injectedWebOrigins,
+  googleLoginUrl,
+} from '../core/allowedApiBases';
 import { logger } from '../core/logger';
 import { handleError } from '../core/errorHandler';
 import { runScan } from '../core/scanManager';
@@ -210,14 +215,35 @@ async function reloadOpenDashboardTabs(): Promise<void> {
   }
 }
 
+/** Chrome opens this URL after uninstall so we can ask why they left. */
+async function syncUninstallUrl() {
+  try {
+    const { apiBaseUrl } = await getAuthState();
+    const web = resolveWebBase(apiBaseUrl).replace(/\/$/, '');
+    const version = chrome.runtime.getManifest().version;
+    const params = new URLSearchParams({
+      v: version,
+      src: 'chrome',
+    });
+    const url = `${web}/uninstall?${params.toString()}`;
+    await chrome.runtime.setUninstallURL(url);
+  } catch (error) {
+    logger.warn('Could not set uninstall URL', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   logger.info('Extension installed');
   chrome.alarms.create('sync-flush', { periodInMinutes: 1 });
   chrome.alarms.create('health-ping', { periodInMinutes: 5 });
+  void syncUninstallUrl();
   void reloadOpenDashboardTabs().then(() => sendExtensionConnected());
 });
 
 chrome.runtime.onStartup.addListener(() => {
+  void syncUninstallUrl();
   void sendExtensionConnected();
 });
 

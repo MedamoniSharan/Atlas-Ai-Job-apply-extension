@@ -779,6 +779,44 @@ export async function fetchAdminAudit(page = 1, limit = 40) {
   }>(`/api/v1/admin/audit?page=${page}&limit=${limit}`);
 }
 
+export async function fetchAdminUninstallFeedback(page = 1, limit = 40) {
+  return request<{
+    items: Array<{
+      id: string;
+      reason: string;
+      comment?: string;
+      email?: string;
+      extensionVersion?: string;
+      browser?: string;
+      source?: string;
+      ip?: string;
+      createdAt?: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(`/api/v1/admin/feedback/uninstall?page=${page}&limit=${limit}`);
+}
+
+export async function submitUninstallFeedback(body: {
+  reason: string;
+  comment?: string;
+  email?: string;
+  extensionVersion?: string;
+  browser?: string;
+  source?: string;
+}) {
+  return request<{ id: string }>(
+    '/api/v1/feedback/uninstall',
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+    false
+  );
+}
+
 export async function fetchInvoiceBlob(
   paymentId: string,
   mode: 'inline' | 'attachment' = 'attachment'

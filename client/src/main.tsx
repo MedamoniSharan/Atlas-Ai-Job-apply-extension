@@ -12,6 +12,7 @@ import { AdminSubscriptionsPage } from './admin/AdminSubscriptionsPage';
 import { AdminPaymentsPage } from './admin/AdminPaymentsPage';
 import { AdminPlansPage } from './admin/AdminPlansPage';
 import { AdminAuditPage } from './admin/AdminAuditPage';
+import { AdminFeedbackPage } from './admin/AdminFeedbackPage';
 import { AdminLoginPage } from './admin/AdminLoginPage';
 import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
@@ -25,6 +26,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LegalPage } from './pages/LegalPage';
 import { SupportPage } from './pages/SupportPage';
+import { UninstallFeedbackPage } from './pages/UninstallFeedbackPage';
 import { FaqPage } from './pages/FaqPage';
 import { BlogIndexPage } from './pages/BlogIndexPage';
 import { BlogPostPage } from './pages/BlogPostPage';
@@ -47,6 +49,7 @@ const app = (
           <Route path="/privacy" element={<LegalPage kind="privacy" />} />
           <Route path="/terms" element={<LegalPage kind="terms" />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/uninstall" element={<UninstallFeedbackPage />} />
           <Route path="/faq" element={<FaqPage />} />
           <Route path="/blog" element={<BlogIndexPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
@@ -73,6 +76,7 @@ const app = (
             <Route path="payments" element={<AdminPaymentsPage />} />
             <Route path="plans" element={<AdminPlansPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
+            <Route path="feedback" element={<AdminFeedbackPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

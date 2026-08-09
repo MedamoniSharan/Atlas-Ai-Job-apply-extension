@@ -10,6 +10,7 @@ Tables:
   CosmoSubscriptions   PK=subscriptionId  GSI UserSubsIndex (userId, createdAt)
   CosmoPlanConfigs     PK=tier
   CosmoAdminAudit      PK=auditId  GSI CreatedAtIndex (entityType, createdAt)
+  CosmoUninstallFeedback PK=feedbackId GSI CreatedAtIndex (entityType, createdAt)
   CosmoScanSessions    PK=userId SK=sessionId  (optional metrics)
 
 S3: INVOICES_BUCKET (default cosmo-invoices)
@@ -36,6 +37,7 @@ PAYMENTS_TABLE = os.environ.get("PAYMENTS_TABLE", "CosmoPayments")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE", "CosmoSubscriptions")
 PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "CosmoAdminAudit")
+UNINSTALL_FEEDBACK_TABLE = os.environ.get("UNINSTALL_FEEDBACK_TABLE", "CosmoUninstallFeedback")
 SCAN_SESSIONS_TABLE = os.environ.get("SCAN_SESSIONS_TABLE", "CosmoScanSessions")
 INVOICES_BUCKET = os.environ.get("INVOICES_BUCKET", "cosmo-invoices")
 JWT_ACCESS_SECRET = os.environ.get("JWT_ACCESS_SECRET", "dev-access-secret-change-me")
@@ -74,6 +76,7 @@ payments_tbl = ddb.Table(PAYMENTS_TABLE)
 subs_tbl = ddb.Table(SUBSCRIPTIONS_TABLE)
 plans_tbl = ddb.Table(PLAN_CONFIGS_TABLE)
 audit_tbl = ddb.Table(AUDIT_TABLE)
+feedback_tbl = ddb.Table(UNINSTALL_FEEDBACK_TABLE)
 scan_sessions_tbl = ddb.Table(SCAN_SESSIONS_TABLE)
 
 CORS = {
@@ -974,6 +977,48 @@ def list_audit(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
     return ok(event, data)
 
 
+def list_uninstall_feedback(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
+    q = qs(event)
+    page, limit = page_limit(q, 40)
+    reason = (q.get("reason") or "").strip()
+    try:
+        items, start = [], None
+        while True:
+            kw: Dict[str, Any] = {
+                "IndexName": "CreatedAtIndex",
+                "KeyConditionExpression": Key("entityType").eq("uninstall"),
+                "ScanIndexForward": False,
+            }
+            if start:
+                kw["ExclusiveStartKey"] = start
+            res = feedback_tbl.query(**kw)
+            items.extend(res.get("Items") or [])
+            start = res.get("LastEvaluatedKey")
+            if not start:
+                break
+    except Exception:
+        items = sorted(
+            [i for i in scan_all(feedback_tbl) if (i.get("entityType") or "uninstall") == "uninstall"],
+            key=lambda x: x.get("createdAt") or "",
+            reverse=True,
+        )
+    if reason:
+        items = [i for i in items if i.get("reason") == reason]
+    data = paginate(items, page, limit)
+    data["items"] = [{
+        "id": a.get("feedbackId"),
+        "reason": a.get("reason"),
+        "comment": a.get("comment") or "",
+        "email": a.get("email") or "",
+        "extensionVersion": a.get("extensionVersion") or "",
+        "browser": a.get("browser") or "",
+        "source": a.get("source") or "",
+        "ip": a.get("ip") or "",
+        "createdAt": a.get("createdAt"),
+    } for a in data["items"]]
+    return ok(event, data)
+
+
 # ─── Routing ───────────────────────────────────────────────────
 
 _RE_USER = re.compile(r"/admin/users/([^/]+)(?:/(plan|suspend|unsuspend|impersonate))?$")
@@ -1011,6 +1056,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "listPayments": list_payments,
         "listPlans": list_plans,
         "listAudit": list_audit,
+        "listUninstallFeedback": list_uninstall_feedback,
     }
     if action in actions:
         return actions[action](event, admin_id)
@@ -1047,6 +1093,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         ("/admin/payments", "GET"): list_payments,
         ("/admin/plans", "GET"): list_plans,
         ("/admin/audit", "GET"): list_audit,
+        ("/admin/feedback/uninstall", "GET"): list_uninstall_feedback,
     }
     for suffix, mth in list(rest.keys()):
         if path.endswith(suffix) and method == mth:

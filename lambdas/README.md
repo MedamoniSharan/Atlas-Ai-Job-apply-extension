@@ -22,6 +22,7 @@ Create these in **Asia Pacific (Hyderabad) `ap-south-2`** (on-demand billing is 
 | `CosmoSubscriptions` | `subscriptionId` (S) | — | `UserSubsIndex` PK=`userId` SK=`createdAt`; `RazorpaySubIndex` PK=`razorpaySubscriptionId` |
 | `CosmoPlanConfigs` | `tier` (S) | — | — |
 | `CosmoAdminAudit` | `auditId` (S) | — | `CreatedAtIndex` PK=`entityType` SK=`createdAt` |
+| `CosmoUninstallFeedback` | `feedbackId` (S) | — | `CreatedAtIndex` PK=`entityType` SK=`createdAt` |
 | `CosmoApplyCounters` | `userId` (S) | `periodKey` (S) | — |
 
 `periodKey` format (IST): `day#YYYY-MM-DD`, `month#YYYY-MM`, `hour#YYYY-MM-DDTHH` (hour optional; used by billing/me).
@@ -80,6 +81,7 @@ Route map (ANY → Lambda proxy):
 | ANY | `/api/v1/scan-sessions` | cosmo-scan-sessions |
 | ANY | `/api/v1/scan-sessions/{proxy+}` | cosmo-scan-sessions |
 | ANY | `/api/v1/billing/{proxy+}` | cosmo-billing |
+| ANY | `/api/v1/feedback/{proxy+}` | cosmo-feedback |
 | ANY | `/api/v1/admin/{proxy+}` | cosmo-admin |
 
 Enable CORS on the API for your web origin(s) and extension ID.  

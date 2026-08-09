@@ -2,16 +2,10 @@ import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useInView } from 'motion/react';
 import { CosmosIconMark, CosmovaiWordmark } from './CosmosLogo';
-
-const connectLinks = [
-  {
-    label: 'Instagram',
-    href: 'https://www.instagram.com/codex.career/',
-  },
-  { label: 'TikTok', href: '#', stub: true },
-  { label: 'X', href: '#', stub: true },
-  { label: 'Substack', href: '#', stub: true },
-] as const;
+import {
+  communityLinks,
+  type CommunityLink,
+} from '../content/communityLinks';
 
 const moreLinks = [
   { label: 'Support', to: '/support' as const },
@@ -76,12 +70,8 @@ function MoreLink({ link }: { link: (typeof moreLinks)[number] }) {
   return <Link to={link.to}>{link.label}</Link>;
 }
 
-function ConnectLink({
-  link,
-}: {
-  link: (typeof connectLinks)[number];
-}) {
-  const isStub = 'stub' in link && link.stub;
+function ConnectLink({ link }: { link: CommunityLink }) {
+  const isStub = Boolean(link.stub);
   return (
     <a
       href={link.href}
@@ -100,8 +90,8 @@ export function CosmosDreamFooter() {
       <footer className="site-footer">
         <div className="desktop-footer">
           <nav aria-label="Connect" className="footer-links">
-            {connectLinks.map((link) => (
-              <ConnectLink key={link.label} link={link} />
+            {communityLinks.map((link) => (
+              <ConnectLink key={link.icon} link={link} />
             ))}
           </nav>
           <div className="footer-center">
@@ -122,8 +112,8 @@ export function CosmosDreamFooter() {
           </div>
           <div className="mobile-nav-group">
             <h3>Connect</h3>
-            {connectLinks.map((link) => (
-              <ConnectLink key={link.label} link={link} />
+            {communityLinks.map((link) => (
+              <ConnectLink key={link.icon} link={link} />
             ))}
           </div>
           <div className="mobile-nav-group">

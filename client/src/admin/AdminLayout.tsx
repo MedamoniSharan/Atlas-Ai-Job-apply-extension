@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquareWarning,
   Receipt,
   ScrollText,
   Shield,
@@ -27,6 +28,7 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/payments')) return 'Payments';
   if (pathname.startsWith('/admin/plans')) return 'Plans';
   if (pathname.startsWith('/admin/audit')) return 'Audit log';
+  if (pathname.startsWith('/admin/feedback')) return 'Uninstall feedback';
   return 'Overview';
 }
 
@@ -112,6 +114,10 @@ export function AdminLayout() {
           <NavLink to="/admin/audit" className="admin-sidebar__link">
             <ScrollText size={17} strokeWidth={1.9} aria-hidden />
             Audit
+          </NavLink>
+          <NavLink to="/admin/feedback" className="admin-sidebar__link">
+            <MessageSquareWarning size={17} strokeWidth={1.9} aria-hidden />
+            Uninstall
           </NavLink>
         </nav>
 

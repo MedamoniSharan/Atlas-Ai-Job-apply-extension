@@ -7,6 +7,7 @@ import {
   adminPaymentsQuerySchema,
   adminSetPlanSchema,
   adminSubscriptionsQuerySchema,
+  adminUninstallFeedbackQuerySchema,
   adminUpdatePlanSchema,
   adminUsersQuerySchema,
   ok,
@@ -21,6 +22,7 @@ import {
 import { validateBody } from '../../middleware/validate';
 import * as adminService from './admin.service';
 import * as billingService from '../billing/billing.service';
+import * as feedbackService from '../feedback/feedback.service';
 
 export const adminRouter = Router();
 
@@ -256,6 +258,22 @@ adminRouter.get(
     const data = await adminService.listAudit(
       parsed.data.page,
       parsed.data.limit
+    );
+    res.json(ok(data));
+  })
+);
+
+adminRouter.get(
+  '/feedback/uninstall',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const parsed = adminUninstallFeedbackQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      throw new AppError('Validation failed', 400, 'VALIDATION_ERROR');
+    }
+    const data = await feedbackService.listUninstallFeedback(
+      parsed.data.page,
+      parsed.data.limit,
+      parsed.data.reason
     );
     res.json(ok(data));
   })
