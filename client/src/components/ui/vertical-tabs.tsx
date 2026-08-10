@@ -64,9 +64,9 @@ export function VerticalTabs() {
       className="w-full bg-white py-8 md:py-16 lg:py-24"
       aria-labelledby="vertical-tabs-title"
     >
-      <div className="mx-auto w-full px-4 md:px-8 lg:px-12 xl:px-20">
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
-          <div className="order-2 flex flex-col justify-center pt-4 lg:order-1 lg:col-span-6">
+      <div className="mx-auto w-full max-w-5xl px-4 md:px-8 lg:px-12">
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
+          <div className="order-2 flex flex-col justify-center pt-4 lg:order-1 lg:col-span-7">
             <div className="mb-12 space-y-1">
               <h2
                 id="vertical-tabs-title"
@@ -168,7 +168,7 @@ export function VerticalTabs() {
           </div>
 
           <div
-            className="order-1 flex justify-center lg:order-2 lg:col-span-6 lg:justify-end"
+            className="order-1 flex justify-center lg:order-2 lg:col-span-5 lg:justify-end"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
           >
