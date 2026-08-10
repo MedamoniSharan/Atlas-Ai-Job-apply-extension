@@ -74,6 +74,15 @@ export function VerticalTabs() {
               >
               <DiaTextReveal
                 text="How to install Cosmo"
+                colors={[
+                  '#ff0040',
+                  '#ff8a00',
+                  '#ffee00',
+                  '#00c853',
+                  '#00b0ff',
+                  '#7c4dff',
+                  '#e040fb',
+                ]}
                 textColor="#121212"
                 duration={3.2}
                 delay={0.1}
