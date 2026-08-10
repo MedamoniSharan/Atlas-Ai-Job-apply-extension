@@ -33,6 +33,7 @@ import { BlogPostPage } from './pages/BlogPostPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { googleClientId } from './lib/googleAuth';
 import './styles.css';
+import './styles/tailwind.css';
 import './admin/admin.css';
 
 const queryClient = new QueryClient();

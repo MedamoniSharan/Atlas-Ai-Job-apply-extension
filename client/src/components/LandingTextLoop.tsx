@@ -9,16 +9,16 @@ export function LandingTextLoop() {
         speed={90}
         direction="forward"
         separator="✦"
-        curviness={28}
-        fontSize={34}
+        curviness={18}
+        fontSize={22}
         fontWeight={800}
-        letterSpacing={2}
+        letterSpacing={1.5}
         uppercase
         color="#ffffff"
         ribbon
-        ribbonColor="#15362b"
-        ribbonWidth={64}
-        viewHeight={148}
+        ribbonColor="#000000"
+        ribbonWidth={40}
+        viewHeight={96}
         pauseOnHover={false}
       />
     </section>

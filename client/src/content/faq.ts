@@ -37,7 +37,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'How do I install the Cosmo Chrome extension?',
     answer:
-      'Open the Cosmo Chrome Web Store listing from cosmovai.in (Add to Chrome), install Cosmo Job Assistant, then sign in to the Cosmo dashboard with Google so the extension can sync your session.',
+      'Open the Cosmo Chrome Web Store listing from cosmovai.in (Add to Chrome), install Cosmo Job Assistant, then sign in to the Cosmo dashboard with Google so the extension can sync your session. For a full walkthrough, watch the step-by-step YouTube guide: https://www.youtube.com/shorts/1Rv02UdoHLo',
   },
   {
     question: 'What do I need before using the Naukri co-pilot?',

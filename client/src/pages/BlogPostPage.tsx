@@ -2,6 +2,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { SeoHead } from '../components/SeoHead';
+import { TutorialVideo } from '../components/TutorialVideo';
 import { getBlogPost } from '../content/blog';
 import { CHROME_EXTENSION_URL } from '../lib/chromeExtension';
 import {
@@ -69,6 +70,7 @@ export function BlogPostPage() {
               : ''}
           </p>
           <div className="legal-body">
+            {post.videoUrl ? <TutorialVideo /> : null}
             {post.sections.map((section, i) => (
               <section key={i}>
                 {section.heading ? <h2>{section.heading}</h2> : null}
@@ -87,6 +89,17 @@ export function BlogPostPage() {
 
             <h2>Next steps</h2>
             <ul>
+              {post.videoUrl ? (
+                <li>
+                  <a
+                    href={post.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Watch the step-by-step video on YouTube
+                  </a>
+                </li>
+              ) : null}
               <li>
                 <a
                   href={CHROME_EXTENSION_URL}

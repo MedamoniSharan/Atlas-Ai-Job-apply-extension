@@ -5,7 +5,9 @@ import { useAuthStore } from '../store/authStore';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import { BrowserStoreButtons } from '../components/BrowserStoreButtons';
 import { CosmosLoader } from '../components/CosmosLogo';
+import { TutorialVideo } from '../components/TutorialVideo';
 import { ONBOARDING_QUERY_KEY } from '../lib/onboarding';
+import { TUTORIAL_VIDEO_PREVIEW_SECONDS } from '../lib/tutorialVideo';
 
 export function GetStartedPage() {
   const user = useAuthStore((s) => s.user);
@@ -67,6 +69,20 @@ export function GetStartedPage() {
         <section className="get-extension__stores" aria-labelledby="stores-heading">
           <h3 id="stores-heading">Install for Chrome</h3>
           <BrowserStoreButtons featured="chrome" />
+        </section>
+
+        <section
+          className="get-extension__video"
+          aria-labelledby="tutorial-heading"
+        >
+          <h3 id="tutorial-heading">Step-by-step video</h3>
+          <p className="muted">
+            Watch how to install Cosmo and run assisted Easy Apply on Naukri.
+          </p>
+          <TutorialVideo
+            shortsPlayer
+            stopAfterSeconds={TUTORIAL_VIDEO_PREVIEW_SECONDS}
+          />
         </section>
 
         {!extensionDone ? (

@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { SeoHead } from '../components/SeoHead';
+import { TutorialVideo } from '../components/TutorialVideo';
 import { CHROME_EXTENSION_URL } from '../lib/chromeExtension';
 import { breadcrumbJsonLd, webPageJsonLd } from '../lib/jsonLd';
 import { SUPPORT_EMAIL } from '../lib/seo';
+import { TUTORIAL_VIDEO_URL } from '../lib/tutorialVideo';
 import '../styles/landing-fonts.css';
 
 const DESCRIPTION =
@@ -57,6 +59,18 @@ export function SupportPage() {
             </ul>
 
             <h2>Installing the extension</h2>
+            <p>
+              Prefer a walkthrough? Watch the{' '}
+              <a
+                href={TUTORIAL_VIDEO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                step-by-step install &amp; how-to video
+              </a>
+              .
+            </p>
+            <TutorialVideo />
             <ol>
               <li>
                 Open the{' '}

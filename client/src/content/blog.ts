@@ -1,3 +1,5 @@
+import { TUTORIAL_VIDEO_URL } from '../lib/tutorialVideo';
+
 export type BlogSection = {
   heading?: string;
   paragraphs: string[];
@@ -10,6 +12,8 @@ export type BlogPost = {
   description: string;
   datePublished: string;
   dateModified?: string;
+  /** Optional YouTube Short / walkthrough embed for the guide */
+  videoUrl?: string;
   sections: BlogSection[];
 };
 
@@ -20,6 +24,7 @@ export const BLOG_POSTS: BlogPost[] = [
     description:
       'Step-by-step guide to installing Cosmo, setting preferences, consenting to co-pilot, and assisting Naukri Easy Apply at a human pace.',
     datePublished: '2026-08-01',
+    videoUrl: TUTORIAL_VIDEO_URL,
     sections: [
       {
         paragraphs: [
@@ -29,7 +34,7 @@ export const BLOG_POSTS: BlogPost[] = [
       {
         heading: '1. Install and sign in',
         paragraphs: [
-          'Add Cosmo from the Chrome Web Store, open cosmovai.in, and sign in with Google. The extension receives your session from the dashboard so sync stays in one account.',
+          'Add Cosmo from the Chrome Web Store, open cosmovai.in, and sign in with Google. The extension receives your session from the dashboard so sync stays in one account. Prefer video? Follow the embedded walkthrough above.',
         ],
       },
       {

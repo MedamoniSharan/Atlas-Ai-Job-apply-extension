@@ -8,6 +8,7 @@ import {
   faqPageJsonLd,
   webPageJsonLd,
 } from '../lib/jsonLd';
+import { TUTORIAL_VIDEO_URL } from '../lib/tutorialVideo';
 import '../styles/landing-fonts.css';
 
 export function FaqPage() {
@@ -83,6 +84,15 @@ export function FaqPage() {
 
             <h2>Guides</h2>
             <ul>
+              <li>
+                <a
+                  href={TUTORIAL_VIDEO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Step-by-step install &amp; how-to video
+                </a>
+              </li>
               <li>
                 <Link to="/blog/naukri-easy-apply-copilot-guide">
                   Naukri Easy Apply co-pilot walkthrough

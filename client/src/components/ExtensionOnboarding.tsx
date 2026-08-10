@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { BrowserStoreButtons } from './BrowserStoreButtons';
+import { TutorialVideo } from './TutorialVideo';
 import { ONBOARDING_QUERY_KEY } from '../lib/onboarding';
 
 export function ExtensionOnboarding({
@@ -30,6 +31,8 @@ export function ExtensionOnboarding({
       </div>
 
       <BrowserStoreButtons featured="chrome" />
+
+      <TutorialVideo compact={compact} />
 
       <ol className="onboarding__steps">
         <li className="onboarding__step onboarding__step--active">

@@ -3,6 +3,7 @@ import { HeroAutoApply } from '../components/HeroAutoApply';
 import { JobSearchSteps } from '../components/JobSearchSteps';
 import { LandingTextLoop } from '../components/LandingTextLoop';
 import { LandingNavbar } from '../components/LandingNavbar';
+import { LandingTutorialSection } from '../components/LandingTutorialSection';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { PricingPlans } from '../components/PricingPlans';
 import { RateUsSection } from '../components/RateUsSection';
@@ -49,6 +50,8 @@ export function LandingPage() {
       <LandingTextLoop />
 
       <JobSearchSteps />
+
+      <LandingTutorialSection />
 
       <TestimonialMasonry />
 
