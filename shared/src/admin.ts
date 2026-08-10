@@ -85,7 +85,7 @@ export type AdminAuditQuery = z.infer<typeof adminAuditQuerySchema>;
 
 export const adminMetricsQuerySchema = z.object({
   /** Preset window or calendar month/year. `days` kept for backward compatibility. */
-  range: z.enum(['7d', '30d', '90d', 'month', 'year']).optional(),
+  range: z.enum(['7d', '30d', '90d', 'month', 'year', 'all']).optional(),
   days: z.coerce.number().int().min(7).max(90).optional(),
   year: z.coerce.number().int().min(2020).max(2100).optional(),
   month: z.coerce.number().int().min(1).max(12).optional(),

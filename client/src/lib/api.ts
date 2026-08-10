@@ -497,7 +497,7 @@ export async function fetchScanStats(
 // ─── Admin API ───────────────────────────────────────────────
 
 export async function fetchAdminMetrics(params: {
-  range?: '7d' | '30d' | '90d' | 'month' | 'year';
+  range?: '7d' | '30d' | '90d' | 'month' | 'year' | 'all';
   days?: number;
   year?: number;
   month?: number;
@@ -510,7 +510,7 @@ export async function fetchAdminMetrics(params: {
   const qs = search.toString();
   return request<{
     period: {
-      range: '7d' | '30d' | '90d' | 'month' | 'year';
+      range: '7d' | '30d' | '90d' | 'month' | 'year' | 'all';
       grain: 'day' | 'month';
       label: string;
       year: number;
@@ -540,6 +540,13 @@ export async function fetchAdminMetrics(params: {
     series: {
       revenueDaily: Array<{ date: string; amountPaise: number; count: number }>;
       signupsDaily: Array<{ date: string; count: number }>;
+      jobsDaily: Array<{
+        date: string;
+        sessions: number;
+        scanned: number;
+        matched: number;
+        applied: number;
+      }>;
       planMix: Array<{ tier: string; count: number }>;
       paymentOutcomes: Array<{ status: string; count: number }>;
       subsByTier: Array<{ tier: string; count: number }>;
@@ -566,6 +573,13 @@ export async function fetchAdminMetrics(params: {
         updatedAt?: string;
         userName?: string;
         userEmail?: string;
+      }>;
+      powerUsers: Array<{
+        rank: number;
+        userId: string;
+        userName?: string;
+        userEmail?: string;
+        applied: number;
       }>;
     };
   }>(`/api/v1/admin/metrics${qs ? `?${qs}` : ''}`);

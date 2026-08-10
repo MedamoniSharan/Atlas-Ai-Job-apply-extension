@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Zap } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -39,7 +40,7 @@ const MONTHS = [
   { value: 12, label: 'December' },
 ] as const;
 
-type Range = '7d' | '30d' | '90d' | 'month' | 'year';
+type Range = '7d' | '30d' | '90d' | 'month' | 'year' | 'all';
 
 function yearOptions(): number[] {
   const current = new Date().getFullYear();
@@ -54,7 +55,56 @@ function formatAxisDate(value: string, grain: 'day' | 'month'): string {
     if (!y || !m) return value;
     return `${MONTHS[Number(m) - 1]?.label.slice(0, 3) ?? m} ${y}`;
   }
-  return value.length >= 10 ? value.slice(5) : value;
+  if (value.length >= 10) {
+    const day = Number(value.slice(8, 10));
+    const monthIdx = Number(value.slice(5, 7)) - 1;
+    const mon = MONTHS[monthIdx]?.label.slice(0, 3);
+    if (mon && Number.isFinite(day)) return `${day} ${mon}`;
+    return value.slice(5);
+  }
+  return value;
+}
+
+function toUtcDayKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function toUtcMonthKey(d: Date): string {
+  return d.toISOString().slice(0, 7);
+}
+
+/** Fill every day/month in the metrics window so the chart X-axis shows the full range. */
+function enumeratePeriodBuckets(
+  sinceIso: string,
+  untilIso: string,
+  grain: 'day' | 'month'
+): string[] {
+  const since = new Date(sinceIso);
+  const until = new Date(untilIso);
+  if (Number.isNaN(since.getTime()) || Number.isNaN(until.getTime()) || since >= until) {
+    return [];
+  }
+
+  const out: string[] = [];
+  if (grain === 'month') {
+    const cursor = new Date(Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), 1));
+    while (cursor < until) {
+      out.push(toUtcMonthKey(cursor));
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      if (out.length > 120) break;
+    }
+    return out;
+  }
+
+  const cursor = new Date(
+    Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), since.getUTCDate())
+  );
+  while (cursor < until) {
+    out.push(toUtcDayKey(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (out.length > 100) break;
+  }
+  return out;
 }
 
 export function AdminOverviewPage() {
@@ -94,7 +144,9 @@ export function AdminOverviewPage() {
       ? `${MONTHS[(period.month ?? 1) - 1]?.label ?? ''} ${period.year}`
       : period.range === 'year'
         ? String(period.year)
-        : period.label;
+        : period.range === 'all'
+          ? 'All time'
+          : period.label;
 
   const revenueChart = series.revenueDaily.map((d) => ({
     date: formatAxisDate(d.date, grain),
@@ -105,6 +157,26 @@ export function AdminOverviewPage() {
     date: formatAxisDate(d.date, grain),
     signups: d.count,
   }));
+  const jobsByDate = new Map(
+    (series.jobsDaily ?? []).map((d) => [d.date, d] as const)
+  );
+  const jobBuckets = enumeratePeriodBuckets(period.since, period.until, grain);
+  const jobsChart =
+    jobBuckets.length > 0
+      ? jobBuckets.map((key) => {
+          const row = jobsByDate.get(key);
+          return {
+            date: formatAxisDate(key, grain),
+            scanned: row?.scanned ?? 0,
+            applied: row?.applied ?? 0,
+          };
+        })
+      : (series.jobsDaily ?? []).map((d) => ({
+          date: formatAxisDate(d.date, grain),
+          scanned: d.scanned,
+          applied: d.applied,
+        }));
+  const jobsAngleLabels = jobsChart.length > 12;
 
   return (
     <div className="admin-page">
@@ -121,6 +193,7 @@ export function AdminOverviewPage() {
             <option value="90d">Last 90 days</option>
             <option value="month">Month</option>
             <option value="year">Year</option>
+            <option value="all">All time</option>
           </select>
         </label>
 
@@ -204,6 +277,31 @@ export function AdminOverviewPage() {
       </div>
 
       <div className="admin-chart-grid">
+        <section className="admin-panel admin-panel--wide">
+          <h2>Engine Performance (Scanned vs Applied)</h2>
+          <div className="admin-chart">
+            <ResponsiveContainer width="100%" height={jobsAngleLabels ? 320 : 280}>
+              <BarChart data={jobsChart} margin={{ bottom: jobsAngleLabels ? 8 : 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  interval={0}
+                  minTickGap={0}
+                  tick={{ fontSize: 12, fill: '#334155' }}
+                  angle={jobsAngleLabels ? -40 : 0}
+                  textAnchor={jobsAngleLabels ? 'end' : 'middle'}
+                  height={jobsAngleLabels ? 64 : 40}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="scanned" fill="#6366f1" name="Jobs Scanned" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="applied" fill="#10b981" name="Jobs Applied" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
         <section className="admin-panel">
           <h2>Revenue ({periodLabel})</h2>
           <div className="admin-chart">
@@ -282,6 +380,28 @@ export function AdminOverviewPage() {
       </div>
 
       <div className="admin-lists-grid">
+        <section className="admin-panel admin-power-users">
+          <h2>
+            <Zap size={16} aria-hidden />
+            Power Users ({periodLabel})
+          </h2>
+          <ul className="admin-power-users__list">
+            {(lists.powerUsers ?? []).map((u) => (
+              <li key={u.userId}>
+                <span className="admin-power-users__rank">{u.rank}.</span>
+                <span className="admin-power-users__name">
+                  {u.userName || u.userEmail || '—'}
+                </span>
+                <span className="admin-power-users__badge">
+                  {u.applied.toLocaleString()} applied
+                </span>
+              </li>
+            ))}
+            {(lists.powerUsers ?? []).length === 0 ? (
+              <li className="muted">No applies in this period</li>
+            ) : null}
+          </ul>
+        </section>
         <section className="admin-panel">
           <h2>Recent payments</h2>
           <ul className="admin-mini-list">

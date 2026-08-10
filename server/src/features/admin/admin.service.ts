@@ -83,7 +83,7 @@ function daysAgo(n: number): Date {
 }
 
 type MetricsPeriod = {
-  range: '7d' | '30d' | '90d' | 'month' | 'year';
+  range: '7d' | '30d' | '90d' | 'month' | 'year' | 'all';
   since: Date;
   until: Date;
   grain: 'day' | 'month';
@@ -102,6 +102,17 @@ function resolveMetricsPeriod(query: AdminMetricsQuery): MetricsPeriod {
     if (query.days === 7) range = '7d';
     else if (query.days === 90) range = '90d';
     else range = '30d';
+  }
+
+  if (range === 'all') {
+    return {
+      range: 'all',
+      since: new Date(0),
+      until: now,
+      grain: 'month',
+      label: 'All time',
+      year: currentYear,
+    };
   }
 
   if (range === '7d' || range === '30d' || range === '90d') {
@@ -169,6 +180,8 @@ export async function getMetrics(query: AdminMetricsQuery) {
     haltedSubs,
     jobTotalsAll,
     jobTotalsPeriod,
+    jobsSeries,
+    powerUsersRaw,
   ] = await Promise.all([
     UserModel.countDocuments(),
     UserModel.countDocuments({ createdAt: { $gte: day7 } }),
@@ -288,6 +301,47 @@ export async function getMetrics(query: AdminMetricsQuery) {
         },
       },
     ]),
+    ScanSessionModel.aggregate<{
+      _id: string;
+      sessions: number;
+      scanned: number;
+      matched: number;
+      applied: number;
+    }>([
+      {
+        $match: {
+          startedAt: { $gte: period.since, $lt: period.until },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: dateFormat, date: '$startedAt' },
+          },
+          sessions: { $sum: 1 },
+          scanned: { $sum: '$scanned' },
+          matched: { $sum: '$matched' },
+          applied: { $sum: '$applied' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    ScanSessionModel.aggregate<{ _id: unknown; applied: number }>([
+      {
+        $match: {
+          startedAt: { $gte: period.since, $lt: period.until },
+        },
+      },
+      {
+        $group: {
+          _id: '$userId',
+          applied: { $sum: '$applied' },
+        },
+      },
+      { $match: { applied: { $gt: 0 } } },
+      { $sort: { applied: -1 } },
+      { $limit: 10 },
+    ]),
   ]);
 
   const jobAll = jobTotalsAll[0] ?? {
@@ -325,6 +379,25 @@ export async function getMetrics(query: AdminMetricsQuery) {
     { $match: createdInPeriod },
     { $group: { _id: '$status', count: { $sum: 1 } } },
   ]);
+
+  const powerUserDocs = await UserModel.find({
+    _id: { $in: powerUsersRaw.map((r) => r._id) },
+  })
+    .select('name email')
+    .lean();
+  const powerUserMap = new Map(
+    powerUserDocs.map((u) => [u._id.toString(), u] as const)
+  );
+  const powerUsers = powerUsersRaw.map((r, i) => {
+    const u = powerUserMap.get(String(r._id));
+    return {
+      rank: i + 1,
+      userId: String(r._id),
+      userName: u?.name,
+      userEmail: u?.email,
+      applied: r.applied,
+    };
+  });
 
   const plans = await listPlanConfigs();
   const priceByTier = Object.fromEntries(
@@ -385,6 +458,13 @@ export async function getMetrics(query: AdminMetricsQuery) {
       signupsDaily: signupsSeries.map((r) => ({
         date: r._id,
         count: r.count,
+      })),
+      jobsDaily: jobsSeries.map((r) => ({
+        date: r._id,
+        sessions: r.sessions,
+        scanned: r.scanned,
+        matched: r.matched,
+        applied: r.applied,
       })),
       planMix: [
         { tier: 'free', count: mixMap.free ?? 0 },
@@ -447,6 +527,7 @@ export async function getMetrics(query: AdminMetricsQuery) {
           userEmail: u?.email,
         };
       }),
+      powerUsers,
     },
   };
 }

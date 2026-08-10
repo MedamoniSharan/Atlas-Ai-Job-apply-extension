@@ -437,7 +437,10 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
     q, now = qs(event), datetime.now(timezone.utc)
     rk = q.get("range") or ("7d" if q.get("days") == "7" else "90d" if q.get("days") == "90" else "30d")
     year = month = None
-    if rk in ("7d", "30d", "90d"):
+    if rk == "all":
+        since, until, grain, label = datetime(1970, 1, 1, tzinfo=timezone.utc), now, "month", "All time"
+        year = now.year
+    elif rk in ("7d", "30d", "90d"):
         days = {"7d": 7, "30d": 30, "90d": 90}[rk]
         since, until, grain, label = now - timedelta(days=days), now, "day", rk
         year = now.year
@@ -493,6 +496,43 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
 
     job_all = sum_job_stats(scan_sessions)
     job_period = sum_job_stats(scan_sessions, since=since, until=until)
+    jobs_map: Dict[str, Dict[str, int]] = {}
+    for s in scan_sessions:
+        if not in_p(s.get("startedAt")):
+            continue
+        b = bucket(s.get("startedAt"))
+        if not b:
+            continue
+        row = jobs_map.setdefault(b, {"sessions": 0, "scanned": 0, "matched": 0, "applied": 0})
+        row["sessions"] += 1
+        row["scanned"] += as_int(s.get("scanned"))
+        row["matched"] += as_int(s.get("matched"))
+        row["applied"] += as_int(s.get("applied"))
+
+    applied_by_user: Dict[str, int] = {}
+    for s in scan_sessions:
+        if not in_p(s.get("startedAt")):
+            continue
+        uid = s.get("userId") or ""
+        if not uid:
+            continue
+        applied_by_user[uid] = applied_by_user.get(uid, 0) + as_int(s.get("applied"))
+    top_power = sorted(
+        ((uid, n) for uid, n in applied_by_user.items() if n > 0),
+        key=lambda x: x[1],
+        reverse=True,
+    )[:10]
+    power_map = umap([uid for uid, _ in top_power])
+    power_users = [
+        {
+            "rank": i + 1,
+            "userId": uid,
+            "userName": uinfo(power_map, uid)[0],
+            "userEmail": uinfo(power_map, uid)[1],
+            "applied": applied,
+        }
+        for i, (uid, applied) in enumerate(top_power)
+    ]
 
     m = umap([p.get("userId") for p in payments] + [s.get("userId") for s in subs])
     recent = sorted([p for p in payments if p.get("status") == "paid"], key=lambda x: x.get("createdAt") or "", reverse=True)[:8]
@@ -528,6 +568,7 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
         "series": {
             "revenueDaily": [{"date": d, **v} for d, v in sorted(rev_map.items())],
             "signupsDaily": [{"date": d, "count": c} for d, c in sorted(signup_map.items())],
+            "jobsDaily": [{"date": d, **v} for d, v in sorted(jobs_map.items())],
             "planMix": [{"tier": t, "count": mix[t]} for t in ("free", "pro", "max")],
             "paymentOutcomes": [{"status": s, "count": c} for s, c in outcomes.items()],
             "subsByTier": [{"tier": t, "count": sum(1 for s in active if s.get("tier") == t)} for t in ("pro", "max")],
@@ -548,6 +589,7 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
                  "userName": uinfo(m, s.get("userId"))[0], "userEmail": uinfo(m, s.get("userId"))[1]}
                 for s in halted
             ],
+            "powerUsers": power_users,
         },
     })
 
