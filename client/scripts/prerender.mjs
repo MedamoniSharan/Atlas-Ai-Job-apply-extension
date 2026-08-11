@@ -293,14 +293,10 @@ function injectHead(html, route) {
 }
 
 function injectBody(html, route) {
-  const shell = `<div id="root">${route.bodyHtml.trim()}</div>`;
-  if (/<div id="root"><\/div>/i.test(html)) {
-    return html.replace(/<div id="root"><\/div>/i, shell);
-  }
-  if (/<div id="root">[\s\S]*?<\/div>/i.test(html)) {
-    return html.replace(/<div id="root">[\s\S]*?<\/div>/i, shell);
-  }
-  return html;
+  // Keep SEO markup in the HTML source for crawlers, but hide it visually so
+  // visitors never see a flash of unstyled text before React mounts.
+  const shell = `<div id="root"><div data-seo-prerender hidden>${route.bodyHtml.trim()}</div></div>`;
+  return html.replace(/<div id="root">[\s\S]*?<\/div>\s*<\/body>/i, `${shell}\n  </body>`);
 }
 
 function writeRoute(indexHtml, route) {

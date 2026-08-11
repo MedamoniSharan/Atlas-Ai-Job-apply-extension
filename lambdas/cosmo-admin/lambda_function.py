@@ -51,7 +51,7 @@ CORS_ORIGINS = [
 PLAN_PRICES_PAISE = {"pro": 9900, "max": 29900}
 PLAN_DISPLAY = {"free": "Basic", "pro": "Premium", "max": "UltraMag"}
 PLAN_LIMITS = {
-    "free": {"monthlyApplies": 50, "monthlyScans": 500, "appliesPerHour": 6, "appliesPerDay": 15},
+    "free": {"monthlyApplies": 30, "monthlyScans": 500, "appliesPerHour": 6, "appliesPerDay": 15},
     "pro": {"monthlyApplies": 300, "monthlyScans": 1500, "appliesPerHour": 12, "appliesPerDay": 40},
     "max": {"monthlyApplies": 1000, "monthlyScans": 5000, "appliesPerHour": 18, "appliesPerDay": 60},
 }
@@ -367,6 +367,12 @@ def seed_plans() -> List[Dict[str, Any]]:
                 "createdAt": now_iso(), "updatedAt": now_iso(),
             }
             plans_tbl.put_item(Item=item)
+        elif tier == "free":
+            limits = dict(item.get("limits") or {})
+            if as_int(limits.get("monthlyApplies"), 0) == 50:
+                limits["monthlyApplies"] = PLAN_LIMITS["free"]["monthlyApplies"]
+                item = {**item, "limits": limits, "updatedAt": now_iso()}
+                plans_tbl.put_item(Item=item)
         out.append(item)
     return out
 

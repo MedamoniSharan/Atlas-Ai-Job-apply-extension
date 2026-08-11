@@ -20,7 +20,7 @@ const PLAN_LABEL: Record<PlanTier, string> = {
 };
 
 const PLAN_FEATURES: Record<PlanTier, string[]> = {
-  free: ['50 automated applies / month', '500 multi-board scans / month'],
+  free: ['30 automated applies / month', '500 multi-board scans / month'],
   pro: [
     '300 automated applies / month',
     '1500 multi-board scans / month',

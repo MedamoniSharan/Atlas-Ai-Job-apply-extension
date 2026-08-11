@@ -95,3 +95,4 @@ createRoot(document.getElementById('root')!).render(
     )}
   </StrictMode>
 );
+document.documentElement.classList.add('app-ready');

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { useInView } from 'motion/react';
 import {
   TUTORIAL_VIDEO_EMBED_URL,
   TUTORIAL_VIDEO_HEIGHT,
@@ -21,6 +22,11 @@ type TutorialVideoProps = {
   shortsPlayer?: boolean;
   /** Autoplay muted, then pause after this many seconds (landing preview). */
   stopAfterSeconds?: number;
+  /**
+   * Start muted autoplay only after this player scrolls into view.
+   * Defaults to true when `stopAfterSeconds` is set.
+   */
+  playOnView?: boolean;
   className?: string;
 };
 
@@ -91,18 +97,35 @@ export function TutorialVideo({
   hideFallbackLink = false,
   shortsPlayer = false,
   stopAfterSeconds,
+  playOnView,
   className = '',
 }: TutorialVideoProps) {
   const rawId = useId();
   const playerHostId = `cosmo-yt-${rawId.replace(/:/g, '')}`;
+  const rootRef = useRef<HTMLElement>(null);
   const playerRef = useRef<YtPlayer | null>(null);
   const pollRef = useRef<number | null>(null);
   const previewStoppedRef = useRef(false);
   const useControlledPreview =
     typeof stopAfterSeconds === 'number' && stopAfterSeconds > 0;
+  const shouldPlayOnView = playOnView ?? useControlledPreview;
+
+  const isInView = useInView(rootRef, {
+    once: false,
+    amount: 0.45,
+    margin: '0px 0px -8% 0px',
+  });
+  const isInViewRef = useRef(isInView);
+  isInViewRef.current = isInView;
+  const [activated, setActivated] = useState(!shouldPlayOnView);
 
   useEffect(() => {
-    if (!useControlledPreview) return;
+    if (!shouldPlayOnView) return;
+    if (isInView) setActivated(true);
+  }, [isInView, shouldPlayOnView]);
+
+  useEffect(() => {
+    if (!useControlledPreview || !activated) return;
 
     let cancelled = false;
     const limit = stopAfterSeconds;
@@ -126,13 +149,14 @@ export function TutorialVideo({
           playsinline: 1,
           rel: 0,
           controls: 1,
-          autoplay: 1,
+          autoplay: shouldPlayOnView ? 0 : 1,
           mute: 1,
           modestbranding: 0,
         },
         events: {
           onReady: (event) => {
             if (cancelled) return;
+            if (shouldPlayOnView && !isInViewRef.current) return;
             event.target.playVideo();
           },
           onStateChange: (event) => {
@@ -166,15 +190,41 @@ export function TutorialVideo({
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [playerHostId, stopAfterSeconds, useControlledPreview]);
+  }, [
+    activated,
+    playerHostId,
+    shouldPlayOnView,
+    stopAfterSeconds,
+    useControlledPreview,
+  ]);
+
+  useEffect(() => {
+    if (!useControlledPreview || !shouldPlayOnView) return;
+    const player = playerRef.current;
+    if (!player || previewStoppedRef.current) return;
+
+    if (isInView) {
+      player.playVideo();
+    } else {
+      player.pauseVideo();
+    }
+  }, [isInView, shouldPlayOnView, useControlledPreview]);
 
   return (
     <figure
+      ref={rootRef}
       className={`tutorial-video${compact ? ' tutorial-video--compact' : ''}${shortsPlayer ? ' tutorial-video--shorts' : ''}${className ? ` ${className}` : ''}`}
     >
       <div className="tutorial-video__frame">
         {useControlledPreview ? (
-          <div id={playerHostId} className="tutorial-video__api-host" />
+          activated ? (
+            <div id={playerHostId} className="tutorial-video__api-host" />
+          ) : (
+            <div
+              className="tutorial-video__api-host tutorial-video__api-host--idle"
+              aria-hidden
+            />
+          )
         ) : (
           <iframe
             src={TUTORIAL_VIDEO_EMBED_URL}

@@ -38,7 +38,7 @@ const plans: Plan[] = [
     priceNote: '/ forever',
     cta: 'Get started',
     features: [
-      { label: '50 assisted applies / month' },
+      { label: '30 assisted applies / month' },
       { label: 'Safety: 15/day' },
       { label: '500 multi-board scans' },
     ],

@@ -2,7 +2,7 @@ import type { PlanTier } from './models';
 
 export const PLAN_LIMITS = {
   free: {
-    monthlyApplies: 50,
+    monthlyApplies: 30,
     monthlyScans: 500,
     appliesPerHour: 6,
     appliesPerDay: 15,

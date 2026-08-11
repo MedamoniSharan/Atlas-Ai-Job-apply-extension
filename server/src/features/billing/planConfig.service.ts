@@ -53,7 +53,17 @@ export async function seedPlanConfigs(): Promise<void> {
   const tiers: PlanTier[] = ['free', 'pro', 'max'];
   for (const tier of tiers) {
     const existing = await PlanConfigModel.findOne({ tier });
-    if (existing) continue;
+    if (existing) {
+      // Align free monthly cap with product default (50 → 30).
+      if (
+        tier === 'free' &&
+        existing.limits?.monthlyApplies === 50
+      ) {
+        existing.limits.monthlyApplies = PLAN_LIMITS.free.monthlyApplies;
+        await existing.save();
+      }
+      continue;
+    }
     await PlanConfigModel.create({
       tier,
       name: PLAN_DISPLAY_NAMES[tier],

@@ -42,7 +42,7 @@ CORS_ORIGINS = [
 IST = ZoneInfo("Asia/Kolkata")
 
 PLAN_LIMITS = {
-    "free": {"appliesPerDay": 15, "monthlyApplies": 50},
+    "free": {"appliesPerDay": 15, "monthlyApplies": 30},
     "pro": {"appliesPerDay": 40, "monthlyApplies": 300},
     "max": {"appliesPerDay": 60, "monthlyApplies": 1000},
 }

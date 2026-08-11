@@ -59,7 +59,7 @@ PLAN_PRICES_PAISE = {"pro": 9900, "max": 29900}
 PLAN_DISPLAY_NAMES = {"free": "Basic", "pro": "Premium", "max": "UltraMag"}
 PLAN_LIMITS = {
     "free": {
-        "monthlyApplies": 50,
+        "monthlyApplies": 30,
         "monthlyScans": 500,
         "appliesPerHour": 6,
         "appliesPerDay": 15,
@@ -358,6 +358,17 @@ def seed_plan_configs() -> List[Dict[str, Any]]:
     for tier in ("free", "pro", "max"):
         existing = plans_tbl.get_item(Key={"tier": tier}).get("Item")
         if existing:
+            # One-time align: free monthly cap moved 50 → 30 in product defaults.
+            if tier == "free":
+                limits = dict(existing.get("limits") or {})
+                if _as_int(limits.get("monthlyApplies"), 0) == 50:
+                    limits["monthlyApplies"] = PLAN_LIMITS["free"]["monthlyApplies"]
+                    existing = {
+                        **existing,
+                        "limits": limits,
+                        "updatedAt": now_iso(),
+                    }
+                    plans_tbl.put_item(Item=existing)
             seeded.append(existing)
             continue
         item = {
