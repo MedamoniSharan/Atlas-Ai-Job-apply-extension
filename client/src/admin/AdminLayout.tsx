@@ -11,9 +11,11 @@ import {
   LogOut,
   Menu,
   MessageSquareWarning,
+  Percent,
   Receipt,
   ScrollText,
   Shield,
+  Tag,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -27,6 +29,8 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/subscriptions')) return 'Subscriptions';
   if (pathname.startsWith('/admin/payments')) return 'Payments';
   if (pathname.startsWith('/admin/plans')) return 'Plans';
+  if (pathname.startsWith('/admin/offers')) return 'Offers';
+  if (pathname.startsWith('/admin/coupons')) return 'Coupons';
   if (pathname.startsWith('/admin/audit')) return 'Audit log';
   if (pathname.startsWith('/admin/feedback')) return 'Uninstall feedback';
   return 'Overview';
@@ -110,6 +114,14 @@ export function AdminLayout() {
           <NavLink to="/admin/plans" className="admin-sidebar__link">
             <CreditCard size={17} strokeWidth={1.9} aria-hidden />
             Plans
+          </NavLink>
+          <NavLink to="/admin/offers" className="admin-sidebar__link">
+            <Tag size={17} strokeWidth={1.9} aria-hidden />
+            Offers
+          </NavLink>
+          <NavLink to="/admin/coupons" className="admin-sidebar__link">
+            <Percent size={17} strokeWidth={1.9} aria-hidden />
+            Coupons
           </NavLink>
           <NavLink to="/admin/audit" className="admin-sidebar__link">
             <ScrollText size={17} strokeWidth={1.9} aria-hidden />

@@ -9,6 +9,8 @@ export interface ISubscription extends Document {
   status: SubscriptionStatus;
   razorpaySubscriptionId?: string;
   razorpayPlanId?: string;
+  couponCode?: string | null;
+  amountPaise?: number | null;
   currentPeriodStart?: Date | null;
   currentPeriodEnd?: Date | null;
   cancelAtPeriodEnd: boolean;
@@ -48,6 +50,8 @@ const subscriptionSchema = new Schema<ISubscription>(
       sparse: true,
     },
     razorpayPlanId: { type: String },
+    couponCode: { type: String, default: null },
+    amountPaise: { type: Number, default: null },
     currentPeriodStart: { type: Date, default: null },
     currentPeriodEnd: { type: Date, default: null },
     cancelAtPeriodEnd: { type: Boolean, default: false },
@@ -80,6 +84,11 @@ export interface IPlanConfig extends Document {
   name: string;
   description: string;
   amountPaise: number;
+  compareAtPaise?: number | null;
+  features?: string[];
+  badge?: string | null;
+  highlighted?: boolean;
+  lockNote?: string | null;
   limits: PlanLimitsDoc;
   razorpayPlanId?: string | null;
   active: boolean;
@@ -98,6 +107,11 @@ const planConfigSchema = new Schema<IPlanConfig>(
     name: { type: String, required: true },
     description: { type: String, default: '' },
     amountPaise: { type: Number, required: true, default: 0 },
+    compareAtPaise: { type: Number, default: null },
+    features: { type: [String], default: [] },
+    badge: { type: String, default: null },
+    highlighted: { type: Boolean, default: false },
+    lockNote: { type: String, default: null },
     limits: {
       monthlyApplies: { type: Number, required: true },
       monthlyScans: { type: Number, required: true },

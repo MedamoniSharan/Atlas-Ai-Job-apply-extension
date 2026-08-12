@@ -30,6 +30,7 @@ import {
 } from './lib/api';
 import { ChromeIcon } from './components/ChromeInstallCta';
 import { CosmosLogo, CosmosLoader } from './components/CosmosLogo';
+import { OfferTicker } from './components/OfferTicker';
 import { NoIndexHead } from './components/NoIndexHead';
 import { ShimmerButton } from './components/ui/ShimmerButton';
 import { PublicCompaniesPage } from './pages/CompaniesPage';
@@ -203,6 +204,7 @@ export function AppLayout() {
   return (
     <div className={`shell${sidebarOpen ? ' shell--nav-open' : ''}`}>
       <NoIndexHead title="Cosmo account" path={location.pathname} />
+      <OfferTicker />
       <div
         className="shell__backdrop"
         aria-hidden={!sidebarOpen}

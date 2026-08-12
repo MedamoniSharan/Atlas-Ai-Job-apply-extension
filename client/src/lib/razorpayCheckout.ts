@@ -88,14 +88,15 @@ export type CheckoutResult = {
 };
 
 export async function startPlanCheckout(
-  plan: PaidPlan
+  plan: PaidPlan,
+  couponCode?: string
 ): Promise<CheckoutResult> {
   await loadRazorpayScript();
   if (!window.Razorpay) {
     throw new Error('Razorpay Checkout failed to load');
   }
 
-  const subRes = await createSubscription(plan);
+  const subRes = await createSubscription(plan, couponCode);
   if (!subRes.success) {
     throw new Error(subRes.message || 'Could not create subscription');
   }

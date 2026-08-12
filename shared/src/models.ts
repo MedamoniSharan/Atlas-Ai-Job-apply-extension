@@ -71,6 +71,7 @@ export type VerifyBillingPaymentInput = z.infer<
 
 export const createSubscriptionSchema = z.object({
   plan: paidPlanSchema,
+  couponCode: z.string().min(1).max(40).optional(),
 });
 
 export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;

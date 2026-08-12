@@ -6,6 +6,7 @@ import { LandingNavbar } from '../components/LandingNavbar';
 import { LandingTutorialSection } from '../components/LandingTutorialSection';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import { PricingPlans } from '../components/PricingPlans';
+import { OfferTicker } from '../components/OfferTicker';
 import { RateUsSection } from '../components/RateUsSection';
 import { SeoHead } from '../components/SeoHead';
 import { SproutJobsMarquee } from '../components/SproutJobsMarquee';
@@ -39,6 +40,7 @@ export function LandingPage() {
           softwareApplicationJsonLd(),
         ]}
       />
+      <OfferTicker />
       <LandingNavbar />
 
       <HeroAutoApply />

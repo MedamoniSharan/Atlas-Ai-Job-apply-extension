@@ -11,6 +11,8 @@ import { AdminUsersPage } from './admin/AdminUsersPage';
 import { AdminSubscriptionsPage } from './admin/AdminSubscriptionsPage';
 import { AdminPaymentsPage } from './admin/AdminPaymentsPage';
 import { AdminPlansPage } from './admin/AdminPlansPage';
+import { AdminOffersPage } from './admin/AdminOffersPage';
+import { AdminCouponsPage } from './admin/AdminCouponsPage';
 import { AdminAuditPage } from './admin/AdminAuditPage';
 import { AdminFeedbackPage } from './admin/AdminFeedbackPage';
 import { AdminLoginPage } from './admin/AdminLoginPage';
@@ -76,6 +78,8 @@ const app = (
             <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
             <Route path="payments" element={<AdminPaymentsPage />} />
             <Route path="plans" element={<AdminPlansPage />} />
+            <Route path="offers" element={<AdminOffersPage />} />
+            <Route path="coupons" element={<AdminCouponsPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
             <Route path="feedback" element={<AdminFeedbackPage />} />
           </Route>

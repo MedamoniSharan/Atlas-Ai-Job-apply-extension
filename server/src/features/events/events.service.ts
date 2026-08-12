@@ -1,14 +1,13 @@
 import {
   APPLY_CAP_CODES,
   getEffectivePlan,
-  getPlanAppliesLimit,
-  getPlanAppliesPerDay,
   jobPayloadSchema,
   type EventEnvelope,
   type SyncEventsResult,
 } from '@cosmo/shared';
 import { ActivityModel } from './activity.model';
 import { ApplicationModel, IApplication } from '../applications/application.model';
+import { getPlanLimitsFromConfig } from '../billing/planConfig.service';
 import { UserModel } from '../users/user.model';
 import { getIo } from '../../realtime/socket';
 import { logger } from '../../config/logger';
@@ -77,8 +76,9 @@ async function assertApplyCaps(userId: string): Promise<void> {
   ]);
 
   const plan = getEffectivePlan(user.plan, user.planExpiresAt);
-  const dayLimit = getPlanAppliesPerDay(user.plan, user.planExpiresAt);
-  const monthLimit = getPlanAppliesLimit(user.plan, user.planExpiresAt);
+  const limits = await getPlanLimitsFromConfig(plan);
+  const dayLimit = limits.appliesPerDay;
+  const monthLimit = limits.monthlyApplies;
 
   if (dayUsed >= dayLimit) {
     throw new AppError(

@@ -5,13 +5,11 @@ import {
   PLAN_PRICES_PAISE,
   getEffectivePlan,
   getIstMonthBounds,
-  getPlanAppliesLimit,
-  getPlanAppliesPerDay,
-  getPlanAppliesPerHour,
   type CancelSubscriptionInput,
   type CreateBillingOrderInput,
   type CreateSubscriptionInput,
   type PaidPlan,
+  type ValidateCouponInput,
   type VerifyBillingPaymentInput,
   type VerifySubscriptionInput,
 } from '@cosmo/shared';
@@ -26,9 +24,14 @@ import {
   monthRange,
 } from '../applications/applyCount';
 import { UserModel } from '../users/user.model';
+import * as couponService from './coupon.service';
 import { PaymentModel } from './payment.model';
 import { generateInvoicePdf, invoiceFilePath } from './invoice.service';
-import { getPaidPlanAmount, getPlanConfig } from './planConfig.service';
+import {
+  getPaidPlanAmount,
+  getPlanConfig,
+  getPlanLimitsFromConfig,
+} from './planConfig.service';
 import { SubscriptionModel } from './subscription.model';
 
 const SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles
@@ -177,6 +180,39 @@ async function ensureRazorpayCustomer(userId: string) {
   }
 }
 
+async function createRazorpayPlanAtAmount(
+  plan: PaidPlan,
+  amountPaise: number,
+  notes: Record<string, string> = {}
+): Promise<string> {
+  const cfg = await getPlanConfig(plan);
+  if (!amountPaise || amountPaise <= 0) {
+    throw new AppError(
+      `Cannot create Razorpay plan for ${plan}: invalid amount`,
+      500,
+      'PLAN_AMOUNT_INVALID'
+    );
+  }
+
+  const razorpay = getRazorpay();
+  try {
+    const created = await razorpay.plans.create({
+      period: 'monthly',
+      interval: 1,
+      item: {
+        name: `Cosmo ${cfg.name}`,
+        amount: amountPaise,
+        currency: 'INR',
+        description: cfg.description || `${cfg.name} monthly`,
+      },
+      notes: { tier: plan, ...notes },
+    });
+    return created.id;
+  } catch (error) {
+    throw razorpayAppError(error, 'Could not create Razorpay plan');
+  }
+}
+
 async function ensureRazorpayPlanId(plan: PaidPlan): Promise<string> {
   const cfg = await getPlanConfig(plan);
   const razorpay = getRazorpay();
@@ -196,39 +232,16 @@ async function ensureRazorpayPlanId(plan: PaidPlan): Promise<string> {
   }
 
   const amount = cfg.amountPaise || PLAN_PRICES_PAISE[plan];
-  if (!amount || amount <= 0) {
-    throw new AppError(
-      `Cannot create Razorpay plan for ${plan}: invalid amount`,
-      500,
-      'PLAN_AMOUNT_INVALID'
-    );
-  }
-
-  let created: { id: string };
-  try {
-    created = await razorpay.plans.create({
-      period: 'monthly',
-      interval: 1,
-      item: {
-        name: `Cosmo ${cfg.name}`,
-        amount,
-        currency: 'INR',
-        description: cfg.description || `${cfg.name} monthly`,
-      },
-      notes: { tier: plan },
-    });
-  } catch (error) {
-    throw razorpayAppError(error, 'Could not create Razorpay plan');
-  }
+  const createdId = await createRazorpayPlanAtAmount(plan, amount);
 
   const { PlanConfigModel } = await import('./subscription.model');
   const { invalidatePlanCache } = await import('./planConfig.service');
   await PlanConfigModel.findOneAndUpdate(
     { tier: plan },
-    { razorpayPlanId: created.id }
+    { razorpayPlanId: createdId }
   );
   invalidatePlanCache();
-  return created.id;
+  return createdId;
 }
 
 function periodFromUnix(start?: number | null, end?: number | null) {
@@ -396,6 +409,13 @@ export async function verifyPayment(
   };
 }
 
+export async function validateCouponForUser(
+  userId: string,
+  input: ValidateCouponInput
+) {
+  return couponService.validateCoupon(userId, input.code, input.plan);
+}
+
 export async function createSubscription(
   userId: string,
   input: CreateSubscriptionInput
@@ -410,7 +430,25 @@ export async function createSubscription(
     throw new AppError('Plan is not available', 400, 'PLAN_INACTIVE');
   }
 
-  const razorpayPlanId = await ensureRazorpayPlanId(input.plan);
+  let amountPaise = planCfg.amountPaise;
+  let couponCode: string | null = null;
+  if (input.couponCode) {
+    const validated = await couponService.validateCoupon(
+      userId,
+      input.couponCode,
+      input.plan
+    );
+    amountPaise = validated.finalAmountPaise;
+    couponCode = validated.code;
+  }
+
+  const razorpayPlanId =
+    couponCode && amountPaise !== planCfg.amountPaise
+      ? await createRazorpayPlanAtAmount(input.plan, amountPaise, {
+          coupon: couponCode,
+          discounted: '1',
+        })
+      : await ensureRazorpayPlanId(input.plan);
   const razorpay = getRazorpay();
 
   // Cancel any open created Razorpay drafts for this user locally
@@ -418,6 +456,12 @@ export async function createSubscription(
     { userId, status: 'created', source: 'razorpay' },
     { status: 'cancelled', cancelledAt: new Date() }
   );
+
+  const notes: Record<string, string> = {
+    userId,
+    plan: input.plan,
+  };
+  if (couponCode) notes.couponCode = couponCode;
 
   let subscription: { id: string };
   try {
@@ -427,10 +471,7 @@ export async function createSubscription(
       total_count: SUBSCRIPTION_TOTAL_COUNT,
       customer_notify: 1,
       quantity: 1,
-      notes: {
-        userId,
-        plan: input.plan,
-      },
+      notes,
       ...(customerId ? { customer_id: customerId } : {}),
     } as Parameters<typeof razorpay.subscriptions.create>[0])) as {
       id: string;
@@ -445,6 +486,8 @@ export async function createSubscription(
     status: 'created',
     razorpaySubscriptionId: subscription.id,
     razorpayPlanId,
+    couponCode,
+    amountPaise,
     source: 'razorpay',
     cancelAtPeriodEnd: false,
   });
@@ -454,7 +497,7 @@ export async function createSubscription(
     localSubscriptionId: doc._id.toString(),
     keyId: env.razorpayKeyId,
     plan: input.plan,
-    amountPaise: planCfg.amountPaise,
+    amountPaise,
   };
 }
 
@@ -503,7 +546,10 @@ export async function verifySubscription(
     razorpayPaymentId: input.razorpay_payment_id,
   });
   if (!payment) {
-    const amountPaise = await getPaidPlanAmount(sub.tier);
+    const amountPaise =
+      sub.amountPaise && sub.amountPaise > 0
+        ? sub.amountPaise
+        : await getPaidPlanAmount(sub.tier);
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new AppError('User not found', 404, 'NOT_FOUND');
@@ -536,6 +582,14 @@ export async function verifySubscription(
       invoiceNumber,
       invoicePath: relativePath,
     });
+  }
+
+  if (sub.couponCode) {
+    await couponService.redeemCoupon(
+      userId,
+      sub.couponCode,
+      payment._id.toString()
+    );
   }
 
   return {
@@ -619,9 +673,10 @@ export async function getBillingMe(userId: string) {
 
   const { periodStart, periodEnd } = getIstMonthBounds();
   const effectivePlan = getEffectivePlan(user.plan, user.planExpiresAt);
-  const appliesLimit = getPlanAppliesLimit(user.plan, user.planExpiresAt);
-  const appliesHourLimit = getPlanAppliesPerHour(user.plan, user.planExpiresAt);
-  const appliesDayLimit = getPlanAppliesPerDay(user.plan, user.planExpiresAt);
+  const limits = await getPlanLimitsFromConfig(effectivePlan);
+  const appliesLimit = limits.monthlyApplies;
+  const appliesHourLimit = limits.appliesPerHour;
+  const appliesDayLimit = limits.appliesPerDay;
 
   const month = monthRange();
   const hour = hourRange();

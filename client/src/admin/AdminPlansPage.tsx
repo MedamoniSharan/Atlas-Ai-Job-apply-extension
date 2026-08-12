@@ -7,6 +7,11 @@ type PlanForm = {
   name: string;
   description: string;
   amountPaise: number;
+  compareAtPaise: number;
+  featuresText: string;
+  badge: string;
+  highlighted: boolean;
+  lockNote: string;
   active: boolean;
   monthlyApplies: number;
   monthlyScans: number;
@@ -36,6 +41,11 @@ export function AdminPlansPage() {
         name: p.name,
         description: p.description,
         amountPaise: p.amountPaise,
+        compareAtPaise: p.compareAtPaise ?? 0,
+        featuresText: (p.features ?? []).join('\n'),
+        badge: p.badge ?? '',
+        highlighted: Boolean(p.highlighted),
+        lockNote: p.lockNote ?? '',
         active: p.active,
         monthlyApplies: p.limits.monthlyApplies,
         monthlyScans: p.limits.monthlyScans,
@@ -51,10 +61,19 @@ export function AdminPlansPage() {
     mutationFn: async (tier: string) => {
       const f = forms[tier];
       if (!f) return;
+      const features = f.featuresText
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
       const res = await updateAdminPlan(tier, {
         name: f.name,
         description: f.description,
         amountPaise: f.amountPaise,
+        compareAtPaise: f.compareAtPaise || null,
+        features,
+        badge: f.badge.trim() || null,
+        highlighted: f.highlighted,
+        lockNote: f.lockNote.trim() || null,
         active: f.active,
         limits: {
           monthlyApplies: f.monthlyApplies,
@@ -66,8 +85,10 @@ export function AdminPlansPage() {
       if (!res.success) throw new Error(res.message);
       return res.data;
     },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] });
+      void queryClient.invalidateQueries({ queryKey: ['public', 'plans'] });
+    },
   });
 
   if (isLoading) {
@@ -77,9 +98,9 @@ export function AdminPlansPage() {
   return (
     <div className="admin-page">
       <p className="admin-note">
+        Edits here update pricing on the website, checkout, and apply limits.
         Price changes create a new Razorpay plan for <strong>new</strong>{' '}
-        subscriptions. Existing subscribers stay on their current Razorpay plan
-        id until they change or resubscribe.
+        subscriptions.
       </p>
       <div className="admin-plans-grid">
         {(['free', 'pro', 'max'] as const).map((tier) => {
@@ -129,6 +150,74 @@ export function AdminPlansPage() {
                     }))
                   }
                 />
+              </label>
+              <label className="admin-field">
+                Compare-at / strike (paise)
+                <input
+                  type="number"
+                  value={f.compareAtPaise}
+                  disabled={tier === 'free'}
+                  onChange={(e) =>
+                    setForms((prev) => ({
+                      ...prev,
+                      [tier]: {
+                        ...f,
+                        compareAtPaise: Number(e.target.value) || 0,
+                      },
+                    }))
+                  }
+                />
+              </label>
+              <label className="admin-field">
+                Features (one per line)
+                <textarea
+                  value={f.featuresText}
+                  rows={5}
+                  onChange={(e) =>
+                    setForms((prev) => ({
+                      ...prev,
+                      [tier]: { ...f, featuresText: e.target.value },
+                    }))
+                  }
+                />
+              </label>
+              <label className="admin-field">
+                Badge
+                <input
+                  value={f.badge}
+                  onChange={(e) =>
+                    setForms((prev) => ({
+                      ...prev,
+                      [tier]: { ...f, badge: e.target.value },
+                    }))
+                  }
+                  placeholder="Popular"
+                />
+              </label>
+              <label className="admin-field">
+                Lock note
+                <input
+                  value={f.lockNote}
+                  onChange={(e) =>
+                    setForms((prev) => ({
+                      ...prev,
+                      [tier]: { ...f, lockNote: e.target.value },
+                    }))
+                  }
+                />
+              </label>
+              <label className="admin-check">
+                <input
+                  type="checkbox"
+                  checked={f.highlighted}
+                  onChange={(e) =>
+                    setForms((prev) => ({
+                      ...prev,
+                      [tier]: { ...f, highlighted: e.target.checked },
+                    }))
+                  }
+                />
+                Highlighted card
               </label>
               <div className="admin-limits-grid">
                 {(

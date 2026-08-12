@@ -21,6 +21,9 @@ Create these in **Asia Pacific (Hyderabad) `ap-south-2`** (on-demand billing is 
 | `CosmoPayments` | `paymentId` (S) | — | `UserPaymentsIndex` PK=`userId` SK=`createdAt`; `InvoiceNumberIndex` PK=`invoiceNumber` |
 | `CosmoSubscriptions` | `subscriptionId` (S) | — | `UserSubsIndex` PK=`userId` SK=`createdAt`; `RazorpaySubIndex` PK=`razorpaySubscriptionId` |
 | `CosmoPlanConfigs` | `tier` (S) | — | — |
+| `CosmoSiteOffers` | `offerId` (S) | — | — |
+| `CosmoCoupons` | `code` (S) | — | — |
+| `CosmoCouponRedemptions` | `code` (S) | `redemptionSk` (S, `{userId}#{paymentId}`) | — |
 | `CosmoAdminAudit` | `auditId` (S) | — | `CreatedAtIndex` PK=`entityType` SK=`createdAt` |
 | `CosmoUninstallFeedback` | `feedbackId` (S) | — | `CreatedAtIndex` PK=`entityType` SK=`createdAt` |
 | `CosmoApplyCounters` | `userId` (S) | `periodKey` (S) | — |
@@ -53,7 +56,7 @@ Each Lambda role needs:
 | `CORS_ORIGINS` | all (comma-separated exact origins; include `chrome-extension://<id>`) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET` | billing |
 | `INVOICES_BUCKET` | billing (default `cosmo-invoices`) |
-| Table name overrides | optional `USERS_TABLE`, `APPLICATIONS_TABLE`, etc. |
+| Table name overrides | optional `USERS_TABLE`, `APPLICATIONS_TABLE`, `SITE_OFFERS_TABLE`, `COUPONS_TABLE`, `COUPON_REDEMPTIONS_TABLE`, etc. |
 
 ## API Gateway (HTTP API) — live
 

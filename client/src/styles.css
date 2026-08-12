@@ -10561,3 +10561,66 @@ textarea {
     width: 100%;
   }
 }
+
+/* Offer ticker + coupon field */
+.offer-ticker {
+  overflow: hidden;
+  background: #111;
+  color: #f7f7f7;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.shell > .offer-ticker {
+  grid-column: 1 / -1;
+}
+.offer-ticker__track {
+  display: flex;
+  gap: 3rem;
+  width: max-content;
+  padding: 0.55rem 0;
+  animation: offer-ticker-scroll 28s linear infinite;
+}
+.offer-ticker__item,
+.offer-ticker__link {
+  white-space: nowrap;
+  padding: 0 1.5rem;
+  color: inherit;
+  text-decoration: none;
+}
+.offer-ticker__link:hover {
+  text-decoration: underline;
+}
+@keyframes offer-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.pricing-coupon {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 280px;
+  margin: 0 auto 1.5rem;
+}
+.pricing-coupon label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--pricing-muted, #5f6b66);
+}
+.pricing-coupon input {
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+}
+.pricing-coupon__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #1b5e3b;
+}
+.profile-plan__coupon {
+  margin: 0 0 1rem;
+  max-width: none;
+}

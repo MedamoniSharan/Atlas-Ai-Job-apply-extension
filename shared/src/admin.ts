@@ -71,6 +71,11 @@ export const adminUpdatePlanSchema = z.object({
   name: z.string().min(1).max(80).optional(),
   description: z.string().max(500).optional(),
   amountPaise: z.number().int().min(0).optional(),
+  compareAtPaise: z.number().int().min(0).nullable().optional(),
+  features: z.array(z.string().min(1).max(160)).max(20).optional(),
+  badge: z.string().max(40).nullable().optional(),
+  highlighted: z.boolean().optional(),
+  lockNote: z.string().max(160).nullable().optional(),
   active: z.boolean().optional(),
   limits: z
     .object({

@@ -1246,6 +1246,11 @@ export async function updatePlan(
   const before = {
     name: plan.name,
     amountPaise: plan.amountPaise,
+    compareAtPaise: plan.compareAtPaise ?? null,
+    features: plan.features ?? [],
+    badge: plan.badge ?? null,
+    highlighted: plan.highlighted ?? false,
+    lockNote: plan.lockNote ?? null,
     limits: { ...plan.limits },
     active: plan.active,
     razorpayPlanId: plan.razorpayPlanId,
@@ -1254,6 +1259,13 @@ export async function updatePlan(
   if (input.name !== undefined) plan.name = input.name;
   if (input.description !== undefined) plan.description = input.description;
   if (input.active !== undefined) plan.active = input.active;
+  if (input.compareAtPaise !== undefined) {
+    plan.compareAtPaise = input.compareAtPaise;
+  }
+  if (input.features !== undefined) plan.features = input.features;
+  if (input.badge !== undefined) plan.badge = input.badge;
+  if (input.highlighted !== undefined) plan.highlighted = input.highlighted;
+  if (input.lockNote !== undefined) plan.lockNote = input.lockNote;
   if (input.limits) {
     plan.limits = input.limits;
   }
@@ -1293,6 +1305,11 @@ export async function updatePlan(
     after: {
       name: plan.name,
       amountPaise: plan.amountPaise,
+      compareAtPaise: plan.compareAtPaise ?? null,
+      features: plan.features ?? [],
+      badge: plan.badge ?? null,
+      highlighted: plan.highlighted ?? false,
+      lockNote: plan.lockNote ?? null,
       limits: { ...plan.limits },
       active: plan.active,
       razorpayPlanId: plan.razorpayPlanId,
@@ -1305,6 +1322,11 @@ export async function updatePlan(
     name: plan.name,
     description: plan.description,
     amountPaise: plan.amountPaise,
+    compareAtPaise: plan.compareAtPaise ?? null,
+    features: plan.features ?? [],
+    badge: plan.badge ?? null,
+    highlighted: plan.highlighted ?? false,
+    lockNote: plan.lockNote ?? null,
     limits: plan.limits,
     razorpayPlanId: plan.razorpayPlanId,
     active: plan.active,

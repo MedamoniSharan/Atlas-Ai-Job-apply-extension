@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   adminAuditQuerySchema,
+  adminCreateCouponSchema,
+  adminCreateSiteOfferSchema,
   adminExtendSubscriptionSchema,
   adminMetricsQuerySchema,
   adminPatchUserSchema,
@@ -8,7 +10,9 @@ import {
   adminSetPlanSchema,
   adminSubscriptionsQuerySchema,
   adminUninstallFeedbackQuerySchema,
+  adminUpdateCouponSchema,
   adminUpdatePlanSchema,
+  adminUpdateSiteOfferSchema,
   adminUsersQuerySchema,
   ok,
   planTierSchema,
@@ -22,7 +26,9 @@ import {
 import { validateBody } from '../../middleware/validate';
 import * as adminService from './admin.service';
 import * as billingService from '../billing/billing.service';
+import * as couponService from '../billing/coupon.service';
 import * as feedbackService from '../feedback/feedback.service';
+import * as offerService from '../billing/offer.service';
 
 export const adminRouter = Router();
 
@@ -245,6 +251,80 @@ adminRouter.patch(
       clientIp(req)
     );
     res.json(ok(data, 'Plan updated'));
+  })
+);
+
+adminRouter.get(
+  '/offers',
+  asyncHandler(async (_req, res) => {
+    const data = await offerService.listOffersAdmin();
+    res.json(ok(data));
+  })
+);
+
+adminRouter.post(
+  '/offers',
+  validateBody(adminCreateSiteOfferSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await offerService.createOffer(req.body);
+    res.status(201).json(ok(data, 'Offer created'));
+  })
+);
+
+adminRouter.patch(
+  '/offers/:id',
+  validateBody(adminUpdateSiteOfferSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await offerService.updateOffer(
+      String(req.params.id),
+      req.body
+    );
+    res.json(ok(data, 'Offer updated'));
+  })
+);
+
+adminRouter.delete(
+  '/offers/:id',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await offerService.deleteOffer(String(req.params.id));
+    res.json(ok(data, 'Offer deleted'));
+  })
+);
+
+adminRouter.get(
+  '/coupons',
+  asyncHandler(async (_req, res) => {
+    const data = await couponService.listCouponsAdmin();
+    res.json(ok(data));
+  })
+);
+
+adminRouter.post(
+  '/coupons',
+  validateBody(adminCreateCouponSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await couponService.createCoupon(req.body);
+    res.status(201).json(ok(data, 'Coupon created'));
+  })
+);
+
+adminRouter.patch(
+  '/coupons/:code',
+  validateBody(adminUpdateCouponSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await couponService.updateCoupon(
+      String(req.params.code),
+      req.body
+    );
+    res.json(ok(data, 'Coupon updated'));
+  })
+);
+
+adminRouter.delete(
+  '/coupons/:code',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await couponService.deleteCoupon(String(req.params.code));
+    res.json(ok(data, 'Coupon deleted'));
   })
 );
 

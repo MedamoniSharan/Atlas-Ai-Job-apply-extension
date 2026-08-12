@@ -12,6 +12,9 @@ Tables:
     GSI UserSubsIndex       PK=userId SK=createdAt
     GSI RazorpaySubIndex    PK=razorpaySubscriptionId
   CosmoPlanConfigs      PK=tier
+  CosmoSiteOffers       PK=offerId
+  CosmoCoupons          PK=code
+  CosmoCouponRedemptions PK=code  SK=redemptionSk  (userId#paymentId)
   CosmoApplyCounters    PK=userId  SK=periodKey
   CosmoApplications     PK=userId  SK=eventId  (optional usage fallback)
     GSI UserCreatedIndex    PK=userId SK=createdAt
@@ -41,6 +44,11 @@ USERS_TABLE = os.environ.get("USERS_TABLE", "CosmoUsers")
 PAYMENTS_TABLE = os.environ.get("PAYMENTS_TABLE", "CosmoPayments")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE", "CosmoSubscriptions")
 PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
+SITE_OFFERS_TABLE = os.environ.get("SITE_OFFERS_TABLE", "CosmoSiteOffers")
+COUPONS_TABLE = os.environ.get("COUPONS_TABLE", "CosmoCoupons")
+COUPON_REDEMPTIONS_TABLE = os.environ.get(
+    "COUPON_REDEMPTIONS_TABLE", "CosmoCouponRedemptions"
+)
 APPLY_COUNTERS_TABLE = os.environ.get("APPLY_COUNTERS_TABLE", "CosmoApplyCounters")
 APPLICATIONS_TABLE = os.environ.get("APPLICATIONS_TABLE", "CosmoApplications")
 INVOICES_BUCKET = os.environ.get("INVOICES_BUCKET", "cosmo-invoices")
@@ -82,6 +90,27 @@ DEFAULT_DESCRIPTIONS = {
     "pro": "Higher apply volume for active job seekers",
     "max": "Highest monthly volume and scan capacity",
 }
+DEFAULT_PLAN_FEATURES = {
+    "free": [
+        "30 assisted applies / month",
+        "Safety: 15/day",
+        "500 multi-board scans",
+    ],
+    "pro": [
+        "300 assisted applies / month",
+        "Safety: 40/day",
+        "1500 multi-board scans",
+        "Human-paced co-pilot sessions",
+    ],
+    "max": [
+        "1000 assisted applies / month",
+        "Safety: 60/day",
+        "5000 multi-board scans",
+        "Human-paced co-pilot sessions",
+    ],
+}
+DEFAULT_COMPARE_AT = {"pro": 29900, "max": 79900}
+DEFAULT_LOCK_NOTE = "Price locks forever when you upgrade"
 SUBSCRIPTION_TOTAL_COUNT = 120
 ACTIVE_SUB_STATUSES = frozenset(
     {"created", "authenticated", "active", "pending", "halted"}
@@ -100,6 +129,9 @@ users_tbl = dynamodb.Table(USERS_TABLE)
 payments_tbl = dynamodb.Table(PAYMENTS_TABLE)
 subs_tbl = dynamodb.Table(SUBSCRIPTIONS_TABLE)
 plans_tbl = dynamodb.Table(PLAN_CONFIGS_TABLE)
+offers_tbl = dynamodb.Table(SITE_OFFERS_TABLE)
+coupons_tbl = dynamodb.Table(COUPONS_TABLE)
+redemptions_tbl = dynamodb.Table(COUPON_REDEMPTIONS_TABLE)
 counters_tbl = dynamodb.Table(APPLY_COUNTERS_TABLE)
 apps_tbl = dynamodb.Table(APPLICATIONS_TABLE)
 
@@ -376,6 +408,11 @@ def seed_plan_configs() -> List[Dict[str, Any]]:
             "name": PLAN_DISPLAY_NAMES[tier],
             "description": DEFAULT_DESCRIPTIONS[tier],
             "amountPaise": 0 if tier == "free" else PLAN_PRICES_PAISE[tier],
+            "compareAtPaise": DEFAULT_COMPARE_AT.get(tier),
+            "features": list(DEFAULT_PLAN_FEATURES[tier]),
+            "badge": "Popular" if tier == "pro" else None,
+            "highlighted": tier == "pro",
+            "lockNote": DEFAULT_LOCK_NOTE if tier in ("pro", "max") else None,
             "limits": dict(PLAN_LIMITS[tier]),
             "razorpayPlanId": None,
             "active": True,
@@ -400,6 +437,11 @@ def get_plan_config(tier: str) -> Dict[str, Any]:
         "name": PLAN_DISPLAY_NAMES.get(tier, tier),
         "description": DEFAULT_DESCRIPTIONS.get(tier, ""),
         "amountPaise": 0 if tier == "free" else PLAN_PRICES_PAISE.get(tier, 0),
+        "compareAtPaise": DEFAULT_COMPARE_AT.get(tier),
+        "features": list(DEFAULT_PLAN_FEATURES.get(tier, [])),
+        "badge": "Popular" if tier == "pro" else None,
+        "highlighted": tier == "pro",
+        "lockNote": DEFAULT_LOCK_NOTE if tier in ("pro", "max") else None,
         "limits": dict(PLAN_LIMITS.get(tier, PLAN_LIMITS["free"])),
         "razorpayPlanId": None,
         "active": True,
@@ -409,6 +451,251 @@ def get_plan_config(tier: str) -> Dict[str, Any]:
 def get_paid_plan_amount(plan: str) -> int:
     cfg = get_plan_config(plan)
     return _as_int(cfg.get("amountPaise"), PLAN_PRICES_PAISE.get(plan, 0))
+
+
+def plan_public(p: Dict[str, Any]) -> Dict[str, Any]:
+    """Public plan shape; backfill marketing defaults on read when missing."""
+    tier = p.get("tier") or "free"
+    features = p.get("features")
+    if not features:
+        features = list(DEFAULT_PLAN_FEATURES.get(tier, []))
+    compare_at = p.get("compareAtPaise")
+    if compare_at is None and tier in DEFAULT_COMPARE_AT:
+        compare_at = DEFAULT_COMPARE_AT[tier]
+    badge = p.get("badge")
+    if badge is None and tier == "pro":
+        badge = "Popular"
+    highlighted = p.get("highlighted")
+    if highlighted is None:
+        highlighted = tier == "pro"
+    lock_note = p.get("lockNote")
+    if lock_note is None and tier in ("pro", "max"):
+        lock_note = DEFAULT_LOCK_NOTE
+    return {
+        "tier": tier,
+        "name": p.get("name") or PLAN_DISPLAY_NAMES.get(tier, tier),
+        "description": p.get("description") or DEFAULT_DESCRIPTIONS.get(tier, ""),
+        "amountPaise": _as_int(p.get("amountPaise"), 0 if tier == "free" else PLAN_PRICES_PAISE.get(tier, 0)),
+        "compareAtPaise": (
+            None if compare_at is None else _as_int(compare_at)
+        ),
+        "features": list(features),
+        "badge": badge,
+        "highlighted": bool(highlighted),
+        "lockNote": lock_note,
+        "limits": p.get("limits") or dict(PLAN_LIMITS.get(tier, PLAN_LIMITS["free"])),
+        "active": bool(p.get("active", True)),
+    }
+
+
+def list_public_plans(event: Dict[str, Any]) -> Dict[str, Any]:
+    seeded = seed_plan_configs()
+    order = {"free": 0, "pro": 1, "max": 2}
+    active = [plan_public(p) for p in seeded if p.get("active", True) is not False]
+    active.sort(key=lambda x: order.get(x.get("tier") or "", 99))
+    return ok(event, active, "Plans")
+
+
+# ─── Site offers ───────────────────────────────────────────────
+
+
+def offer_is_live(o: Dict[str, Any], now_iso_str: str) -> bool:
+    if o.get("active") is False:
+        return False
+    starts = o.get("startsAt")
+    ends = o.get("endsAt")
+    if starts and now_iso_str < starts:
+        return False
+    if ends and now_iso_str > ends:
+        return False
+    return True
+
+
+def list_public_offers(event: Dict[str, Any]) -> Dict[str, Any]:
+    now = now_iso()
+    try:
+        items = offers_tbl.scan().get("Items") or []
+    except Exception:
+        items = []
+    live = [o for o in items if offer_is_live(o, now)]
+    live.sort(key=lambda o: _as_int(o.get("priority"), 0), reverse=True)
+    return ok(
+        event,
+        [
+            {
+                "offerId": o.get("offerId"),
+                "message": o.get("message"),
+                "couponCode": o.get("couponCode"),
+                "linkUrl": o.get("linkUrl"),
+                "active": bool(o.get("active", True)),
+                "startsAt": o.get("startsAt"),
+                "endsAt": o.get("endsAt"),
+                "priority": _as_int(o.get("priority"), 0),
+            }
+            for o in live
+        ],
+        "Offers",
+    )
+
+
+# ─── Coupons ───────────────────────────────────────────────────
+
+
+def normalize_code(code: str) -> str:
+    return (code or "").strip().upper()
+
+
+def compute_discount(
+    amount: int, discount_type: str, value: int
+) -> Tuple[int, int]:
+    """Return (discountPaise, finalAmountPaise); never below 0."""
+    amount = max(0, _as_int(amount))
+    value = max(0, _as_int(value))
+    if discount_type == "percent":
+        discount = min(amount, (amount * value) // 100)
+    else:
+        discount = min(amount, value)
+    return discount, max(0, amount - discount)
+
+
+def get_coupon(code: str) -> Optional[Dict[str, Any]]:
+    if not code:
+        return None
+    return coupons_tbl.get_item(Key={"code": normalize_code(code)}).get("Item")
+
+
+def _coupon_label(coupon: Dict[str, Any]) -> str:
+    desc = (coupon.get("description") or "").strip()
+    if desc:
+        return desc
+    if coupon.get("type") == "percent":
+        return f"{_as_int(coupon.get('value'))}% off"
+    paise = _as_int(coupon.get("value"))
+    rupees = paise // 100
+    return f"₹{rupees} off"
+
+
+def count_user_coupon_redemptions(code: str, user_id: str) -> int:
+    try:
+        total = 0
+        kwargs: Dict[str, Any] = {
+            "KeyConditionExpression": Key("code").eq(code)
+            & Key("redemptionSk").begins_with(f"{user_id}#"),
+        }
+        while True:
+            res = redemptions_tbl.query(**kwargs)
+            total += len(res.get("Items") or [])
+            lek = res.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+        return total
+    except Exception:
+        return 0
+
+
+def coupon_valid_for_plan(
+    coupon: Optional[Dict[str, Any]], plan: str, user_id: str
+) -> Optional[str]:
+    """Return error message if invalid, else None."""
+    if not coupon:
+        return "Coupon not found"
+    if coupon.get("active") is False:
+        return "Coupon is not active"
+    now = now_iso()
+    starts = coupon.get("startsAt")
+    ends = coupon.get("endsAt")
+    if starts and now < starts:
+        return "Coupon is not yet valid"
+    if ends and now > ends:
+        return "Coupon has expired"
+    applicable = coupon.get("applicablePlans") or []
+    if applicable and plan not in applicable:
+        return "Coupon not valid for this plan"
+    max_red = coupon.get("maxRedemptions")
+    if max_red is not None:
+        if _as_int(coupon.get("redemptionCount"), 0) >= _as_int(max_red):
+            return "Coupon redemption limit reached"
+    per_user = _as_int(coupon.get("perUserLimit"), 1)
+    if per_user > 0 and user_id:
+        if count_user_coupon_redemptions(normalize_code(coupon.get("code") or ""), user_id) >= per_user:
+            return "You have already used this coupon"
+    ctype = coupon.get("type")
+    if ctype not in ("percent", "fixedPaise"):
+        return "Invalid coupon type"
+    if _as_int(coupon.get("value")) <= 0:
+        return "Invalid coupon value"
+    return None
+
+
+def validate_coupon_handler(
+    event: Dict[str, Any], user_id: str, body: Dict[str, Any]
+) -> Dict[str, Any]:
+    code = normalize_code(body.get("code") or "")
+    plan = (body.get("plan") or "").strip()
+    if not code or plan not in ("pro", "max"):
+        return err(event, "code and plan (pro|max) required", 400, "VALIDATION_ERROR")
+    coupon = get_coupon(code)
+    bad = coupon_valid_for_plan(coupon, plan, user_id)
+    if bad:
+        return err(event, bad, 400, "COUPON_INVALID")
+    assert coupon is not None
+    original = get_paid_plan_amount(plan)
+    discount, final = compute_discount(
+        original, coupon.get("type") or "percent", _as_int(coupon.get("value"))
+    )
+    return ok(
+        event,
+        {
+            "code": normalize_code(coupon.get("code") or code),
+            "plan": plan,
+            "originalAmountPaise": original,
+            "discountPaise": discount,
+            "finalAmountPaise": final,
+            "label": _coupon_label(coupon),
+        },
+        "Coupon valid",
+    )
+
+
+def record_coupon_redemption(
+    code: str, user_id: str, payment_id: str, max_redemptions: Any = None
+) -> None:
+    code = normalize_code(code)
+    sk = f"{user_id}#{payment_id}"
+    try:
+        redemptions_tbl.put_item(
+            Item={
+                "code": code,
+                "redemptionSk": sk,
+                "userId": user_id,
+                "paymentId": payment_id,
+                "createdAt": now_iso(),
+            },
+            ConditionExpression="attribute_not_exists(redemptionSk)",
+        )
+    except Exception as exc:
+        # Already recorded for this payment (idempotent verify) or race.
+        if "ConditionalCheckFailed" in type(exc).__name__ or "ConditionalCheckFailed" in str(exc):
+            return
+        raise
+
+    update_kwargs: Dict[str, Any] = {
+        "Key": {"code": code},
+        "UpdateExpression": "ADD redemptionCount :one SET updatedAt = :u",
+        "ExpressionAttributeValues": {":one": 1, ":u": now_iso()},
+    }
+    if max_redemptions is not None:
+        update_kwargs["ConditionExpression"] = (
+            "attribute_not_exists(redemptionCount) OR redemptionCount < :max"
+        )
+        update_kwargs["ExpressionAttributeValues"][":max"] = _as_int(max_redemptions)
+    try:
+        coupons_tbl.update_item(**update_kwargs)
+    except Exception as exc:
+        if "ConditionalCheckFailed" in type(exc).__name__ or "ConditionalCheckFailed" in str(exc):
+            return
+        raise
 
 
 # ─── Razorpay HTTP ─────────────────────────────────────────────
@@ -713,6 +1000,112 @@ def ensure_razorpay_plan_id(plan: str) -> str:
     return created_plan["id"]
 
 
+def ensure_promo_razorpay_plan(
+    plan: str, amount_paise: int, coupon_code: str
+) -> str:
+    """Create/ensure a Razorpay plan at the discounted amount for a coupon.
+
+    Note: a promo plan applies for the subscription lifetime at the discounted
+    rate when the Offers API is unavailable. Preferred first-cycle semantics
+    use a Razorpay offer_id on the standard plan (see ensure_or_create_coupon_offer).
+    """
+    code = normalize_code(coupon_code)
+    amount_paise = _as_int(amount_paise)
+    if amount_paise <= 0:
+        raise RuntimeError("PLAN_AMOUNT_INVALID")
+    coupon = get_coupon(code) or {"code": code}
+    promo_map = dict(coupon.get("razorpayPromoPlanIds") or {})
+    existing = promo_map.get(plan)
+    if existing:
+        try:
+            razorpay_request("GET", f"/plans/{existing}")
+            return existing
+        except Exception:
+            pass
+    cfg = get_plan_config(plan)
+    created_plan = razorpay_request(
+        "POST",
+        "/plans",
+        {
+            "period": "monthly",
+            "interval": 1,
+            "item": {
+                "name": f"Cosmo {cfg.get('name')} ({code})",
+                "amount": amount_paise,
+                "currency": "INR",
+                "description": f"{cfg.get('name')} promo {code}",
+            },
+            "notes": {"tier": plan, "couponCode": code, "promo": "1"},
+        },
+    )
+    promo_map[plan] = created_plan["id"]
+    try:
+        coupons_tbl.update_item(
+            Key={"code": code},
+            UpdateExpression="SET razorpayPromoPlanIds = :m, updatedAt = :u",
+            ExpressionAttributeValues={":m": promo_map, ":u": now_iso()},
+        )
+    except Exception:
+        pass
+    return created_plan["id"]
+
+
+def ensure_or_create_coupon_offer(
+    coupon: Dict[str, Any], plan: str, amount_paise: int
+) -> Optional[str]:
+    """Best-effort Razorpay offer for first-cycle discount; caches razorpayOfferId.
+
+    Returns offer id or None if the Offers API is unavailable / fails.
+    """
+    existing = coupon.get("razorpayOfferId")
+    if existing:
+        try:
+            razorpay_request("GET", f"/offers/{existing}")
+            return existing
+        except Exception:
+            pass
+
+    code = normalize_code(coupon.get("code") or "")
+    ctype = coupon.get("type") or "percent"
+    value = _as_int(coupon.get("value"))
+    label = _coupon_label(coupon)
+    # Razorpay may reject offer creation via API; callers fall back to promo plan.
+    payload: Dict[str, Any] = {
+        "name": f"Cosmo {code} {plan}",
+        "display_text": label,
+        "terms": coupon.get("description") or f"Coupon {code}",
+        "description": coupon.get("description") or label,
+        "type": "instant",
+        "currency": "INR",
+        "notes": {
+            "couponCode": code,
+            "plan": plan,
+            "originalAmountPaise": str(_as_int(amount_paise)),
+        },
+    }
+    if ctype == "percent":
+        payload["percent_off"] = value
+        payload["discount"] = {"type": "percentage", "percentage": value}
+    else:
+        payload["amount_off"] = value
+        payload["discount"] = {"type": "flat", "amount": value}
+
+    try:
+        created_offer = razorpay_request("POST", "/offers", payload)
+        offer_id = created_offer.get("id")
+        if not offer_id:
+            return None
+        coupons_tbl.update_item(
+            Key={"code": code},
+            UpdateExpression="SET razorpayOfferId = :o, updatedAt = :u",
+            ExpressionAttributeValues={":o": offer_id, ":u": now_iso()},
+        )
+        coupon["razorpayOfferId"] = offer_id
+        return offer_id
+    except Exception:
+        return None
+
+
 # ─── Apply usage ───────────────────────────────────────────────
 
 
@@ -955,9 +1348,45 @@ def create_subscription(
     if plan_cfg.get("active") is False:
         return err(event, "Plan is not available", 400, "PLAN_INACTIVE")
 
+    original_amount = _as_int(plan_cfg.get("amountPaise"), PLAN_PRICES_PAISE.get(plan, 0))
+    final_amount = original_amount
+    discount_paise = 0
+    coupon_code = normalize_code(body.get("couponCode") or "")
+    coupon: Optional[Dict[str, Any]] = None
+    offer_id: Optional[str] = None
+
+    if coupon_code:
+        coupon = get_coupon(coupon_code)
+        bad = coupon_valid_for_plan(coupon, plan, user_id)
+        if bad:
+            return err(event, bad, 400, "COUPON_INVALID")
+        assert coupon is not None
+        coupon_code = normalize_code(coupon.get("code") or coupon_code)
+        discount_paise, final_amount = compute_discount(
+            original_amount,
+            coupon.get("type") or "percent",
+            _as_int(coupon.get("value")),
+        )
+        if final_amount <= 0:
+            return err(
+                event,
+                "Coupon would reduce amount below minimum",
+                400,
+                "COUPON_INVALID",
+            )
+
     try:
         customer_id = ensure_razorpay_customer(user)
         razorpay_plan_id = ensure_razorpay_plan_id(plan)
+        # Prefer first-cycle discount via offer_id on the standard plan.
+        # If offer API fails, fall back to a promo plan at the discounted amount
+        # (promo plan applies for subscription lifetime at discounted rate).
+        if coupon:
+            offer_id = ensure_or_create_coupon_offer(coupon, plan, original_amount)
+            if not offer_id:
+                razorpay_plan_id = ensure_promo_razorpay_plan(
+                    plan, final_amount, coupon_code
+                )
     except RuntimeError as exc:
         code = str(exc)
         if code == "RAZORPAY_NOT_CONFIGURED":
@@ -983,38 +1412,50 @@ def create_subscription(
     except Exception:
         pass
 
+    notes: Dict[str, Any] = {"userId": user_id, "plan": plan}
+    if coupon_code:
+        notes["couponCode"] = coupon_code
+        notes["originalAmountPaise"] = str(original_amount)
+        notes["discountPaise"] = str(discount_paise)
+
+    sub_payload: Dict[str, Any] = {
+        "plan_id": razorpay_plan_id,
+        "total_count": SUBSCRIPTION_TOTAL_COUNT,
+        "customer_notify": 1,
+        "quantity": 1,
+        "customer_id": customer_id,
+        "notes": notes,
+    }
+    if offer_id:
+        sub_payload["offer_id"] = offer_id
+
     try:
-        subscription = razorpay_request(
-            "POST",
-            "/subscriptions",
-            {
-                "plan_id": razorpay_plan_id,
-                "total_count": SUBSCRIPTION_TOTAL_COUNT,
-                "customer_notify": 1,
-                "quantity": 1,
-                "customer_id": customer_id,
-                "notes": {"userId": user_id, "plan": plan},
-            },
-        )
+        subscription = razorpay_request("POST", "/subscriptions", sub_payload)
     except RuntimeError as exc:
         return err(event, str(exc), 502, "RAZORPAY_ERROR")
 
     local_id = str(uuid.uuid4())
     created_at = now_iso()
-    subs_tbl.put_item(
-        Item={
-            "subscriptionId": local_id,
-            "userId": user_id,
-            "tier": plan,
-            "status": "created",
-            "razorpaySubscriptionId": subscription["id"],
-            "razorpayPlanId": razorpay_plan_id,
-            "source": "razorpay",
-            "cancelAtPeriodEnd": False,
-            "createdAt": created_at,
-            "updatedAt": created_at,
-        }
-    )
+    local_item: Dict[str, Any] = {
+        "subscriptionId": local_id,
+        "userId": user_id,
+        "tier": plan,
+        "status": "created",
+        "razorpaySubscriptionId": subscription["id"],
+        "razorpayPlanId": razorpay_plan_id,
+        "source": "razorpay",
+        "cancelAtPeriodEnd": False,
+        "createdAt": created_at,
+        "updatedAt": created_at,
+    }
+    if coupon_code:
+        local_item["couponCode"] = coupon_code
+        local_item["originalAmountPaise"] = original_amount
+        local_item["discountPaise"] = discount_paise
+        local_item["promoAmountPaise"] = final_amount
+        if offer_id:
+            local_item["razorpayOfferId"] = offer_id
+    subs_tbl.put_item(Item=local_item)
     return created(
         event,
         {
@@ -1022,7 +1463,10 @@ def create_subscription(
             "localSubscriptionId": local_id,
             "keyId": RAZORPAY_KEY_ID,
             "plan": plan,
-            "amountPaise": _as_int(plan_cfg.get("amountPaise")),
+            "amountPaise": final_amount,
+            "originalAmountPaise": original_amount,
+            "discountPaise": discount_paise,
+            "couponCode": coupon_code or None,
         },
         "Subscription created",
     )
@@ -1066,7 +1510,10 @@ def verify_subscription(
 
     payment = find_payment_by_razorpay_payment_id(payment_id)
     if not payment:
-        amount_paise = get_paid_plan_amount(sub["tier"])
+        amount_paise = _as_int(
+            sub.get("promoAmountPaise"),
+            get_paid_plan_amount(sub["tier"]),
+        )
         invoice_number = next_invoice_number()
         invoice_key = upload_invoice(
             invoice_number,
@@ -1103,6 +1550,18 @@ def verify_subscription(
                 "updatedAt": created_at,
             }
         )
+
+    if sub.get("couponCode") and payment and payment.get("status") == "paid":
+        try:
+            coupon = get_coupon(sub["couponCode"])
+            record_coupon_redemption(
+                sub["couponCode"],
+                user_id,
+                payment["paymentId"],
+                None if not coupon else coupon.get("maxRedemptions"),
+            )
+        except Exception:
+            pass
 
     return ok(
         event,
@@ -1584,6 +2043,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             },
             "Plan configs seeded",
         )
+    if action == "listPlans":
+        return list_public_plans(event)
+    if action == "listOffers":
+        return list_public_offers(event)
+    if action == "validateCoupon":
+        return with_auth(event, lambda e, uid: validate_coupon_handler(e, uid, body))
     if action == "createOrder":
         return with_auth(event, lambda e, uid: create_order(e, uid, body))
     if action == "verify":
@@ -1599,6 +2064,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if action == "invoice":
         pid = body.get("paymentId") or ""
         return with_auth(event, lambda e, uid: get_invoice(e, uid, pid))
+
+    # REST routing (public)
+    if path.endswith("/billing/plans") and method == "GET":
+        return list_public_plans(event)
+    if path.endswith("/billing/offers") and method == "GET":
+        return list_public_offers(event)
+    if path.endswith("/billing/validate-coupon") and method == "POST":
+        return with_auth(event, lambda e, uid: validate_coupon_handler(e, uid, body))
 
     # REST routing
     if path.endswith("/billing/create-order") and method == "POST":

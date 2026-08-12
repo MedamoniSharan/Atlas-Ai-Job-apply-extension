@@ -9,6 +9,7 @@ Tables:
                      GSI ExternalJobIndex (userId, platformExternalJobId)
   CosmoActivities    PK=userId  SK=eventId
   CosmoApplyCounters PK=userId  SK=periodKey
+  CosmoPlanConfigs   PK=tier
 """
 
 import base64
@@ -32,6 +33,7 @@ USERS_TABLE = os.environ.get("USERS_TABLE", "CosmoUsers")
 APPLICATIONS_TABLE = os.environ.get("APPLICATIONS_TABLE", "CosmoApplications")
 ACTIVITIES_TABLE = os.environ.get("ACTIVITIES_TABLE", "CosmoActivities")
 APPLY_COUNTERS_TABLE = os.environ.get("APPLY_COUNTERS_TABLE", "CosmoApplyCounters")
+PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
 JWT_ACCESS_SECRET = os.environ.get("JWT_ACCESS_SECRET", "dev-access-secret-change-me")
 CORS_ORIGINS = [
     o.strip().rstrip("/")
@@ -77,6 +79,7 @@ users_tbl = dynamodb.Table(USERS_TABLE)
 apps_tbl = dynamodb.Table(APPLICATIONS_TABLE)
 activities_tbl = dynamodb.Table(ACTIVITIES_TABLE)
 counters_tbl = dynamodb.Table(APPLY_COUNTERS_TABLE)
+plans_tbl = dynamodb.Table(PLAN_CONFIGS_TABLE)
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -236,12 +239,38 @@ def get_effective_plan(
     return tier if tier in PLAN_LIMITS else "free"
 
 
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def get_plan_limits(tier: str) -> Dict[str, int]:
+    fallback = PLAN_LIMITS.get(tier) or PLAN_LIMITS["free"]
+    try:
+        item = plans_tbl.get_item(Key={"tier": tier}).get("Item") or {}
+        limits = item.get("limits") or {}
+        return {
+            "appliesPerDay": _as_int(limits.get("appliesPerDay"), fallback["appliesPerDay"]),
+            "monthlyApplies": _as_int(
+                limits.get("monthlyApplies"), fallback["monthlyApplies"]
+            ),
+        }
+    except Exception:
+        return dict(fallback)
+
+
 def plan_day_limit(plan: Optional[str], plan_expires_at: Any) -> int:
-    return PLAN_LIMITS[get_effective_plan(plan, plan_expires_at)]["appliesPerDay"]
+    tier = get_effective_plan(plan, plan_expires_at)
+    return get_plan_limits(tier)["appliesPerDay"]
 
 
 def plan_month_limit(plan: Optional[str], plan_expires_at: Any) -> int:
-    return PLAN_LIMITS[get_effective_plan(plan, plan_expires_at)]["monthlyApplies"]
+    tier = get_effective_plan(plan, plan_expires_at)
+    return get_plan_limits(tier)["monthlyApplies"]
 
 
 def ist_period_keys(now: Optional[datetime] = None) -> Tuple[str, str]:

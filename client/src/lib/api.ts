@@ -405,16 +405,25 @@ export async function verifyBillingPayment(payload: {
   });
 }
 
-export async function createSubscription(plan: PaidPlan) {
+export async function createSubscription(
+  plan: PaidPlan,
+  couponCode?: string
+) {
   return request<{
     subscriptionId: string;
     localSubscriptionId: string;
     keyId: string;
     plan: PaidPlan;
     amountPaise: number;
+    originalAmountPaise?: number;
+    discountPaise?: number;
+    couponCode?: string | null;
   }>('/api/v1/billing/subscribe', {
     method: 'POST',
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({
+      plan,
+      ...(couponCode ? { couponCode } : {}),
+    }),
   });
 }
 
@@ -481,6 +490,58 @@ export async function fetchBillingMe() {
       paidAt?: string;
     }>;
   }>('/api/v1/billing/me');
+}
+
+export type PublicPlanCard = {
+  tier: 'free' | 'pro' | 'max';
+  name: string;
+  description: string;
+  amountPaise: number;
+  compareAtPaise?: number | null;
+  features: string[];
+  badge?: string | null;
+  highlighted?: boolean;
+  lockNote?: string | null;
+  limits: {
+    monthlyApplies: number;
+    monthlyScans: number;
+    appliesPerHour: number;
+    appliesPerDay: number;
+  };
+  active: boolean;
+};
+
+export async function fetchPublicPlans() {
+  return request<PublicPlanCard[]>('/api/v1/billing/plans', undefined, false);
+}
+
+export type PublicSiteOffer = {
+  offerId: string;
+  message: string;
+  couponCode?: string | null;
+  linkUrl?: string | null;
+  active: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  priority?: number;
+};
+
+export async function fetchPublicOffers() {
+  return request<PublicSiteOffer[]>('/api/v1/billing/offers', undefined, false);
+}
+
+export async function validateCoupon(code: string, plan: PaidPlan) {
+  return request<{
+    code: string;
+    plan: PaidPlan;
+    originalAmountPaise: number;
+    discountPaise: number;
+    finalAmountPaise: number;
+    label: string;
+  }>('/api/v1/billing/validate-coupon', {
+    method: 'POST',
+    body: JSON.stringify({ code, plan }),
+  });
 }
 
 export async function fetchScanStats(
@@ -754,6 +815,11 @@ export async function fetchAdminPlans() {
       name: string;
       description: string;
       amountPaise: number;
+      compareAtPaise?: number | null;
+      features?: string[];
+      badge?: string | null;
+      highlighted?: boolean;
+      lockNote?: string | null;
       limits: {
         monthlyApplies: number;
         monthlyScans: number;
@@ -773,6 +839,87 @@ export async function updateAdminPlan(
   return request(`/api/v1/admin/plans/${tier}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
+  });
+}
+
+export type AdminSiteOffer = {
+  offerId: string;
+  message: string;
+  couponCode?: string | null;
+  linkUrl?: string | null;
+  active: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  priority?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchAdminOffers() {
+  return request<AdminSiteOffer[]>('/api/v1/admin/offers');
+}
+
+export async function createAdminOffer(body: Record<string, unknown>) {
+  return request<AdminSiteOffer>('/api/v1/admin/offers', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateAdminOffer(
+  offerId: string,
+  body: Record<string, unknown>
+) {
+  return request<AdminSiteOffer>(`/api/v1/admin/offers/${offerId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteAdminOffer(offerId: string) {
+  return request(`/api/v1/admin/offers/${offerId}`, { method: 'DELETE' });
+}
+
+export type AdminCoupon = {
+  code: string;
+  type: 'percent' | 'fixedPaise';
+  value: number;
+  applicablePlans: PaidPlan[];
+  maxRedemptions?: number | null;
+  redemptionCount?: number;
+  perUserLimit?: number;
+  active: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchAdminCoupons() {
+  return request<AdminCoupon[]>('/api/v1/admin/coupons');
+}
+
+export async function createAdminCoupon(body: Record<string, unknown>) {
+  return request<AdminCoupon>('/api/v1/admin/coupons', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateAdminCoupon(
+  code: string,
+  body: Record<string, unknown>
+) {
+  return request<AdminCoupon>(`/api/v1/admin/coupons/${encodeURIComponent(code)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteAdminCoupon(code: string) {
+  return request(`/api/v1/admin/coupons/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
   });
 }
 

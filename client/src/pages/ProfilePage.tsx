@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Download, Eye, FileText, Sparkles, X } from 'lucide-react';
-import type { PaidPlan, PlanTier } from '@cosmo/shared';
-import { fetchBillingMe } from '../lib/api';
+import {
+  DEFAULT_PLAN_FEATURES,
+  PLAN_DISPLAY_NAMES,
+  PLAN_PRICES_PAISE,
+  type PaidPlan,
+  type PlanTier,
+} from '@cosmo/shared';
+import { fetchBillingMe, fetchPublicPlans, validateCoupon } from '../lib/api';
 import {
   downloadPaymentInvoice,
   previewPaymentInvoice,
@@ -12,27 +18,6 @@ import {
 } from '../lib/razorpayCheckout';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader } from '../components/CosmosLogo';
-
-const PLAN_LABEL: Record<PlanTier, string> = {
-  free: 'Basic',
-  pro: 'Premium',
-  max: 'UltraMag',
-};
-
-const PLAN_FEATURES: Record<PlanTier, string[]> = {
-  free: ['30 automated applies / month', '500 multi-board scans / month'],
-  pro: [
-    '300 automated applies / month',
-    '1500 multi-board scans / month',
-    'Human-paced co-pilot',
-  ],
-  max: [
-    '1000 automated applies / month',
-    '5000 multi-board scans / month',
-    'Human-paced co-pilot',
-    'Highest monthly volume',
-  ],
-};
 
 function formatInr(amountPaise: number): string {
   return `₹${(amountPaise / 100).toFixed(0)}`;
@@ -51,6 +36,8 @@ export function ProfilePage() {
   const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState('Invoice preview');
+  const [couponCode, setCouponCode] = useState('');
+  const [couponHint, setCouponHint] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['billing', 'me'],
@@ -61,6 +48,35 @@ export function ProfilePage() {
     },
     staleTime: 30_000,
   });
+
+  const { data: catalog } = useQuery({
+    queryKey: ['public', 'plans'],
+    queryFn: async () => {
+      const res = await fetchPublicPlans();
+      if (!res.success) throw new Error(res.message);
+      return res.data ?? [];
+    },
+    staleTime: 60_000,
+  });
+
+  const planCards = useMemo(() => {
+    const byTier = new Map(
+      (catalog ?? []).map((p) => [p.tier, p] as const)
+    );
+    const tiers: PlanTier[] = ['free', 'pro', 'max'];
+    return tiers.map((tier) => {
+      const p = byTier.get(tier);
+      return {
+        tier,
+        name: p?.name || PLAN_DISPLAY_NAMES[tier],
+        amountPaise:
+          p?.amountPaise ??
+          (tier === 'free' ? 0 : PLAN_PRICES_PAISE[tier as PaidPlan]),
+        features:
+          p?.features?.length ? p.features : DEFAULT_PLAN_FEATURES[tier],
+      };
+    });
+  }, [catalog]);
 
   useEffect(() => {
     return () => {
@@ -73,7 +89,13 @@ export function ProfilePage() {
     setStatus(null);
     setLastPaymentId(null);
     try {
-      const result = await startPlanCheckout(plan);
+      const code = couponCode.trim();
+      if (code) {
+        const preview = await validateCoupon(code, plan);
+        if (preview.success) setCouponHint(preview.data.label);
+        else setCouponHint(preview.message || 'Invalid coupon');
+      }
+      const result = await startPlanCheckout(plan, code || undefined);
       setLastPaymentId(result.paymentId);
       setStatus(
         `${plan === 'pro' ? 'Premium' : 'UltraMag'} subscription is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
@@ -169,8 +191,11 @@ export function ProfilePage() {
   }
 
   const plan = data.plan;
-  const planLabel = PLAN_LABEL[plan];
+  const planLabel = PLAN_DISPLAY_NAMES[plan];
   const payments = data.payments ?? [];
+  const freeCard = planCards.find((p) => p.tier === 'free')!;
+  const proCard = planCards.find((p) => p.tier === 'pro')!;
+  const maxCard = planCards.find((p) => p.tier === 'max')!;
 
   return (
     <div className="dash">
@@ -276,16 +301,32 @@ export function ProfilePage() {
           </div>
         ) : null}
 
+        <div className="pricing-coupon profile-plan__coupon">
+          <label>
+            Coupon code
+            <input
+              value={couponCode}
+              onChange={(e) => {
+                setCouponCode(e.target.value.toUpperCase());
+                setCouponHint(null);
+              }}
+              placeholder="Optional"
+              autoComplete="off"
+            />
+          </label>
+          {couponHint ? <p className="pricing-coupon__hint">{couponHint}</p> : null}
+        </div>
+
         <div className="profile-plan__grid">
           <article
             className={`profile-plan__option${plan === 'free' ? ' is-current' : ''}`}
           >
             <div className="profile-plan__option-top">
-              <h3>Basic</h3>
-              <strong>₹0</strong>
+              <h3>{freeCard.name}</h3>
+              <strong>{formatInr(freeCard.amountPaise)}</strong>
             </div>
             <ul>
-              {PLAN_FEATURES.free.map((f) => (
+              {freeCard.features.map((f) => (
                 <li key={f}>
                   <Check size={14} strokeWidth={2.2} aria-hidden />
                   {f}
@@ -302,15 +343,16 @@ export function ProfilePage() {
           >
             <div className="profile-plan__option-top">
               <h3>
-                Premium
+                {proCard.name}
                 <Sparkles size={14} strokeWidth={2} aria-hidden />
               </h3>
               <strong>
-                ₹99<span>/mo</span>
+                {formatInr(proCard.amountPaise)}
+                <span>/mo</span>
               </strong>
             </div>
             <ul>
-              {PLAN_FEATURES.pro.map((f) => (
+              {proCard.features.map((f) => (
                 <li key={f}>
                   <Check size={14} strokeWidth={2.2} aria-hidden />
                   {f}
@@ -329,7 +371,7 @@ export function ProfilePage() {
                 {busyPlan === 'pro' ? (
                   <CosmosLoader label="" size={20} className="cosmos-loader--inline" />
                 ) : (
-                  'Upgrade to Premium'
+                  `Upgrade to ${proCard.name}`
                 )}
               </button>
             )}
@@ -339,13 +381,14 @@ export function ProfilePage() {
             className={`profile-plan__option${plan === 'max' ? ' is-current' : ''}`}
           >
             <div className="profile-plan__option-top">
-              <h3>UltraMag</h3>
+              <h3>{maxCard.name}</h3>
               <strong>
-                ₹299<span>/mo</span>
+                {formatInr(maxCard.amountPaise)}
+                <span>/mo</span>
               </strong>
             </div>
             <ul>
-              {PLAN_FEATURES.max.map((f) => (
+              {maxCard.features.map((f) => (
                 <li key={f}>
                   <Check size={14} strokeWidth={2.2} aria-hidden />
                   {f}
@@ -364,7 +407,7 @@ export function ProfilePage() {
                 {busyPlan === 'max' ? (
                   <CosmosLoader label="" size={20} className="cosmos-loader--inline" />
                 ) : (
-                  'Upgrade to UltraMag'
+                  `Upgrade to ${maxCard.name}`
                 )}
               </button>
             )}
@@ -399,7 +442,7 @@ export function ProfilePage() {
                     <div>
                       <strong>{title}</strong>
                       <p>
-                        {PLAN_LABEL[payment.plan]} ·{' '}
+                        {PLAN_DISPLAY_NAMES[payment.plan]} ·{' '}
                         {formatInr(payment.amountPaise)}
                         {payment.paidAt
                           ? ` · ${new Date(payment.paidAt).toLocaleDateString('en-IN')}`

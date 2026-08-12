@@ -4,6 +4,7 @@ import {
   createBillingOrderSchema,
   createSubscriptionSchema,
   ok,
+  validateCouponSchema,
   verifyBillingPaymentSchema,
   verifySubscriptionSchema,
 } from '@cosmo/shared';
@@ -11,8 +12,39 @@ import { asyncHandler } from '../../middleware/errorHandler';
 import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import * as billingService from './billing.service';
+import * as offerService from './offer.service';
+import { listPublicPlans } from './planConfig.service';
 
 export const billingRouter = Router();
+
+billingRouter.get(
+  '/plans',
+  asyncHandler(async (_req, res) => {
+    const data = await listPublicPlans();
+    res.json(ok(data));
+  })
+);
+
+billingRouter.get(
+  '/offers',
+  asyncHandler(async (_req, res) => {
+    const data = await offerService.listActiveOffers();
+    res.json(ok(data));
+  })
+);
+
+billingRouter.post(
+  '/validate-coupon',
+  requireAuth,
+  validateBody(validateCouponSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await billingService.validateCouponForUser(
+      req.user!.sub,
+      req.body
+    );
+    res.json(ok(data));
+  })
+);
 
 billingRouter.post(
   '/create-order',

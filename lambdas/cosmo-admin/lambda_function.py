@@ -9,6 +9,9 @@ Tables:
   CosmoPayments        PK=paymentId  GSI UserPaymentsIndex (userId, createdAt)
   CosmoSubscriptions   PK=subscriptionId  GSI UserSubsIndex (userId, createdAt)
   CosmoPlanConfigs     PK=tier
+  CosmoSiteOffers      PK=offerId
+  CosmoCoupons         PK=code
+  CosmoCouponRedemptions PK=redemptionId (user/code usage tracking)
   CosmoAdminAudit      PK=auditId  GSI CreatedAtIndex (entityType, createdAt)
   CosmoUninstallFeedback PK=feedbackId GSI CreatedAtIndex (entityType, createdAt)
   CosmoScanSessions    PK=userId SK=sessionId  (optional metrics)
@@ -36,6 +39,9 @@ APPLICATIONS_TABLE = os.environ.get("APPLICATIONS_TABLE", "CosmoApplications")
 PAYMENTS_TABLE = os.environ.get("PAYMENTS_TABLE", "CosmoPayments")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE", "CosmoSubscriptions")
 PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
+SITE_OFFERS_TABLE = os.environ.get("SITE_OFFERS_TABLE", "CosmoSiteOffers")
+COUPONS_TABLE = os.environ.get("COUPONS_TABLE", "CosmoCoupons")
+COUPON_REDEMPTIONS_TABLE = os.environ.get("COUPON_REDEMPTIONS_TABLE", "CosmoCouponRedemptions")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "CosmoAdminAudit")
 UNINSTALL_FEEDBACK_TABLE = os.environ.get("UNINSTALL_FEEDBACK_TABLE", "CosmoUninstallFeedback")
 SCAN_SESSIONS_TABLE = os.environ.get("SCAN_SESSIONS_TABLE", "CosmoScanSessions")
@@ -49,6 +55,7 @@ CORS_ORIGINS = [
 ]
 
 PLAN_PRICES_PAISE = {"pro": 9900, "max": 29900}
+PLAN_COMPARE_AT_PAISE = {"free": None, "pro": 29900, "max": 79900}
 PLAN_DISPLAY = {"free": "Basic", "pro": "Premium", "max": "UltraMag"}
 PLAN_LIMITS = {
     "free": {"monthlyApplies": 30, "monthlyScans": 500, "appliesPerHour": 6, "appliesPerDay": 15},
@@ -60,8 +67,35 @@ PLAN_DESC = {
     "pro": "Higher apply volume for active job seekers",
     "max": "Highest monthly volume and scan capacity",
 }
+PLAN_FEATURES = {
+    "free": [
+        "30 assisted applies / month",
+        "Safety: 15/day",
+        "500 multi-board scans",
+    ],
+    "pro": [
+        "300 assisted applies / month",
+        "Safety: 40/day",
+        "1500 multi-board scans",
+        "Human-paced co-pilot sessions",
+    ],
+    "max": [
+        "1000 assisted applies / month",
+        "Safety: 60/day",
+        "5000 multi-board scans",
+        "Human-paced co-pilot sessions",
+    ],
+}
+PLAN_LOCK_NOTE = {
+    "free": None,
+    "pro": "Price locks forever when you upgrade",
+    "max": "Price locks forever when you upgrade",
+}
+PLAN_BADGE = {"free": None, "pro": "Popular", "max": None}
+PLAN_HIGHLIGHTED = {"free": False, "pro": True, "max": False}
 ACTIVE_SUB = frozenset({"created", "authenticated", "active", "pending", "halted"})
 PAID = frozenset({"pro", "max"})
+PLAN_MARKETING_FIELDS = ("compareAtPaise", "features", "badge", "highlighted", "lockNote")
 
 ddb = boto3.resource("dynamodb")
 _S3_REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "ap-south-2"
@@ -75,6 +109,8 @@ apps_tbl = ddb.Table(APPLICATIONS_TABLE)
 payments_tbl = ddb.Table(PAYMENTS_TABLE)
 subs_tbl = ddb.Table(SUBSCRIPTIONS_TABLE)
 plans_tbl = ddb.Table(PLAN_CONFIGS_TABLE)
+offers_tbl = ddb.Table(SITE_OFFERS_TABLE)
+coupons_tbl = ddb.Table(COUPONS_TABLE)
 audit_tbl = ddb.Table(AUDIT_TABLE)
 feedback_tbl = ddb.Table(UNINSTALL_FEEDBACK_TABLE)
 scan_sessions_tbl = ddb.Table(SCAN_SESSIONS_TABLE)
@@ -360,9 +396,15 @@ def seed_plans() -> List[Dict[str, Any]]:
     for tier in ("free", "pro", "max"):
         item = plans_tbl.get_item(Key={"tier": tier}).get("Item")
         if not item:
+            compare_at = PLAN_COMPARE_AT_PAISE[tier]
             item = {
                 "tier": tier, "name": PLAN_DISPLAY[tier], "description": PLAN_DESC[tier],
                 "amountPaise": 0 if tier == "free" else PLAN_PRICES_PAISE[tier],
+                "compareAtPaise": 0 if compare_at is None else compare_at,
+                "features": list(PLAN_FEATURES[tier]),
+                "badge": PLAN_BADGE[tier],
+                "highlighted": PLAN_HIGHLIGHTED[tier],
+                "lockNote": PLAN_LOCK_NOTE[tier],
                 "limits": dict(PLAN_LIMITS[tier]), "razorpayPlanId": None, "active": True,
                 "createdAt": now_iso(), "updatedAt": now_iso(),
             }
@@ -379,9 +421,28 @@ def seed_plans() -> List[Dict[str, Any]]:
 
 def plan_public(p: Dict[str, Any]) -> Dict[str, Any]:
     t = p.get("tier") or "free"
+    features = p.get("features")
+    if not isinstance(features, list) or not features:
+        features = list(PLAN_FEATURES.get(t, []))
+    compare_default = PLAN_COMPARE_AT_PAISE.get(t)
+    if "compareAtPaise" in p and p.get("compareAtPaise") is not None:
+        compare_at = as_int(p.get("compareAtPaise"))
+        if t == "free" and compare_at == 0:
+            compare_at = None
+    else:
+        compare_at = compare_default
+    badge = p.get("badge") if "badge" in p else PLAN_BADGE.get(t)
+    lock_note = p.get("lockNote") if "lockNote" in p else PLAN_LOCK_NOTE.get(t)
+    highlighted = p.get("highlighted") if "highlighted" in p else PLAN_HIGHLIGHTED.get(t, False)
     return {
         "tier": t, "name": p.get("name"), "description": p.get("description"),
-        "amountPaise": as_int(p.get("amountPaise")), "limits": p.get("limits") or PLAN_LIMITS.get(t),
+        "amountPaise": as_int(p.get("amountPaise")),
+        "compareAtPaise": compare_at,
+        "features": features,
+        "badge": badge,
+        "highlighted": bool(highlighted),
+        "lockNote": lock_note,
+        "limits": p.get("limits") or PLAN_LIMITS.get(t),
         "razorpayPlanId": p.get("razorpayPlanId"), "active": bool(p.get("active", True)),
         "displayFallback": PLAN_DISPLAY.get(t, t),
     }
@@ -998,10 +1059,11 @@ def update_plan(event: Dict[str, Any], aid: str, tier: str, body: Dict[str, Any]
     plan = plans_tbl.get_item(Key={"tier": tier}).get("Item")
     if not plan:
         return err(event, "Plan not found", 404, "NOT_FOUND")
-    before = {k: plan.get(k) for k in ("name", "amountPaise", "limits", "active", "razorpayPlanId")}
+    audit_keys = ("name", "amountPaise", "limits", "active", "razorpayPlanId") + PLAN_MARKETING_FIELDS
+    before = {k: plan.get(k) for k in audit_keys}
     updates = {"updatedAt": now_iso()}
-    for f in ("name", "description", "active", "amountPaise", "limits"):
-        if f in body and body[f] is not None:
+    for f in ("name", "description", "active", "amountPaise", "limits") + PLAN_MARKETING_FIELDS:
+        if f in body:
             updates[f] = body[f]
     names = {f"#k{i}": k for i, k in enumerate(updates)}
     vals = {f":v{i}": v for i, v in enumerate(updates.values())}
@@ -1011,8 +1073,229 @@ def update_plan(event: Dict[str, Any], aid: str, tier: str, body: Dict[str, Any]
         ExpressionAttributeNames=names, ExpressionAttributeValues=vals,
     )
     plan.update(updates)
-    write_audit(aid, "plan.update", "plan", tier, before, {k: plan.get(k) for k in before}, client_ip(event))
+    write_audit(aid, "plan.update", "plan", tier, before, {k: plan.get(k) for k in audit_keys}, client_ip(event))
     return ok(event, plan_public(plan), "Plan updated")
+
+
+def offer_public(o: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "offerId": o.get("offerId"),
+        "message": o.get("message") or "",
+        "couponCode": o.get("couponCode"),
+        "linkUrl": o.get("linkUrl"),
+        "active": bool(o.get("active", True)),
+        "startsAt": o.get("startsAt"),
+        "endsAt": o.get("endsAt"),
+        "priority": as_int(o.get("priority")),
+        "createdAt": o.get("createdAt"),
+        "updatedAt": o.get("updatedAt"),
+    }
+
+
+def list_offers(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
+    items = scan_all(offers_tbl)
+    items.sort(key=lambda x: (as_int(x.get("priority")), x.get("createdAt") or ""), reverse=True)
+    return ok(event, [offer_public(o) for o in items])
+
+
+def create_offer(event: Dict[str, Any], aid: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    message = str(body.get("message") or "").strip()
+    if not message:
+        return err(event, "message is required", 400, "VALIDATION_ERROR")
+    now = now_iso()
+    offer_id = str(uuid.uuid4())
+    coupon_code = body.get("couponCode")
+    link_url = body.get("linkUrl")
+    item = {
+        "offerId": offer_id,
+        "message": message,
+        "couponCode": (str(coupon_code).strip() or None) if coupon_code is not None else None,
+        "linkUrl": (str(link_url).strip() or None) if link_url is not None else None,
+        "active": bool(body.get("active", True)),
+        "startsAt": body.get("startsAt"),
+        "endsAt": body.get("endsAt"),
+        "priority": as_int(body.get("priority")),
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    offers_tbl.put_item(Item=item)
+    write_audit(aid, "offer.create", "offer", offer_id, None, offer_public(item), client_ip(event))
+    return ok(event, offer_public(item), "Offer created")
+
+
+def update_offer(event: Dict[str, Any], aid: str, offer_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    offer = offers_tbl.get_item(Key={"offerId": offer_id}).get("Item")
+    if not offer:
+        return err(event, "Offer not found", 404, "NOT_FOUND")
+    fields = ("message", "couponCode", "linkUrl", "active", "startsAt", "endsAt", "priority")
+    before = {k: offer.get(k) for k in fields}
+    updates = {"updatedAt": now_iso()}
+    if "message" in body:
+        message = str(body.get("message") or "").strip()
+        if not message:
+            return err(event, "message is required", 400, "VALIDATION_ERROR")
+        updates["message"] = message
+    if "couponCode" in body:
+        raw = body.get("couponCode")
+        updates["couponCode"] = (str(raw).strip() or None) if raw is not None else None
+    if "linkUrl" in body:
+        raw = body.get("linkUrl")
+        updates["linkUrl"] = (str(raw).strip() or None) if raw is not None else None
+    if "active" in body and body["active"] is not None:
+        updates["active"] = bool(body["active"])
+    if "startsAt" in body:
+        updates["startsAt"] = body["startsAt"]
+    if "endsAt" in body:
+        updates["endsAt"] = body["endsAt"]
+    if "priority" in body and body["priority"] is not None:
+        updates["priority"] = as_int(body["priority"])
+    names = {f"#k{i}": k for i, k in enumerate(updates)}
+    vals = {f":v{i}": v for i, v in enumerate(updates.values())}
+    offers_tbl.update_item(
+        Key={"offerId": offer_id},
+        UpdateExpression="SET " + ", ".join(f"{n}={v}" for n, v in zip(names, vals)),
+        ExpressionAttributeNames=names, ExpressionAttributeValues=vals,
+    )
+    offer.update(updates)
+    write_audit(aid, "offer.update", "offer", offer_id, before, {k: offer.get(k) for k in fields}, client_ip(event))
+    return ok(event, offer_public(offer), "Offer updated")
+
+
+def delete_offer(event: Dict[str, Any], aid: str, offer_id: str) -> Dict[str, Any]:
+    offer = offers_tbl.get_item(Key={"offerId": offer_id}).get("Item")
+    if not offer:
+        return err(event, "Offer not found", 404, "NOT_FOUND")
+    before = offer_public(offer)
+    offers_tbl.delete_item(Key={"offerId": offer_id})
+    write_audit(aid, "offer.delete", "offer", offer_id, before, {"deleted": True}, client_ip(event))
+    return ok(event, {"offerId": offer_id, "deleted": True}, "Offer deleted")
+
+
+def coupon_public(c: Dict[str, Any]) -> Dict[str, Any]:
+    plans = c.get("applicablePlans") or []
+    if not isinstance(plans, list):
+        plans = []
+    return {
+        "code": c.get("code"),
+        "type": c.get("type"),
+        "value": as_int(c.get("value")),
+        "applicablePlans": plans,
+        "maxRedemptions": c.get("maxRedemptions"),
+        "redemptionCount": as_int(c.get("redemptionCount")),
+        "perUserLimit": as_int(c.get("perUserLimit"), 1),
+        "active": bool(c.get("active", True)),
+        "startsAt": c.get("startsAt"),
+        "endsAt": c.get("endsAt"),
+        "description": c.get("description"),
+        "createdAt": c.get("createdAt"),
+        "updatedAt": c.get("updatedAt"),
+    }
+
+
+def list_coupons(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
+    items = scan_all(coupons_tbl)
+    items.sort(key=lambda x: (x.get("code") or ""))
+    return ok(event, [coupon_public(c) for c in items])
+
+
+def create_coupon(event: Dict[str, Any], aid: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    code = str(body.get("code") or "").strip().upper()
+    if len(code) < 2:
+        return err(event, "code is required", 400, "VALIDATION_ERROR")
+    ctype = body.get("type")
+    if ctype not in ("percent", "fixedPaise"):
+        return err(event, "type must be percent or fixedPaise", 400, "VALIDATION_ERROR")
+    value = as_int(body.get("value"), 0)
+    if value < 1:
+        return err(event, "value must be a positive integer", 400, "VALIDATION_ERROR")
+    existing = coupons_tbl.get_item(Key={"code": code}).get("Item")
+    if existing:
+        return err(event, "Coupon code already exists", 409, "CODE_EXISTS")
+    plans = body.get("applicablePlans")
+    if not isinstance(plans, list) or not plans:
+        plans = ["pro", "max"]
+    plans = [p for p in plans if p in PAID]
+    if not plans:
+        return err(event, "applicablePlans must include pro and/or max", 400, "VALIDATION_ERROR")
+    now = now_iso()
+    item = {
+        "code": code,
+        "type": ctype,
+        "value": value,
+        "applicablePlans": plans,
+        "maxRedemptions": body.get("maxRedemptions"),
+        "redemptionCount": 0,
+        "perUserLimit": max(1, as_int(body.get("perUserLimit"), 1)),
+        "active": bool(body.get("active", True)),
+        "startsAt": body.get("startsAt"),
+        "endsAt": body.get("endsAt"),
+        "description": body.get("description"),
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    coupons_tbl.put_item(Item=item)
+    write_audit(aid, "coupon.create", "coupon", code, None, coupon_public(item), client_ip(event))
+    return ok(event, coupon_public(item), "Coupon created")
+
+
+def update_coupon(event: Dict[str, Any], aid: str, code: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    code = str(code or "").strip().upper()
+    coupon = coupons_tbl.get_item(Key={"code": code}).get("Item")
+    if not coupon:
+        return err(event, "Coupon not found", 404, "NOT_FOUND")
+    fields = ("type", "value", "applicablePlans", "maxRedemptions", "perUserLimit", "active", "startsAt", "endsAt", "description")
+    before = {k: coupon.get(k) for k in fields}
+    updates = {"updatedAt": now_iso()}
+    if "type" in body and body["type"] is not None:
+        if body["type"] not in ("percent", "fixedPaise"):
+            return err(event, "type must be percent or fixedPaise", 400, "VALIDATION_ERROR")
+        updates["type"] = body["type"]
+    if "value" in body and body["value"] is not None:
+        value = as_int(body["value"], 0)
+        if value < 1:
+            return err(event, "value must be a positive integer", 400, "VALIDATION_ERROR")
+        updates["value"] = value
+    if "applicablePlans" in body and body["applicablePlans"] is not None:
+        plans = body["applicablePlans"]
+        if not isinstance(plans, list):
+            return err(event, "applicablePlans must be a list", 400, "VALIDATION_ERROR")
+        plans = [p for p in plans if p in PAID]
+        if not plans:
+            return err(event, "applicablePlans must include pro and/or max", 400, "VALIDATION_ERROR")
+        updates["applicablePlans"] = plans
+    if "maxRedemptions" in body:
+        updates["maxRedemptions"] = body["maxRedemptions"]
+    if "perUserLimit" in body and body["perUserLimit"] is not None:
+        updates["perUserLimit"] = max(1, as_int(body["perUserLimit"], 1))
+    if "active" in body and body["active"] is not None:
+        updates["active"] = bool(body["active"])
+    if "startsAt" in body:
+        updates["startsAt"] = body["startsAt"]
+    if "endsAt" in body:
+        updates["endsAt"] = body["endsAt"]
+    if "description" in body:
+        updates["description"] = body["description"]
+    names = {f"#k{i}": k for i, k in enumerate(updates)}
+    vals = {f":v{i}": v for i, v in enumerate(updates.values())}
+    coupons_tbl.update_item(
+        Key={"code": code},
+        UpdateExpression="SET " + ", ".join(f"{n}={v}" for n, v in zip(names, vals)),
+        ExpressionAttributeNames=names, ExpressionAttributeValues=vals,
+    )
+    coupon.update(updates)
+    write_audit(aid, "coupon.update", "coupon", code, before, {k: coupon.get(k) for k in fields}, client_ip(event))
+    return ok(event, coupon_public(coupon), "Coupon updated")
+
+
+def delete_coupon(event: Dict[str, Any], aid: str, code: str) -> Dict[str, Any]:
+    code = str(code or "").strip().upper()
+    coupon = coupons_tbl.get_item(Key={"code": code}).get("Item")
+    if not coupon:
+        return err(event, "Coupon not found", 404, "NOT_FOUND")
+    before = coupon_public(coupon)
+    coupons_tbl.delete_item(Key={"code": code})
+    write_audit(aid, "coupon.delete", "coupon", code, before, {"deleted": True}, client_ip(event))
+    return ok(event, {"code": code, "deleted": True}, "Coupon deleted")
 
 
 def list_audit(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
@@ -1094,6 +1377,8 @@ _RE_USER = re.compile(r"/admin/users/([^/]+)(?:/(plan|suspend|unsuspend|imperson
 _RE_SUB = re.compile(r"/admin/subscriptions/([^/]+)/(cancel|extend)$")
 _RE_PAY = re.compile(r"/admin/payments/([^/]+)(?:/(reconcile|invoice))?$")
 _RE_PLAN = re.compile(r"/admin/plans/([^/]+)$")
+_RE_OFFER = re.compile(r"/admin/offers/([^/]+)$")
+_RE_COUPON = re.compile(r"/admin/coupons/([^/]+)$")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -1126,6 +1411,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "listPlans": list_plans,
         "listAudit": list_audit,
         "listUninstallFeedback": list_uninstall_feedback,
+        "listOffers": list_offers,
+        "listCoupons": list_coupons,
     }
     if action in actions:
         return actions[action](event, admin_id)
@@ -1154,6 +1441,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return payment_invoice(event, admin_id, pid)
     if action == "updatePlan":
         return update_plan(event, admin_id, body.get("tier") or "", body)
+    if action == "createOffer":
+        return create_offer(event, admin_id, body)
+    if action == "updateOffer":
+        return update_offer(event, admin_id, body.get("offerId") or body.get("id") or "", body)
+    if action == "deleteOffer":
+        return delete_offer(event, admin_id, body.get("offerId") or body.get("id") or "")
+    if action == "createCoupon":
+        return create_coupon(event, admin_id, body)
+    if action == "updateCoupon":
+        return update_coupon(event, admin_id, body.get("code") or body.get("id") or "", body)
+    if action == "deleteCoupon":
+        return delete_coupon(event, admin_id, body.get("code") or body.get("id") or "")
 
     rest = {
         ("/admin/metrics", "GET"): get_metrics,
@@ -1163,10 +1462,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         ("/admin/plans", "GET"): list_plans,
         ("/admin/audit", "GET"): list_audit,
         ("/admin/feedback/uninstall", "GET"): list_uninstall_feedback,
+        ("/admin/offers", "GET"): list_offers,
+        ("/admin/offers", "POST"): create_offer,
+        ("/admin/coupons", "GET"): list_coupons,
+        ("/admin/coupons", "POST"): create_coupon,
     }
     for suffix, mth in list(rest.keys()):
         if path.endswith(suffix) and method == mth:
-            return rest[(suffix, mth)](event, admin_id)
+            handler = rest[(suffix, mth)]
+            if mth == "POST" and suffix in ("/admin/offers", "/admin/coupons"):
+                return handler(event, admin_id, body)
+            return handler(event, admin_id)
 
     m = _RE_USER.search(path)
     if m:
@@ -1206,5 +1512,31 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     m = _RE_PLAN.search(path)
     if m and method == "PATCH":
         return update_plan(event, admin_id, m.group(1), body)
+
+    m = _RE_OFFER.search(path)
+    if m:
+        oid = m.group(1)
+        if method == "GET":
+            offer = offers_tbl.get_item(Key={"offerId": oid}).get("Item")
+            if not offer:
+                return err(event, "Offer not found", 404, "NOT_FOUND")
+            return ok(event, offer_public(offer))
+        if method == "PATCH":
+            return update_offer(event, admin_id, oid, body)
+        if method == "DELETE":
+            return delete_offer(event, admin_id, oid)
+
+    m = _RE_COUPON.search(path)
+    if m:
+        code = m.group(1)
+        if method == "GET":
+            coupon = coupons_tbl.get_item(Key={"code": str(code).strip().upper()}).get("Item")
+            if not coupon:
+                return err(event, "Coupon not found", 404, "NOT_FOUND")
+            return ok(event, coupon_public(coupon))
+        if method == "PATCH":
+            return update_coupon(event, admin_id, code, body)
+        if method == "DELETE":
+            return delete_coupon(event, admin_id, code)
 
     return err(event, f"Unknown route: {method} {path}", 404, "NOT_FOUND")

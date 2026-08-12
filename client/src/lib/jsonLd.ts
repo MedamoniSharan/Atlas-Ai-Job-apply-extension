@@ -41,7 +41,7 @@ export function websiteJsonLd() {
   };
 }
 
-export function softwareApplicationJsonLd() {
+export function softwareApplicationJsonLd(highPrice = '299') {
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -55,7 +55,7 @@ export function softwareApplicationJsonLd() {
     offers: {
       '@type': 'AggregateOffer',
       lowPrice: '0',
-      highPrice: '299',
+      highPrice,
       priceCurrency: 'INR',
       offerCount: 3,
       url: absoluteUrl('/#pricing'),
