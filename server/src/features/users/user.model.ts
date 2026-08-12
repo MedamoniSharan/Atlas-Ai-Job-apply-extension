@@ -26,9 +26,19 @@ export interface IUser extends Document {
 
 const preferencesSchema = new Schema(
   {
-    titles: { type: [String], default: [] },
-    keywords: { type: [String], default: [] },
-    locations: { type: [String], default: [] },
+    titles: {
+      type: [String],
+      default: [
+        'Software Engineer',
+        'Software Developer',
+        'Full Stack Developer',
+      ],
+    },
+    keywords: {
+      type: [String],
+      default: ['Spring Boot', 'React.js', 'Java', 'JavaScript'],
+    },
+    locations: { type: [String], default: ['Bengaluru', 'Remote'] },
     experienceMin: { type: Number, default: 0 },
     experienceMax: { type: Number, default: 5 },
     minSalaryLpa: { type: Number, default: 2 },

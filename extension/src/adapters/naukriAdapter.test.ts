@@ -462,6 +462,7 @@ describe('preference matching helpers', () => {
   it('detects when search URL is missing preference filters', () => {
     const prefs = {
       ...DEFAULT_JOB_PREFERENCES,
+      locations: [],
       minSalaryLpa: 10,
       workMode: 'remote' as const,
     };
@@ -483,6 +484,7 @@ describe('preference matching helpers', () => {
     document.body.innerHTML = `<main><input placeholder="Search jobs" /></main>`;
     const prefs = {
       ...DEFAULT_JOB_PREFERENCES,
+      locations: [],
       minSalaryLpa: 10,
       workMode: 'remote' as const,
     };
@@ -863,6 +865,8 @@ describe('preference matching helpers', () => {
     const prefs = {
       ...DEFAULT_JOB_PREFERENCES,
       titles: ['Dev'],
+      keywords: [],
+      locations: [],
       experienceMin: 2,
       experienceMax: 5,
     };

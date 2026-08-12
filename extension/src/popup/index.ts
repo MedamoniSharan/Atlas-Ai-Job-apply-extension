@@ -7,7 +7,10 @@ import {
   MIN_PREF_TITLES,
   TITLE_SUGGESTIONS,
 } from '@cosmo/shared';
-import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
+import {
+  DEFAULT_JOB_PREFERENCES,
+  resolveJobPreferences,
+} from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
 import { ensureChromeNamespace } from '../shared/browser';
 import { mountChipSuggestField } from '../shared/chipSuggestField';
@@ -171,9 +174,9 @@ function fillPrefsForm(prefs: JobPreferences) {
   (document.getElementById('pref-work-mode') as HTMLSelectElement).value =
     prefs.workMode;
   (document.getElementById('pref-auto-scan') as HTMLInputElement).checked =
-    prefs.autoScanEnabled;
+    prefs.autoScanEnabled !== false;
   (document.getElementById('pref-auto-apply') as HTMLInputElement).checked =
-    prefs.autoApplyEnabled;
+    prefs.autoApplyEnabled !== false;
 }
 
 function readPrefsForm(): JobPreferences {
@@ -305,7 +308,7 @@ async function refreshUi() {
         type: 'GET_PREFERENCES',
       });
       const prefs = prefsRes?.data ?? status.preferences;
-      if (prefs) fillPrefsForm(prefs);
+      if (prefs) fillPrefsForm(resolveJobPreferences(prefs));
     } catch {
       if (status.preferences) fillPrefsForm(status.preferences);
     }

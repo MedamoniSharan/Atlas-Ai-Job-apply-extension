@@ -14,6 +14,7 @@ import {
   clearAuth,
   setCachedPreferences,
 } from './storageManager';
+import { resolveJobPreferences } from './defaults';
 import { logger } from './logger';
 
 function isAuthFailure(
@@ -153,7 +154,9 @@ export async function postScanSession(
 export async function fetchPreferences(): Promise<ApiResponse<JobPreferences>> {
   const result = await request<JobPreferences>('/api/v1/preferences');
   if (result.success) {
-    await setCachedPreferences(result.data);
+    const data = resolveJobPreferences(result.data);
+    await setCachedPreferences(data);
+    return { ...result, data };
   }
   return result;
 }

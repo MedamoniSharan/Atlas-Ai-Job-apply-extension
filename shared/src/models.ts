@@ -158,9 +158,9 @@ export const jobPreferencesUpdateSchema = jobPreferencesSchema.superRefine(
 export type JobPreferencesUpdate = z.infer<typeof jobPreferencesUpdateSchema>;
 
 export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
-  titles: [],
-  keywords: [],
-  locations: [],
+  titles: ['Software Engineer', 'Software Developer', 'Full Stack Developer'],
+  keywords: ['Spring Boot', 'React.js', 'Java', 'JavaScript'],
+  locations: ['Bengaluru', 'Remote'],
   experienceMin: 0,
   experienceMax: 5,
   minSalaryLpa: 2,
@@ -168,6 +168,51 @@ export const DEFAULT_JOB_PREFERENCES: JobPreferences = {
   autoScanEnabled: true,
   autoApplyEnabled: true,
 };
+
+/** True when the user has never saved titles/keywords (empty or missing). */
+export function jobPreferencesAreUnset(
+  prefs: Partial<JobPreferences> | null | undefined
+): boolean {
+  if (!prefs) return true;
+  return !(prefs.titles?.length) && !(prefs.keywords?.length);
+}
+
+/**
+ * Auto-scan + auto-apply default ON.
+ * Older saves used scan-on / apply-off as the implicit default — treat that
+ * as unset so both come back on until the user turns one off.
+ */
+export function resolveAutomationFlags(
+  prefs: Partial<JobPreferences> | null | undefined
+): Pick<JobPreferences, 'autoScanEnabled' | 'autoApplyEnabled'> {
+  const scan = prefs?.autoScanEnabled ?? true;
+  const applyRaw = prefs?.autoApplyEnabled;
+  const legacyApplyOff = applyRaw === false && scan !== false;
+  return {
+    autoScanEnabled: scan !== false,
+    autoApplyEnabled: applyRaw == null || legacyApplyOff ? true : applyRaw,
+  };
+}
+
+/** Fill Naukri-style defaults when the user has not set job preferences. */
+export function resolveJobPreferences(
+  prefs: Partial<JobPreferences> | null | undefined
+): JobPreferences {
+  if (jobPreferencesAreUnset(prefs)) {
+    return { ...DEFAULT_JOB_PREFERENCES };
+  }
+  return {
+    ...DEFAULT_JOB_PREFERENCES,
+    titles: prefs!.titles ?? [],
+    keywords: prefs!.keywords ?? [],
+    locations: prefs!.locations ?? [],
+    experienceMin: prefs!.experienceMin ?? DEFAULT_JOB_PREFERENCES.experienceMin,
+    experienceMax: prefs!.experienceMax ?? DEFAULT_JOB_PREFERENCES.experienceMax,
+    minSalaryLpa: prefs!.minSalaryLpa ?? DEFAULT_JOB_PREFERENCES.minSalaryLpa,
+    workMode: prefs!.workMode ?? DEFAULT_JOB_PREFERENCES.workMode,
+    ...resolveAutomationFlags(prefs),
+  };
+}
 
 export function preferencesAreComplete(prefs: JobPreferences | null | undefined): boolean {
   if (!prefs) return false;

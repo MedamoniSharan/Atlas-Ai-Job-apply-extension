@@ -532,6 +532,16 @@ export async function getMetrics(query: AdminMetricsQuery) {
   };
 }
 
+function utcDayStart(day: string): Date {
+  return new Date(`${day}T00:00:00.000Z`);
+}
+
+function utcDayEndExclusive(day: string): Date {
+  const next = utcDayStart(day);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
 export async function listUsers(query: AdminUsersQuery) {
   const filter: Record<string, unknown> = {};
   if (query.q?.trim()) {
@@ -544,6 +554,12 @@ export async function listUsers(query: AdminUsersQuery) {
   if (query.plan) filter.plan = query.plan;
   if (query.role) filter.role = query.role;
   if (query.status) filter.status = query.status;
+  if (query.from || query.to) {
+    const createdAt: Record<string, Date> = {};
+    if (query.from) createdAt.$gte = utcDayStart(query.from);
+    if (query.to) createdAt.$lt = utcDayEndExclusive(query.to);
+    filter.createdAt = createdAt;
+  }
 
   const page = query.page ?? 1;
   const limit = query.limit ?? 20;

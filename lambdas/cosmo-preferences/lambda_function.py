@@ -31,9 +31,9 @@ CORS_ORIGINS = [
 ]
 
 DEFAULT_PREFS = {
-    "titles": [],
-    "keywords": [],
-    "locations": [],
+    "titles": ["Software Engineer", "Software Developer", "Full Stack Developer"],
+    "keywords": ["Spring Boot", "React.js", "Java", "JavaScript"],
+    "locations": ["Bengaluru", "Remote"],
     "experienceMin": 0,
     "experienceMax": 5,
     "minSalaryLpa": 2,
@@ -165,7 +165,15 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     return items[0] if items else None
 
 
+def prefs_unset(raw: Any) -> bool:
+    if not raw:
+        return True
+    return not (raw.get("titles") or raw.get("keywords"))
+
+
 def normalize_prefs(raw: Any) -> Dict[str, Any]:
+    if prefs_unset(raw):
+        return dict(DEFAULT_PREFS)
     raw = raw or {}
     return {
         "titles": list(raw.get("titles") or []),
@@ -175,8 +183,15 @@ def normalize_prefs(raw: Any) -> Dict[str, Any]:
         "experienceMax": int(raw.get("experienceMax") if raw.get("experienceMax") is not None else 5),
         "minSalaryLpa": raw.get("minSalaryLpa") if raw.get("minSalaryLpa") is not None else 2,
         "workMode": raw.get("workMode") or "any",
-        "autoScanEnabled": bool(raw.get("autoScanEnabled", True)),
-        "autoApplyEnabled": bool(raw.get("autoApplyEnabled", True)),
+        "autoScanEnabled": raw.get("autoScanEnabled", True) is not False,
+        # Old default was scan-on / apply-off; treat that as unset and enable both.
+        "autoApplyEnabled": True
+        if raw.get("autoApplyEnabled") is None
+        or (
+            raw.get("autoApplyEnabled") is False
+            and raw.get("autoScanEnabled", True) is not False
+        )
+        else bool(raw.get("autoApplyEnabled")),
     }
 
 

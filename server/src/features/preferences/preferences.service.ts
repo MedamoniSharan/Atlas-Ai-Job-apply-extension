@@ -1,7 +1,7 @@
 import {
-  DEFAULT_JOB_PREFERENCES,
   JobPreferences,
   preferencesAreComplete,
+  resolveJobPreferences,
 } from '@cosmo/shared';
 import { UserModel } from '../users/user.model';
 import { AppError } from '../../middleware/errorHandler';
@@ -9,18 +9,7 @@ import { AppError } from '../../middleware/errorHandler';
 function normalizePreferences(
   raw: Partial<JobPreferences> | null | undefined
 ): JobPreferences {
-  return {
-    ...DEFAULT_JOB_PREFERENCES,
-    titles: raw?.titles ?? [],
-    keywords: raw?.keywords ?? [],
-    locations: raw?.locations ?? [],
-    experienceMin: raw?.experienceMin ?? DEFAULT_JOB_PREFERENCES.experienceMin,
-    experienceMax: raw?.experienceMax ?? DEFAULT_JOB_PREFERENCES.experienceMax,
-    minSalaryLpa: raw?.minSalaryLpa ?? DEFAULT_JOB_PREFERENCES.minSalaryLpa,
-    workMode: raw?.workMode ?? 'any',
-    autoScanEnabled: raw?.autoScanEnabled ?? true,
-    autoApplyEnabled: raw?.autoApplyEnabled ?? true,
-  };
+  return resolveJobPreferences(raw);
 }
 
 export async function getPreferences(userId: string): Promise<JobPreferences> {

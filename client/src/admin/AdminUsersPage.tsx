@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BadgePlus,
   Ban,
@@ -25,7 +26,6 @@ import {
 import { CosmosLoader } from '../components/CosmosLogo';
 import { useAuthStore } from '../store/authStore';
 import type { PaidPlan, User } from '@cosmo/shared';
-import { useNavigate } from 'react-router-dom';
 
 type UserDetail = {
   id: string;
@@ -50,7 +50,22 @@ type UserDetail = {
   }>;
 };
 
+function formatSignupDay(day: string): string {
+  if (day.length < 10) return day;
+  const date = new Date(`${day}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return day;
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 export function AdminUsersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const signedUpFrom = searchParams.get('from') || undefined;
+  const signedUpTo = searchParams.get('to') || undefined;
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -64,10 +79,21 @@ export function AdminUsersPage() {
   const startImpersonation = useAuthStore((s) => s.startImpersonation);
   const adminUser = useAuthStore((s) => s.user);
 
+  useEffect(() => {
+    setPage(1);
+    setSelectedId(null);
+  }, [signedUpFrom, signedUpTo]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'users', search, page],
+    queryKey: ['admin', 'users', search, page, signedUpFrom, signedUpTo],
     queryFn: async () => {
-      const res = await fetchAdminUsers({ q: search || undefined, page, limit: 10 });
+      const res = await fetchAdminUsers({
+        q: search || undefined,
+        from: signedUpFrom,
+        to: signedUpTo,
+        page,
+        limit: 10,
+      });
       if (!res.success) throw new Error(res.message);
       return res.data;
     },
@@ -226,6 +252,27 @@ export function AdminUsersPage() {
           </button>
         </form>
 
+        {signedUpFrom || signedUpTo ? (
+          <div className="admin-filter-chip">
+            <span>
+              Signed up{' '}
+              {signedUpFrom && signedUpTo && signedUpFrom !== signedUpTo
+                ? `${formatSignupDay(signedUpFrom)} – ${formatSignupDay(signedUpTo)}`
+                : formatSignupDay(signedUpFrom || signedUpTo || '')}
+            </span>
+            <button
+              type="button"
+              className="dash-btn dash-btn--ghost"
+              onClick={() => {
+                setSearchParams({}, { replace: true });
+              }}
+            >
+              <X size={14} strokeWidth={2} aria-hidden />
+              Clear
+            </button>
+          </div>
+        ) : null}
+
         {isLoading ? (
           <CosmosLoader label="Loading users…" className="cosmos-loader--inline" />
         ) : (
@@ -237,9 +284,17 @@ export function AdminUsersPage() {
                   <th>Plan</th>
                   <th>Role</th>
                   <th>Status</th>
+                  <th>Signed up</th>
                 </tr>
               </thead>
               <tbody>
+                {data?.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      No users in this range
+                    </td>
+                  </tr>
+                ) : null}
                 {data?.items.map((u) => (
                   <tr
                     key={u.id}
@@ -253,6 +308,16 @@ export function AdminUsersPage() {
                     <td>{u.plan}</td>
                     <td>{u.role}</td>
                     <td>{u.status}</td>
+                    <td>
+                      {u.createdAt
+                        ? new Date(u.createdAt).toLocaleString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

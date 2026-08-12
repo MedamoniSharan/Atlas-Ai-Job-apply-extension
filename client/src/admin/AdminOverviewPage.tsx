@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Zap } from 'lucide-react';
 import {
@@ -107,8 +108,23 @@ function enumeratePeriodBuckets(
   return out;
 }
 
+function lastDayOfMonth(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  if (!y || !m) return yearMonth;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${yearMonth}-${String(last).padStart(2, '0')}`;
+}
+
+function usersPathForSignupBucket(dateKey: string): string {
+  const from = dateKey.length === 7 ? `${dateKey}-01` : dateKey;
+  const to = dateKey.length === 7 ? lastDayOfMonth(dateKey) : dateKey;
+  const params = new URLSearchParams({ from, to });
+  return `/admin/users?${params.toString()}`;
+}
+
 export function AdminOverviewPage() {
   const now = new Date();
+  const navigate = useNavigate();
   const [range, setRange] = useState<Range>('30d');
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -154,6 +170,7 @@ export function AdminOverviewPage() {
     count: d.count,
   }));
   const signupChart = series.signupsDaily.map((d) => ({
+    dateKey: d.date,
     date: formatAxisDate(d.date, grain),
     signups: d.count,
   }));
@@ -177,6 +194,21 @@ export function AdminOverviewPage() {
           applied: d.applied,
         }));
   const jobsAngleLabels = jobsChart.length > 12;
+
+  function openSignupUsers(raw: unknown) {
+    const rec = raw as {
+      dateKey?: string;
+      signups?: number;
+      payload?: { dateKey?: string; signups?: number };
+      value?: number;
+      activePayload?: Array<{ payload?: { dateKey?: string; signups?: number } }>;
+    };
+    const point = rec?.activePayload?.[0]?.payload ?? rec?.payload ?? rec;
+    const dateKey = point?.dateKey;
+    const count = Number(point?.signups ?? rec?.value ?? 0);
+    if (!dateKey || count <= 0) return;
+    navigate(usersPathForSignupBucket(dateKey));
+  }
 
   return (
     <div className="admin-page">
@@ -325,14 +357,22 @@ export function AdminOverviewPage() {
 
         <section className="admin-panel">
           <h2>Signups ({periodLabel})</h2>
-          <div className="admin-chart">
+          <p className="admin-note">Click a bar to open those users</p>
+          <div className="admin-chart admin-chart--clickable">
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={signupChart}>
+              <BarChart data={signupChart} onClick={openSignupUsers}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Bar dataKey="signups" fill="#22c55e" name="Signups" />
+                <Bar
+                  dataKey="signups"
+                  fill="#22c55e"
+                  name="Signups"
+                  cursor="pointer"
+                  radius={[4, 4, 0, 0]}
+                  onClick={openSignupUsers}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

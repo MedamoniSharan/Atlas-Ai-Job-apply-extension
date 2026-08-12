@@ -1,5 +1,5 @@
 import type { JobPreferences } from '@cosmo/shared';
-import { DEFAULT_JOB_PREFERENCES } from './defaults';
+import { resolveJobPreferences } from './defaults';
 import {
   PRODUCTION_API_BASE,
   migrateApiBaseIfNeeded,
@@ -87,10 +87,9 @@ export async function clearAuth(): Promise<void> {
 
 export async function getCachedPreferences(): Promise<JobPreferences> {
   const data = await chrome.storage.local.get(KEYS.preferences);
-  return {
-    ...DEFAULT_JOB_PREFERENCES,
-    ...((data[KEYS.preferences] as JobPreferences | undefined) ?? {}),
-  };
+  return resolveJobPreferences(
+    data[KEYS.preferences] as JobPreferences | undefined
+  );
 }
 
 export async function setCachedPreferences(

@@ -8,6 +8,7 @@ import {
   MIN_PREF_TITLES,
   TITLE_SUGGESTIONS,
   canonicalizePreferenceValue,
+  resolveJobPreferences,
   suggestPreferenceValues,
   type JobPreferences,
   type WorkMode,
@@ -263,7 +264,7 @@ export function PreferencesForm({
       const res = await fetchPreferences();
       if (cancelled) return;
       if (res.success) {
-        setPrefs(res.data);
+        setPrefs(resolveJobPreferences(res.data));
       }
       setLoading(false);
     })();
@@ -430,7 +431,7 @@ export function PreferencesForm({
           <label className="checkbox">
             <input
               type="checkbox"
-              checked={prefs.autoScanEnabled}
+              checked={prefs.autoScanEnabled !== false}
               onChange={(e) =>
                 setPrefs((p) => ({ ...p, autoScanEnabled: e.target.checked }))
               }
@@ -440,7 +441,7 @@ export function PreferencesForm({
           <label className="checkbox">
             <input
               type="checkbox"
-              checked={prefs.autoApplyEnabled}
+              checked={prefs.autoApplyEnabled !== false}
               onChange={(e) =>
                 setPrefs((p) => ({ ...p, autoApplyEnabled: e.target.checked }))
               }

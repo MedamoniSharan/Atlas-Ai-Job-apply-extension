@@ -600,10 +600,23 @@ def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
     })
 
 
+def utc_day_start(day: str) -> Optional[datetime]:
+    dt = parse_iso(day)
+    if not dt:
+        return None
+    return datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc)
+
+
+def utc_day_end_exclusive(day: str) -> Optional[datetime]:
+    start = utc_day_start(day)
+    return None if not start else start + timedelta(days=1)
+
+
 def list_users(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
     q = qs(event)
     page, limit = page_limit(q, 10)
     needle = (q.get("q") or "").strip().lower()
+    fr, to = utc_day_start(q.get("from") or ""), utc_day_end_exclusive(q.get("to") or "")
     filtered = []
     for u in scan_all(users_tbl):
         if q.get("plan") and (u.get("plan") or "free") != q["plan"]:
@@ -614,6 +627,14 @@ def list_users(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
             continue
         if needle and needle not in f"{u.get('email','')} {u.get('name','')}".lower():
             continue
+        if fr or to:
+            created = parse_iso(u.get("createdAt"))
+            if not created:
+                continue
+            if fr and created < fr:
+                continue
+            if to and created >= to:
+                continue
         filtered.append(u)
     filtered.sort(key=lambda x: x.get("createdAt") or "", reverse=True)
     data = paginate(filtered, page, limit)

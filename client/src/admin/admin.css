@@ -227,6 +227,23 @@
   min-height: 240px;
 }
 
+.admin-chart--clickable .recharts-bar-rectangle {
+  cursor: pointer;
+}
+
+.admin-filter-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: -0.25rem 0 0.85rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 0.85rem;
+}
+
 .admin-mini-list {
   list-style: none;
   margin: 0;
@@ -488,6 +505,10 @@
   margin: 0;
   font-size: 0.85rem;
   color: var(--admin-muted);
+}
+
+.admin-panel .admin-note {
+  margin: -0.35rem 0 0.65rem;
 }
 
 .admin-razorpay-id {

@@ -1,11 +1,19 @@
 import { z } from 'zod';
 import { paidPlanSchema, planTierSchema } from './models';
 
+const dayKeySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
+
 export const adminUsersQuerySchema = z.object({
   q: z.string().optional(),
   plan: planTierSchema.optional(),
   role: z.enum(['user', 'admin']).optional(),
   status: z.enum(['active', 'suspended']).optional(),
+  /** Inclusive UTC signup day (YYYY-MM-DD). */
+  from: dayKeySchema.optional(),
+  /** Inclusive UTC signup day (YYYY-MM-DD). */
+  to: dayKeySchema.optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
 });

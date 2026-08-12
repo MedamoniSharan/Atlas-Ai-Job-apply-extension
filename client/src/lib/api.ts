@@ -590,6 +590,8 @@ export async function fetchAdminUsers(params: {
   plan?: string;
   role?: string;
   status?: string;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 } = {}) {
@@ -598,6 +600,8 @@ export async function fetchAdminUsers(params: {
   if (params.plan) search.set('plan', params.plan);
   if (params.role) search.set('role', params.role);
   if (params.status) search.set('status', params.status);
+  if (params.from) search.set('from', params.from);
+  if (params.to) search.set('to', params.to);
   search.set('page', String(params.page ?? 1));
   search.set('limit', String(params.limit ?? 10));
   return request<{
