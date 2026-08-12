@@ -188,6 +188,22 @@ function patchHistory() {
   window.addEventListener('popstate', onPossibleNavigation);
 }
 
+async function dismissCompanyBenefitsIfOpen(): Promise<boolean> {
+  if (!naukri.dismissCompanyBenefitsPopup(document)) return false;
+  await new Promise((r) => setTimeout(r, 350));
+  if (naukri.findCompanyBenefitsPopup(document)) {
+    naukri.dismissCompanyBenefitsPopup(document);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return true;
+}
+
+function isEasyApplyLabel(el: HTMLElement | null): el is HTMLElement {
+  if (!el) return false;
+  const label = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return label === 'apply' || label.includes('easy apply');
+}
+
 async function runEasyApply(): Promise<{
   ok: boolean;
   skipped?: boolean;
@@ -201,6 +217,9 @@ async function runEasyApply(): Promise<{
   if (blockReason) {
     return { ok: false, blocked: true, reason: blockReason };
   }
+
+  // New Naukri side popup — close it so the existing Apply click can land.
+  await dismissCompanyBenefitsIfOpen();
 
   const loginStatus = naukri.getLoginStatus(document);
   if (loginStatus !== 'loggedIn') {
@@ -283,24 +302,30 @@ async function runEasyApply(): Promise<{
 
   // Reconfirm against Naukri UI — do not assume success.
   let confirmed = false;
+  let retriedAfterBenefits = false;
   for (let i = 0; i < 14; i++) {
     await new Promise((r) => setTimeout(r, 400));
     if (confirmApplied()) {
       confirmed = true;
       break;
     }
-    if (naukri.detectNeedsUserQuestions(document)) break;
     if (naukri.detectNaukriBlockPage(document)) break;
+
+    if (await dismissCompanyBenefitsIfOpen()) {
+      if (!retriedAfterBenefits) {
+        retriedAfterBenefits = true;
+        const again = naukri.findEasyApplyButton(document);
+        if (isEasyApplyLabel(again)) clickInSameTab(again);
+      }
+      continue;
+    }
+
+    if (naukri.detectNeedsUserQuestions(document)) break;
 
     // One retry click if Apply is still the visible CTA mid-poll.
     if (i === 5) {
       const again = naukri.findEasyApplyButton(document);
-      if (again) {
-        const againLabel = (again.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        if (againLabel === 'apply' || againLabel.includes('easy apply')) {
-          clickInSameTab(again);
-        }
-      }
+      if (isEasyApplyLabel(again)) clickInSameTab(again);
     }
   }
 
@@ -395,6 +420,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'READ_JOB_DETAIL': {
+        naukri.dismissCompanyBenefitsPopup(document);
         expandJobDetailSections(document);
         // Allow "Read more" expansions to paint before scraping.
         await new Promise((r) => setTimeout(r, 350));
@@ -505,6 +531,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'PROBE_APPLY_READY': {
+        naukri.dismissCompanyBenefitsPopup(document);
         sendResponse({
           ready: Boolean(
             naukri.findEasyApplyButton(document) &&

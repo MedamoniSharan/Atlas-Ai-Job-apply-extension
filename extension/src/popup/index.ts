@@ -12,6 +12,8 @@ import {
   resolveJobPreferences,
 } from '../core/defaults';
 import type { CopilotAlert, CopilotState } from '../core/copilotState';
+
+type PreferencesSource = 'remote' | 'cache' | 'defaults';
 import { ensureChromeNamespace } from '../shared/browser';
 import { mountChipSuggestField } from '../shared/chipSuggestField';
 import { clearChildren, setTrustedHtml } from '../shared/dom';
@@ -25,6 +27,11 @@ const loginPanel = document.getElementById('login-panel')!;
 const authedSection = document.getElementById('authed')!;
 const formError = document.getElementById('form-error')!;
 const prefsMsg = document.getElementById('prefs-msg')!;
+const prefsRetryEl = document.getElementById('prefs-retry')!;
+const prefsRetryMsg = document.getElementById('prefs-retry-msg')!;
+const prefsRetryBtn = document.getElementById(
+  'prefs-retry-btn'
+) as HTMLButtonElement;
 const toastHost = document.getElementById('popup-toast-host')!;
 const googleSignInBtn = document.getElementById(
   'google-sign-in'
@@ -58,6 +65,8 @@ const locationsField = mountChipSuggestField({
 
 let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 let waitingForGoogle = false;
+let prefsFetchFailed = false;
+let prefsRetrying = false;
 
 function showToast(
   title: string,
@@ -159,6 +168,20 @@ function showStatusError(message: string) {
   authedSection.classList.add('hidden');
 }
 
+function setPrefsRetryVisible(failed: boolean, message?: string | null) {
+  prefsFetchFailed = failed;
+  prefsRetryEl.classList.toggle('hidden', !failed);
+  if (failed) {
+    prefsRetryMsg.textContent = message?.trim()
+      ? `${message.trim().replace(/\.$/, '')}. Retry to sync from Cosmo.`
+      : 'Using last saved settings. Retry to sync from Cosmo.';
+  }
+  if (!prefsRetrying) {
+    prefsRetryBtn.disabled = false;
+    prefsRetryBtn.textContent = 'Retry';
+  }
+}
+
 function fillPrefsForm(prefs: JobPreferences) {
   titlesField.setValues(prefs.titles);
   keywordsField.setValues(prefs.keywords);
@@ -221,6 +244,8 @@ async function refreshUi() {
       applyQueueDepth?: number;
     };
     preferences?: JobPreferences;
+    preferencesSource?: PreferencesSource;
+    preferencesError?: string | null;
     copilot?: CopilotState;
   };
 
@@ -266,16 +291,12 @@ async function refreshUi() {
       const min = Math.floor(sec / 60);
       const rem = sec % 60;
       scanStateEl.textContent = `Co-pilot break — resumes in ${min}:${String(rem).padStart(2, '0')}`;
-    } else if (
-      status.copilot.runPhase === 'apply' &&
-      status.copilot.paceLabel &&
-      (status.copilot.paceRemainingMs ?? 0) > 0
-    ) {
-      const sec = Math.max(
-        0,
-        Math.ceil((status.copilot.paceRemainingMs ?? 0) / 1000)
-      );
-      scanStateEl.textContent = `${status.copilot.paceLabel} — ${sec}s`;
+    } else if (status.copilot.paceLabel) {
+      const remaining = status.copilot.paceRemainingMs ?? 0;
+      scanStateEl.textContent =
+        remaining > 0
+          ? `${status.copilot.paceLabel} — ${Math.max(0, Math.ceil(remaining / 1000))}s`
+          : status.copilot.paceLabel;
     } else {
       const phase =
         status.copilot.runPhase === 'apply'
@@ -303,21 +324,69 @@ async function refreshUi() {
       formError.textContent = '';
       showToast('Signed in', 'Google session synced to Cosmo.');
     }
-    try {
-      const prefsRes = await send<{ success: boolean; data: JobPreferences }>({
-        type: 'GET_PREFERENCES',
-      });
-      const prefs = prefsRes?.data ?? status.preferences;
-      if (prefs) fillPrefsForm(resolveJobPreferences(prefs));
-    } catch {
-      if (status.preferences) fillPrefsForm(status.preferences);
+    if (status.preferences) {
+      fillPrefsForm(resolveJobPreferences(status.preferences));
     }
+    if (!prefsRetrying) {
+      setPrefsRetryVisible(
+        status.preferencesSource != null &&
+          status.preferencesSource !== 'remote',
+        status.preferencesError
+      );
+    }
+  } else {
+    setPrefsRetryVisible(false);
   }
 }
 
 alertDismissBtn.addEventListener('click', async () => {
   await send({ type: 'COPILOT_DISMISS_ALERT' });
   renderAlert(null);
+});
+
+prefsRetryBtn.addEventListener('click', async () => {
+  if (prefsRetrying) return;
+  prefsRetrying = true;
+  prefsRetryBtn.disabled = true;
+  prefsRetryBtn.textContent = 'Retrying…';
+  prefsRetryMsg.textContent = 'Fetching job preferences from Cosmo…';
+
+  try {
+    const result = await send<{
+      success: boolean;
+      data?: JobPreferences;
+      source?: PreferencesSource;
+      message?: string;
+    }>({ type: 'GET_PREFERENCES' });
+
+    if (result?.data) {
+      fillPrefsForm(resolveJobPreferences(result.data));
+    }
+
+    if (result?.success || result?.source === 'remote') {
+      setPrefsRetryVisible(false);
+      showToast('Preferences synced', 'Job preferences loaded from Cosmo.');
+      return;
+    }
+
+    setPrefsRetryVisible(
+      true,
+      result?.message ?? 'Still unable to load job preferences'
+    );
+  } catch (error) {
+    setPrefsRetryVisible(
+      true,
+      error instanceof Error
+        ? error.message
+        : 'Still unable to load job preferences'
+    );
+  } finally {
+    prefsRetrying = false;
+    if (prefsFetchFailed) {
+      prefsRetryBtn.disabled = false;
+      prefsRetryBtn.textContent = 'Retry';
+    }
+  }
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -328,6 +397,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.accessToken || changes.refreshToken) {
     void refreshUi();
+  }
+  if (changes.preferences?.newValue) {
+    fillPrefsForm(resolveJobPreferences(changes.preferences.newValue));
   }
 });
 

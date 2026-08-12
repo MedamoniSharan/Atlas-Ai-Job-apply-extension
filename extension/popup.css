@@ -186,6 +186,44 @@ body {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.prefs-retry {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+}
+
+.prefs-retry__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.prefs-retry__body strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.prefs-retry__body p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.prefs-retry .btn-secondary {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+
 .panel,
 .authed {
   flex: 1;

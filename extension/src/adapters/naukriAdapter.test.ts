@@ -15,6 +15,9 @@ import {
   preferenceFiltersAlreadyApplied,
   preferenceSkipReason,
   searchUrlHasPreferenceFilters,
+  findCompanyBenefitsPopup,
+  dismissCompanyBenefitsPopup,
+  shuffleInPlace,
 } from './naukriAdapter';
 import { backoffMs } from '../core/queueManager';
 import { DEFAULT_JOB_PREFERENCES } from '../core/defaults';
@@ -340,6 +343,101 @@ describe('NaukriAdapter', () => {
   });
 });
 
+describe('Naukri company verified benefits popup', () => {
+  const benefitsPopupHtml = `
+    <div class="jd-header">
+      <h1 class="jd-header-title">Java Developer</h1>
+      <button type="button" class="styles_apply-button__uJI3A">Apply</button>
+    </div>
+    <div role="dialog" class="styles_drawer__benefits" id="benefits-popup">
+      <button type="button" class="styles_closeIcon__x" aria-label="Close" id="benefits-close">×</button>
+      <h2>Company verified benefits</h2>
+      <h3>Flexible Working Hours</h3>
+      <p>We're strictly lenient about your working hours. We trust you to know how to maximize your productivity.</p>
+      <h3>5 Days Working</h3>
+      <p>We believe in the importance of personal space and encourage work-life balance. Keep the weekends for yourself.</p>
+    </div>
+  `;
+
+  it('finds the company benefits side popup', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = benefitsPopupHtml;
+    const popup = adapter.findCompanyBenefitsPopup(document);
+    expect(popup).not.toBeNull();
+    expect(popup?.id).toBe('benefits-popup');
+    expect(findCompanyBenefitsPopup(document)?.id).toBe('benefits-popup');
+  });
+
+  it('closes the benefits popup via the X control', () => {
+    document.body.innerHTML = benefitsPopupHtml;
+    const closeBtn = document.getElementById('benefits-close') as HTMLButtonElement;
+    let clicked = false;
+    closeBtn.addEventListener('click', () => {
+      clicked = true;
+      closeBtn.closest('[role="dialog"]')?.remove();
+    });
+
+    expect(dismissCompanyBenefitsPopup(document)).toBe(true);
+    expect(clicked).toBe(true);
+    expect(findCompanyBenefitsPopup(document)).toBeNull();
+  });
+
+  it('does not treat the benefits popup as apply questions', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = `
+      ${benefitsPopupHtml}
+      <aside class="sidebar">
+        <div>Company verified benefits listed for this employer.</div>
+      </aside>
+    `;
+    expect(adapter.detectNeedsUserQuestions(document)).toBeNull();
+    expect(adapter.hasBlockingApplyFlow(document)).toBeNull();
+  });
+
+  it('still finds Easy Apply behind the benefits popup', () => {
+    const adapter = new NaukriAdapter();
+    document.body.innerHTML = benefitsPopupHtml;
+    const btn = adapter.findEasyApplyButton(document);
+    expect(btn?.textContent?.trim()).toBe('Apply');
+  });
+
+  it('ignores inline JD benefits copy that is not a popup', () => {
+    document.body.innerHTML = `
+      <div class="jd-header">
+        <h1 class="jd-header-title">Java Developer</h1>
+        <button type="button" class="styles_apply-button__uJI3A">Apply</button>
+      </div>
+      <section class="job-desc">
+        <h2>Company verified benefits</h2>
+        <p>Flexible Working Hours and 5 Days Working.</p>
+      </section>
+    `;
+    expect(findCompanyBenefitsPopup(document)).toBeNull();
+    expect(dismissCompanyBenefitsPopup(document)).toBe(false);
+  });
+
+  it('does not click Cosmo toast close when dismissing Naukri benefits', () => {
+    document.body.innerHTML = `
+      <div id="cosmo-copilot-root">
+        <button type="button" class="cosmo-toast-close" aria-label="Dismiss" id="cosmo-close">×</button>
+      </div>
+      ${benefitsPopupHtml}
+    `;
+    let cosmoClicked = false;
+    document.getElementById('cosmo-close')?.addEventListener('click', () => {
+      cosmoClicked = true;
+    });
+    let naukriClicked = false;
+    document.getElementById('benefits-close')?.addEventListener('click', () => {
+      naukriClicked = true;
+    });
+
+    expect(dismissCompanyBenefitsPopup(document)).toBe(true);
+    expect(naukriClicked).toBe(true);
+    expect(cosmoClicked).toBe(false);
+  });
+});
+
 describe('preference matching helpers', () => {
   it('builds a naukri search URL from the primary job title', () => {
     const url = buildNaukriSearchUrl({
@@ -384,6 +482,32 @@ describe('preference matching helpers', () => {
     );
     // URLs unique
     expect(new Set(plan.map((p) => p.url)).size).toBe(plan.length);
+  });
+
+  it('shuffles in place as a permutation of the input', () => {
+    const input = ['a', 'b', 'c', 'd', 'e'];
+    const copy = [...input];
+    shuffleInPlace(copy);
+    expect(copy.sort()).toEqual([...input].sort());
+    expect(copy).toHaveLength(input.length);
+  });
+
+  it('does not always start with the first preferred title', () => {
+    const prefs = {
+      ...DEFAULT_JOB_PREFERENCES,
+      titles: ['Software Engineer', 'Full Stack Developer', 'UI Design'],
+      keywords: ['React', 'Node', 'TypeScript', 'GraphQL'],
+      locations: ['Hyderabad', 'Bangalore'],
+    };
+    const firstTitles = new Set<string>();
+    for (let i = 0; i < 24; i++) {
+      const plan = buildNaukriSearchQueryPlan(prefs);
+      const first = plan.find((p) => p.kind === 'title');
+      if (first) firstTitles.add(first.title);
+      const titleCity = plan.filter((p) => p.kind === 'title');
+      expect(titleCity.length).toBeGreaterThanOrEqual(6);
+    }
+    expect(firstTitles.size).toBeGreaterThan(1);
   });
 
   it('falls back to keywords when titles are empty', () => {

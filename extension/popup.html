@@ -90,6 +90,17 @@
       </section>
 
       <section id="authed" class="authed hidden">
+        <div id="prefs-retry" class="prefs-retry hidden" role="status">
+          <div class="prefs-retry__body">
+            <strong>Couldn’t load job preferences</strong>
+            <p id="prefs-retry-msg">
+              Using last saved settings. Retry to sync from Cosmo.
+            </p>
+          </div>
+          <button type="button" id="prefs-retry-btn" class="btn-secondary">
+            Retry
+          </button>
+        </div>
         <form id="prefs-form" class="prefs">
           <fieldset class="prefs-group">
             <legend>Job search</legend>

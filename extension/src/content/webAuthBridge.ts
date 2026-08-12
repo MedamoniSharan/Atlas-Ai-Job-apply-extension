@@ -1,5 +1,6 @@
 const MESSAGE_SOURCE = 'cosmo-web';
 const MESSAGE_TYPE = 'COSMO_AUTH_SYNC';
+const PREFS_MESSAGE_TYPE = 'COSMO_PREFS_SYNC';
 /** Legacy keys from the Atlas rename — still accepted so existing sessions migrate. */
 const LEGACY_MESSAGE_SOURCE = 'atlas-web';
 const LEGACY_MESSAGE_TYPE = 'ATLAS_AUTH_SYNC';
@@ -18,6 +19,7 @@ type AuthSyncMessage = {
   accessToken: string | null;
   refreshToken: string | null;
   apiBaseUrl?: string;
+  preferences?: unknown;
 };
 
 type PersistedAuth = {
@@ -80,13 +82,19 @@ function syncFromLocalStorage(): void {
   syncTokens(accessToken, refreshToken);
 }
 
+function isKnownSource(source: string | undefined): boolean {
+  return source === MESSAGE_SOURCE || source === LEGACY_MESSAGE_SOURCE;
+}
+
 function isAuthSyncMessage(data: AuthSyncMessage | undefined): boolean {
-  if (!data) return false;
-  const sourceOk =
-    data.source === MESSAGE_SOURCE || data.source === LEGACY_MESSAGE_SOURCE;
-  const typeOk =
-    data.type === MESSAGE_TYPE || data.type === LEGACY_MESSAGE_TYPE;
-  return sourceOk && typeOk;
+  if (!data || !isKnownSource(data.source)) return false;
+  return data.type === MESSAGE_TYPE || data.type === LEGACY_MESSAGE_TYPE;
+}
+
+function isPrefsSyncMessage(data: AuthSyncMessage | undefined): boolean {
+  return Boolean(
+    data && isKnownSource(data.source) && data.type === PREFS_MESSAGE_TYPE
+  );
 }
 
 window.addEventListener('message', (event) => {
@@ -95,6 +103,13 @@ window.addEventListener('message', (event) => {
   }
 
   const data = event.data as AuthSyncMessage | undefined;
+  if (isPrefsSyncMessage(data)) {
+    sendToBackground({
+      type: 'SYNC_PREFERENCES_FROM_WEB',
+      preferences: data!.preferences,
+    });
+    return;
+  }
   if (!isAuthSyncMessage(data)) {
     return;
   }

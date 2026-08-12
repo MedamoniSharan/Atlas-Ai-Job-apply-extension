@@ -8,6 +8,7 @@ import {
   clearCopilotToast,
   getCopilotState,
 } from '../core/copilotState';
+import { scanWaitMessage } from '../core/scanWait';
 import { NaukriAdapter } from '../adapters/naukriAdapter';
 import { cosmosLogoSvg } from '../shared/cosmosLogo';
 import {
@@ -943,10 +944,13 @@ export function mountCopilotPanel() {
       <div class="cosmo-modal-card">
         <h3 id="cosmo-done-title">All jobs matched and applied</h3>
         <p id="cosmo-done-body">
-          Cosmo finished matching and applying. Close to review on your dashboard.
+          Cosmo finished matching and applying. Do you want to apply more, or close and open your dashboard?
         </p>
         <div class="cosmo-modal-actions">
-          <button type="button" class="btn-login" id="cosmo-done-close">
+          <button type="button" class="btn-login" id="cosmo-done-more">
+            Apply more
+          </button>
+          <button type="button" class="btn-resume-login" id="cosmo-done-close">
             Close — view dashboard
           </button>
         </div>
@@ -1013,6 +1017,7 @@ export function mountCopilotPanel() {
   const doneTitle = root.querySelector('#cosmo-done-title') as HTMLElement;
   const doneBody = root.querySelector('#cosmo-done-body') as HTMLElement;
   const doneCloseBtn = root.querySelector('#cosmo-done-close') as HTMLButtonElement;
+  const doneMoreBtn = root.querySelector('#cosmo-done-more') as HTMLButtonElement;
   const consentCheck = root.querySelector('#cosmo-consent-check') as HTMLInputElement;
   const consentStartBtn = root.querySelector('#cosmo-consent-start') as HTMLButtonElement;
   const consentCancelBtn = root.querySelector('#cosmo-consent-cancel') as HTMLButtonElement;
@@ -1234,7 +1239,13 @@ export function mountCopilotPanel() {
     const cdEl = paceToastEl.querySelector('[data-pace-cd]') as HTMLElement;
     titleEl.textContent = label;
     msgEl.textContent = jobTitle || 'Cosmo is pacing like a human';
-    cdEl.textContent = countdown;
+    if (remainingMs > 0) {
+      cdEl.textContent = countdown;
+      cdEl.style.display = '';
+    } else {
+      cdEl.textContent = '';
+      cdEl.style.display = 'none';
+    }
   }
 
   function hidePaceToast() {
@@ -1327,10 +1338,11 @@ export function mountCopilotPanel() {
         ? 'All jobs matched and applied'
         : 'Session finished';
       doneBody.textContent = allDone
-        ? `Matched and applied ${summary.applied} job(s) (matched ${summary.matched}, skipped ${summary.skipped}). Review them on your Cosmo dashboard.`
+        ? `Matched and applied ${summary.applied} job(s) (matched ${summary.matched}, skipped ${summary.skipped}). Apply more, or close this tab and open your Cosmo dashboard?`
         : summary.matched > 0
-          ? `Found ${summary.matched} match(es) after auto page scan (skipped ${summary.skipped}), but none were newly applied this round. Close and review on your dashboard, or Start again.`
-          : `No preference matches after auto page scan (skipped ${summary.skipped}). Broaden prefs and Start again.`;
+          ? `Found ${summary.matched} match(es) (skipped ${summary.skipped}), but none were newly applied. Apply more, or close and open your dashboard?`
+          : `No preference matches this round (skipped ${summary.skipped}). Apply more with broader prefs, or close and open your dashboard?`;
+      doneMoreBtn.textContent = 'Apply more';
       doneCloseBtn.textContent = 'Close — view dashboard';
     }
   }
@@ -1461,18 +1473,43 @@ export function mountCopilotPanel() {
           : 'Paused — login needed'
         : 'Paused';
     } else if (state.running && state.runPhase === 'apply') {
-      statusLabelEl.textContent = 'Applying…';
+      statusLabelEl.textContent =
+        state.paceLabel ||
+        (state.matched
+          ? `Applying ${state.applied || 0}/${state.matched}`
+          : 'Applying…');
+    } else if (state.running && state.runPhase === 'scan') {
+      statusLabelEl.textContent =
+        state.paceLabel ||
+        scanWaitMessage({
+          matched: state.matched || 0,
+          keyword: state.keyword,
+        });
     } else if (state.running) {
       statusLabelEl.textContent = 'Scanning jobs…';
     } else {
       statusLabelEl.textContent = 'Idle — press Start';
     }
 
+    const scanWait =
+      Boolean(state.running && !state.paused) &&
+      state.runPhase === 'scan' &&
+      Boolean(state.paceLabel);
     const pacing =
       state.runPhase === 'apply' &&
       Boolean(state.paceLabel) &&
       (state.paceRemainingMs ?? 0) > 0;
-    if (pacing) {
+    if (scanWait) {
+      showPaceToast(
+        state.paceLabel ||
+          scanWaitMessage({
+            matched: state.matched || 0,
+            keyword: state.keyword,
+          }),
+        0,
+        'Stopping around 30 applied+skipped'
+      );
+    } else if (pacing) {
       showPaceToast(
         state.paceLabel || 'Slowing down',
         state.paceRemainingMs ?? 0,
@@ -1618,6 +1655,10 @@ export function mountCopilotPanel() {
           alert?.kind === 'rate_limit' ||
           alert?.kind === 'blocked' ||
           alert?.level === 'error'));
+    const scanWaitNotice =
+      Boolean(state.running && !state.paused) &&
+      state.runPhase === 'scan' &&
+      !showNotice;
 
     if (showNotice) {
       noticeEl.classList.add('show', 'is-alert');
@@ -1644,6 +1685,15 @@ export function mountCopilotPanel() {
           setCollapsed(false);
         }
       }
+    } else if (scanWaitNotice) {
+      noticeEl.classList.add('show');
+      noticeEl.classList.remove('is-alert', 'flash');
+      noticeEl.textContent =
+        state.paceLabel ||
+        scanWaitMessage({
+          matched: state.matched || 0,
+          keyword: state.keyword,
+        });
     } else {
       noticeEl.classList.remove('show', 'is-alert', 'flash');
       noticeEl.textContent = '';
@@ -1730,14 +1780,25 @@ export function mountCopilotPanel() {
     );
   });
 
+  doneMoreBtn.addEventListener('click', () => {
+    showDoneModal(false);
+    chrome.runtime.sendMessage({ type: 'COPILOT_SESSION_APPLY_MORE' }, () => {
+      showConsentModal(true);
+      void refresh();
+    });
+  });
+
   doneCloseBtn.addEventListener('click', () => {
     showDoneModal(false);
+    doneCloseBtn.disabled = true;
     chrome.runtime.sendMessage({ type: 'COPILOT_SESSION_CLOSE' }, () => {
-      noticeEl.classList.add('show', 'is-alert');
-      noticeEl.textContent =
-        'Visit your Cosmo dashboard to review applications.';
-      setCollapsed(true);
-      void refresh();
+      doneCloseBtn.disabled = false;
+      if (chrome.runtime.lastError) {
+        noticeEl.classList.add('show', 'is-alert');
+        noticeEl.textContent =
+          'Could not open the dashboard. Try Cosmo from the extension popup.';
+        void refresh();
+      }
     });
   });
 

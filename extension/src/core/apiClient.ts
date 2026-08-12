@@ -12,6 +12,8 @@ import {
   getAuthState,
   setAuthState,
   clearAuth,
+  getCachedPreferences,
+  hasCachedPreferences,
   setCachedPreferences,
 } from './storageManager';
 import { resolveJobPreferences } from './defaults';
@@ -41,10 +43,23 @@ async function request<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const res = await fetch(`${apiBaseUrl}${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${apiBaseUrl}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Network request failed';
+    logger.warn('Network request failed', { path, error: message });
+    return {
+      success: false,
+      message,
+      data: null,
+      error: { code: 'NETWORK' },
+    };
+  }
 
   let body: ApiResponse<T> | null = null;
   try {
@@ -151,14 +166,82 @@ export async function postScanSession(
   });
 }
 
+const PREF_FETCH_ATTEMPTS = 3;
+const PREF_RETRY_DELAY_MS = 400;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryablePrefFailure(result: ApiResponse<unknown>): boolean {
+  const code = result.success === false ? result.error?.code : undefined;
+  return code !== 'TOKEN_INVALID' && code !== 'UNAUTHORIZED';
+}
+
 export async function fetchPreferences(): Promise<ApiResponse<JobPreferences>> {
-  const result = await request<JobPreferences>('/api/v1/preferences');
-  if (result.success) {
-    const data = resolveJobPreferences(result.data);
-    await setCachedPreferences(data);
-    return { ...result, data };
+  let last: ApiResponse<JobPreferences> | null = null;
+  for (let attempt = 0; attempt < PREF_FETCH_ATTEMPTS; attempt++) {
+    last = await request<JobPreferences>('/api/v1/preferences');
+    if (last.success) {
+      const data = resolveJobPreferences(last.data);
+      await setCachedPreferences(data);
+      return { ...last, data };
+    }
+    if (!isRetryablePrefFailure(last) || attempt === PREF_FETCH_ATTEMPTS - 1) {
+      break;
+    }
+    await sleep(PREF_RETRY_DELAY_MS * (attempt + 1));
   }
-  return result;
+  return (
+    last ?? {
+      success: false,
+      message: 'Could not load preferences',
+      data: null,
+      error: { code: 'NETWORK' },
+    }
+  );
+}
+
+export type PreferencesSource = 'remote' | 'cache' | 'defaults';
+
+export type PreferencesLoadResult = {
+  preferences: JobPreferences;
+  source: PreferencesSource;
+  error?: string;
+};
+
+/** Remote prefs when possible; never throws — falls back to the local cache. */
+export async function loadPreferencesResult(): Promise<PreferencesLoadResult> {
+  try {
+    const remote = await fetchPreferences();
+    if (remote.success) {
+      return { preferences: remote.data, source: 'remote' };
+    }
+    const cached = await hasCachedPreferences();
+    return {
+      preferences: await getCachedPreferences(),
+      source: cached ? 'cache' : 'defaults',
+      error: remote.message || 'Could not load preferences',
+    };
+  } catch (error) {
+    const cached = await hasCachedPreferences();
+    return {
+      preferences: await getCachedPreferences(),
+      source: cached ? 'cache' : 'defaults',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function loadPreferences(): Promise<JobPreferences> {
+  const result = await loadPreferencesResult();
+  if (result.source !== 'remote') {
+    logger.warn('Preferences fetch failed; using cache', {
+      source: result.source,
+      message: result.error,
+    });
+  }
+  return result.preferences;
 }
 
 /** Jobs already applied in Cosmo DB (shared with dashboard). */

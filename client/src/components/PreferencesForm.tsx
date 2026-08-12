@@ -14,6 +14,7 @@ import {
   type WorkMode,
 } from '@cosmo/shared';
 import { fetchPreferences, savePreferences } from '../lib/api';
+import { syncPreferencesToExtension } from '../lib/extensionAuthBridge';
 import { CosmosLoader } from './CosmosLogo';
 
 type PreferencesFormProps = {
@@ -264,7 +265,9 @@ export function PreferencesForm({
       const res = await fetchPreferences();
       if (cancelled) return;
       if (res.success) {
-        setPrefs(resolveJobPreferences(res.data));
+        const next = resolveJobPreferences(res.data);
+        setPrefs(next);
+        syncPreferencesToExtension(next);
       }
       setLoading(false);
     })();
@@ -308,6 +311,7 @@ export function PreferencesForm({
       return;
     }
     setPrefs(res.data.preferences);
+    syncPreferencesToExtension(res.data.preferences);
     setMessage('Preferences saved.');
     onSaved?.(res.data.preferences);
   }

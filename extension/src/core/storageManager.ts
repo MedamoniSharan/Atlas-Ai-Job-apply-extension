@@ -85,6 +85,36 @@ export async function clearAuth(): Promise<void> {
   ]);
 }
 
+export async function clearCachedPreferences(): Promise<void> {
+  await chrome.storage.local.remove([KEYS.preferences]);
+}
+
+/** Logout / website sign-out — drop tokens and the previous account's prefs. */
+export async function clearSession(): Promise<void> {
+  await chrome.storage.local.remove([
+    KEYS.accessToken,
+    KEYS.refreshToken,
+    KEYS.preferences,
+  ]);
+}
+
+export function jwtSubject(token: string | null | undefined): string | null {
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1] ?? '')) as {
+      sub?: unknown;
+    };
+    return typeof payload.sub === 'string' && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function hasCachedPreferences(): Promise<boolean> {
+  const data = await chrome.storage.local.get(KEYS.preferences);
+  return Boolean(data[KEYS.preferences]);
+}
+
 export async function getCachedPreferences(): Promise<JobPreferences> {
   const data = await chrome.storage.local.get(KEYS.preferences);
   return resolveJobPreferences(

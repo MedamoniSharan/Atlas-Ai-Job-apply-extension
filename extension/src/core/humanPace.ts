@@ -19,6 +19,14 @@ import {
 } from './copilotState';
 import { setBlockedCooldown, setStealthCooldown } from './safetyStorage';
 
+/** Short gap between applies in a collected batch (not the 5.5–11s humanPace floor). */
+export const APPLY_BATCH_BETWEEN_JOBS_MAX_MS = 1200;
+export const APPLY_READY_FIRST_POLL_MS = 1500;
+export const APPLY_READY_RETRY_POLL_MS = 1200;
+export const APPLY_NAV_READY_MAX_MS = 400;
+export const APPLY_NAV_SLOW_MAX_MS = 800;
+export const APPLY_DWELL_READY_MAX_MS = 350;
+
 export function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

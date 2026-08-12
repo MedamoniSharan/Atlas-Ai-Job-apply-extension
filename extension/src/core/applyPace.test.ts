@@ -187,4 +187,40 @@ describe('pacedWait maxMs cap when Apply is ready', () => {
     await vi.advanceTimersByTimeAsync(1200);
     expect(await done).toBe(false);
   });
+
+  it('caps betweenJobs well under the 5.5s assisted floor during apply batch', async () => {
+    const store: Store = {};
+    installChromeMock(store);
+
+    const { pacedWait, APPLY_BATCH_BETWEEN_JOBS_MAX_MS } = await import(
+      './humanPace'
+    );
+    const { DEFAULT_COPILOT_STATE, getCopilotState } = await import(
+      './copilotState'
+    );
+
+    store.copilotState = {
+      ...DEFAULT_COPILOT_STATE,
+      running: true,
+      paused: false,
+    };
+
+    const started = Date.now();
+    const done = pacedWait('assisted', 'betweenJobs', {
+      maxMs: APPLY_BATCH_BETWEEN_JOBS_MAX_MS,
+      label: 'Next job',
+      silent: true,
+    });
+
+    await vi.advanceTimersByTimeAsync(APPLY_BATCH_BETWEEN_JOBS_MAX_MS + 50);
+    const ok = await done;
+    const elapsed = Date.now() - started;
+
+    expect(ok).toBe(true);
+    expect(elapsed).toBeLessThan(2000);
+    expect(elapsed).toBeLessThan(5500);
+
+    const state = await getCopilotState();
+    expect(state.paceLabel).toBeNull();
+  });
 });

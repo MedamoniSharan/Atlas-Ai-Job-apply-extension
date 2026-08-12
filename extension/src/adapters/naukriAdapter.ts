@@ -802,22 +802,34 @@ function pushUniqueQuery(
   plan.push({ ...entry, url });
 }
 
+/** Fisher–Yates shuffle — used so title/keyword/location search order varies per session. */
+export function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const a = items[i]!;
+    items[i] = items[j]!;
+    items[j] = a;
+  }
+  return items;
+}
+
 /**
- * All useful search combinations from prefs, ordered for coverage:
- * 1) Every title × every city (interleaved for variety)
- * 2) Title + skill keyword × each city (e.g. "Software Engineer React")
- * 3) Skill keyword alone × each city
- * 4) Each title India-wide (no city) as a fallback
+ * All useful search combinations from prefs.
+ * Titles, keywords, and locations are shuffled each call so Cosmo does not
+ * always start with the first preference chip.
+ * Shape stays: title×city, title+skill, skill-only, nationwide fallbacks.
  */
 export function buildNaukriSearchQueryPlan(
   prefs: JobPreferences
 ): NaukriSearchQuery[] {
-  const titles = preferenceSearchTitles(prefs);
-  const locations = preferenceSearchLocations(prefs);
-  const skillKeywords = prefs.keywords
-    .map((k) => k.trim())
-    .filter(Boolean)
-    .slice(0, 6);
+  const titles = shuffleInPlace([...preferenceSearchTitles(prefs)]);
+  const locations = shuffleInPlace([...preferenceSearchLocations(prefs)]);
+  const skillKeywords = shuffleInPlace(
+    prefs.keywords
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+  );
 
   const plan: NaukriSearchQuery[] = [];
   const seen = new Set<string>();
@@ -2034,6 +2046,157 @@ export function searchUrlHasPreferenceFilters(
   }
 }
 
+const COMPANY_BENEFITS_HEADING = /company[\s-]+verified[\s-]+benefits/i;
+const COSMO_UI_ROOT_ID = 'cosmo-copilot-root';
+const BENEFITS_CLOSE_LABEL = /^(close|dismiss|got it|ok|okay|skip|maybe later)$/i;
+const BENEFITS_CLOSE_ICON = /^[×x✕⨯✖]$/i;
+
+function isInsideCosmoUi(el: Element | null): boolean {
+  return Boolean(el?.closest(`#${COSMO_UI_ROOT_ID}`));
+}
+
+function isOverlayLike(el: HTMLElement): boolean {
+  const role = (el.getAttribute('role') || '').toLowerCase();
+  if (role === 'dialog' || role === 'alertdialog') return true;
+
+  const cls = String(el.getAttribute('class') || '');
+  if (
+    /modal|drawer|overlay|popup|sidebar|bottomsheet|bottom-sheet|flyout|lightbox|offcanvas/i.test(
+      cls
+    )
+  ) {
+    return true;
+  }
+
+  const view = el.ownerDocument?.defaultView;
+  if (!view?.getComputedStyle) return false;
+  try {
+    const cs = view.getComputedStyle(el);
+    if (cs.position !== 'fixed' && cs.position !== 'absolute') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width >= 240 && rect.height >= 160;
+  } catch {
+    return false;
+  }
+}
+
+function overlayRootFrom(el: HTMLElement): HTMLElement | null {
+  let node: HTMLElement | null = el;
+  for (let i = 0; i < 14 && node && node !== node.ownerDocument.body; i++) {
+    if (!isInsideCosmoUi(node) && isOverlayLike(node)) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function findCompanyBenefitsHeading(doc: Document): HTMLElement | null {
+  const blob = doc.body?.innerText || '';
+  if (!COMPANY_BENEFITS_HEADING.test(blob)) return null;
+
+  const nodes = doc.querySelectorAll(
+    'h1, h2, h3, h4, h5, h6, p, span, strong, div, section, [role="heading"]'
+  );
+  let best: HTMLElement | null = null;
+  let bestLen = Infinity;
+  for (const node of Array.from(nodes)) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (isInsideCosmoUi(node)) continue;
+    if (!isElementVisible(node)) continue;
+    const text = cleanText(node.textContent) || '';
+    if (text.length > 80 || !COMPANY_BENEFITS_HEADING.test(text)) continue;
+    if (text.length < bestLen) {
+      best = node;
+      bestLen = text.length;
+    }
+  }
+  return best;
+}
+
+/** Visible Naukri "Company verified benefits" side popup / drawer — not inline JD copy. */
+export function findCompanyBenefitsPopup(
+  doc: Document = document
+): HTMLElement | null {
+  const heading = findCompanyBenefitsHeading(doc);
+  if (!heading) return null;
+  return overlayRootFrom(heading);
+}
+
+function isBenefitsCloseControl(el: HTMLElement): boolean {
+  if (!isElementVisible(el) || isInsideCosmoUi(el)) return false;
+  const aria = `${el.getAttribute('aria-label') || ''} ${
+    el.getAttribute('title') || ''
+  }`.toLowerCase();
+  if (/\bclose\b|\bdismiss\b/.test(aria)) return true;
+  const cls = String(el.getAttribute('class') || '').toLowerCase();
+  if (/close|crossicon|cross-icon|ni-icon-cross/.test(cls)) {
+    return true;
+  }
+  const label = cleanText(el.textContent) || '';
+  return BENEFITS_CLOSE_ICON.test(label);
+}
+
+function findBenefitsPopupCloseControl(popup: HTMLElement): HTMLElement | null {
+  const candidates = Array.from(
+    popup.querySelectorAll(
+      'button, a, [role="button"], [aria-label], [title], i, span, svg, em'
+    )
+  ) as HTMLElement[];
+  for (const el of candidates) {
+    if (isBenefitsCloseControl(el)) return el;
+  }
+  return null;
+}
+
+function findBenefitsPopupDismissButton(popup: HTMLElement): HTMLElement | null {
+  const buttons = Array.from(
+    popup.querySelectorAll('button, a, [role="button"]')
+  ) as HTMLElement[];
+  for (const el of buttons) {
+    if (!isElementVisible(el) || isInsideCosmoUi(el)) continue;
+    const label = cleanText(el.textContent) || '';
+    if (BENEFITS_CLOSE_LABEL.test(label)) return el;
+  }
+  return null;
+}
+
+function pressEscape(doc: Document): void {
+  const view = doc.defaultView ?? window;
+  const init = {
+    key: 'Escape',
+    code: 'Escape',
+    keyCode: 27,
+    which: 27,
+    bubbles: true,
+    cancelable: true,
+    view,
+  };
+  const target = doc.activeElement instanceof HTMLElement ? doc.activeElement : doc.body;
+  target?.dispatchEvent(new KeyboardEvent('keydown', init));
+  doc.dispatchEvent(new KeyboardEvent('keydown', init));
+}
+
+/**
+ * Close Naukri's company-benefits side popup so Easy Apply can continue.
+ * Returns true when a popup was found and a dismiss was attempted.
+ */
+export function dismissCompanyBenefitsPopup(
+  doc: Document = document
+): boolean {
+  const popup = findCompanyBenefitsPopup(doc);
+  if (!popup) return false;
+
+  const closeBtn =
+    findBenefitsPopupCloseControl(popup) ||
+    findBenefitsPopupDismissButton(popup);
+  if (closeBtn) {
+    clickInSameTab(closeBtn);
+    return true;
+  }
+
+  pressEscape(doc);
+  return true;
+}
+
 export class NaukriAdapter implements PlatformAdapter {
   readonly platform = 'naukri' as const;
 
@@ -2430,6 +2593,14 @@ export class NaukriAdapter implements PlatformAdapter {
     return null;
   }
 
+  findCompanyBenefitsPopup(doc: Document = document): HTMLElement | null {
+    return findCompanyBenefitsPopup(doc);
+  }
+
+  dismissCompanyBenefitsPopup(doc: Document = document): boolean {
+    return dismissCompanyBenefitsPopup(doc);
+  }
+
   /**
    * Naukri often opens a chat/Q&A drawer or shows incomplete-info banners
    * that require the user to answer before apply can succeed.
@@ -2439,6 +2610,8 @@ export class NaukriAdapter implements PlatformAdapter {
     if (this.detectApplicationStatus(doc) === 'applied') {
       return null;
     }
+
+    const benefitsPopup = findCompanyBenefitsPopup(doc);
 
     const text = (doc.body?.innerText || '').toLowerCase();
 
@@ -2469,7 +2642,9 @@ export class NaukriAdapter implements PlatformAdapter {
       const visible =
         (questionUi as HTMLElement).offsetParent !== null ||
         (questionUi as HTMLElement).getClientRects().length > 0;
-      if (visible) {
+      const insideBenefits =
+        benefitsPopup && benefitsPopup.contains(questionUi);
+      if (visible && !insideBenefits) {
         return 'Naukri opened an apply questionnaire';
       }
     }
@@ -2482,6 +2657,9 @@ export class NaukriAdapter implements PlatformAdapter {
     ) as HTMLElement[];
     for (const drawer of drawers) {
       if (drawer.offsetParent === null) continue;
+      if (benefitsPopup && (drawer === benefitsPopup || benefitsPopup.contains(drawer))) {
+        continue;
+      }
       const inputs = drawer.querySelectorAll(
         'input[type="radio"], input[type="checkbox"], input[type="text"], textarea, select'
       );

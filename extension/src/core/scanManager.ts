@@ -5,8 +5,7 @@ import {
   matchesListCandidate,
   searchUrlHasPreferenceFilters,
 } from '../adapters/naukriAdapter';
-import { fetchPreferences } from './apiClient';
-import { getCachedPreferences } from './storageManager';
+import { loadPreferences } from './apiClient';
 import { logger } from './logger';
 import { enqueueApplyJobs } from './applyQueue';
 import { mergeJobFields } from './jobFields';
@@ -88,10 +87,7 @@ export async function runScan(options: {
     payload: Record<string, unknown>
   ) => Promise<void>;
 }): Promise<ScanResult> {
-  const prefsRes = await fetchPreferences();
-  const prefs: JobPreferences = prefsRes.success
-    ? prefsRes.data
-    : await getCachedPreferences();
+  const prefs: JobPreferences = await loadPreferences();
 
   if (!prefs.titles.length && !prefs.keywords.length) {
     return {

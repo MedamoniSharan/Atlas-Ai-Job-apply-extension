@@ -7,21 +7,28 @@ import { flushScanSessions } from '../core/scanSessionReporter';
 import { reportHealth } from '../core/healthMonitor';
 import {
   login as apiLogin,
-  fetchPreferences,
+  loadPreferences,
+  loadPreferencesResult,
   savePreferences,
 } from '../core/apiClient';
 import {
   getAuthState,
   setAuthState,
-  clearAuth,
+  clearCachedPreferences,
+  clearSession,
   getCachedPreferences,
+  hasCachedPreferences,
+  setCachedPreferences,
+  jwtSubject,
   DEFAULT_API,
 } from '../core/storageManager';
+import { resolveJobPreferences } from '../core/defaults';
 import {
   resolveApiBase,
   resolveWebBase,
   injectedWebOrigins,
   googleLoginUrl,
+  dashboardUrl,
 } from '../core/allowedApiBases';
 import { logger } from '../core/logger';
 import { handleError } from '../core/errorHandler';
@@ -49,6 +56,7 @@ import {
   runBot,
   stopBot,
   closeSessionComplete,
+  continueSessionForMoreApplies,
 } from '../core/botRunner';
 import {
   clearAllowedExtraTab,
@@ -189,6 +197,48 @@ const DASHBOARD_TAB_URLS = [
 ];
 
 /**
+ * Close the Naukri work tab and open (or focus) the Cosmo dashboard.
+ * Reuses an existing Cosmo tab when possible — never opens extra Naukri tabs.
+ */
+async function openCosmoDashboardAndCloseNaukri(
+  naukriTabId?: number | null
+): Promise<void> {
+  const auth = await getAuthState();
+  const url = dashboardUrl(auth.apiBaseUrl);
+  const existing = await chrome.tabs.query({ url: DASHBOARD_TAB_URLS });
+  const preferred =
+    existing.find((tab) => tab.id != null && tab.id !== naukriTabId) ??
+    existing[0];
+
+  if (preferred?.id != null && preferred.id !== naukriTabId) {
+    await chrome.tabs.update(preferred.id, { url, active: true });
+    if (preferred.windowId != null) {
+      await chrome.windows.update(preferred.windowId, { focused: true });
+    }
+  } else {
+    try {
+      await chrome.tabs.create({ url, active: true });
+    } catch (error) {
+      logger.warn('Could not open Cosmo dashboard tab', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const closeId = naukriTabId ?? getActiveWorkTabId();
+  if (closeId != null) {
+    try {
+      await chrome.tabs.remove(closeId);
+    } catch {
+      /* tab may already be gone */
+    }
+    if (getActiveWorkTabId() === closeId) {
+      setActiveWorkTabId(null);
+    }
+  }
+}
+
+/**
  * After install/update, content scripts are not injected into already-open tabs.
  * Reload Cosmo tabs so webBridge can push the existing dashboard session.
  */
@@ -254,6 +304,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
   if (alarm.name === 'health-ping') {
     await reportHealth();
+    const auth = await getAuthState();
+    if (auth.accessToken) {
+      await loadPreferences();
+    }
   }
 });
 
@@ -283,7 +337,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const result = await apiLogin(message.email, message.password);
           if (result.success) {
             await sendExtensionConnected();
-            await fetchPreferences();
+            await loadPreferences();
           }
           sendResponse(result);
           break;
@@ -342,13 +396,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               /* still clear locally */
             }
           }
-          await clearAuth();
+          await clearSession();
           sendResponse({ ok: true });
           break;
         }
         case 'SYNC_AUTH_FROM_WEB': {
           if (message.cleared) {
-            await clearAuth();
+            await clearSession();
             sendResponse({ ok: true });
             break;
           }
@@ -374,46 +428,67 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             current.accessToken === accessToken &&
             current.refreshToken === refreshToken &&
             current.apiBaseUrl === apiBaseUrl;
+          const userChanged =
+            jwtSubject(current.accessToken) !== jwtSubject(accessToken);
 
+          if (userChanged) {
+            await clearCachedPreferences();
+          }
           if (!unchanged) {
             await setAuthState({ accessToken, refreshToken, apiBaseUrl });
             await sendExtensionConnected();
-            await fetchPreferences();
           }
+          // Always pull latest dashboard prefs, even when tokens did not change.
+          await loadPreferences();
 
           sendResponse({ ok: true, synced: !unchanged });
+          break;
+        }
+        case 'SYNC_PREFERENCES_FROM_WEB': {
+          const raw = message.preferences;
+          if (!raw || typeof raw !== 'object') {
+            sendResponse({ ok: false, error: 'Missing preferences' });
+            break;
+          }
+          const prefs = resolveJobPreferences(
+            raw as Partial<JobPreferences>
+          );
+          await setCachedPreferences(prefs);
+          sendResponse({ ok: true });
           break;
         }
         case 'GET_STATUS': {
           const auth = await getAuthState();
           const health = await reportHealth();
-          // Always prefer DB preferences so extension stays in sync with dashboard.
-          const remotePrefs = auth.accessToken
-            ? await fetchPreferences()
-            : null;
-          const prefs = remotePrefs?.success
-            ? remotePrefs.data
-            : await getCachedPreferences();
+          const loaded = auth.accessToken
+            ? await loadPreferencesResult()
+            : {
+                preferences: await getCachedPreferences(),
+                source: (await hasCachedPreferences())
+                  ? ('cache' as const)
+                  : ('defaults' as const),
+                error: undefined as string | undefined,
+              };
           const applyQueueDepth = await getApplyQueueDepth();
           const copilot = await getCopilotState();
           sendResponse({
             auth,
             health: { ...health, applyQueueDepth },
-            preferences: prefs,
+            preferences: loaded.preferences,
+            preferencesSource: loaded.source,
+            preferencesError: loaded.error ?? null,
             copilot,
           });
           break;
         }
         case 'GET_PREFERENCES': {
-          const remote = await fetchPreferences();
-          if (remote.success) {
-            sendResponse({ success: true, data: remote.data });
-          } else {
-            sendResponse({
-              success: true,
-              data: await getCachedPreferences(),
-            });
-          }
+          const loaded = await loadPreferencesResult();
+          sendResponse({
+            success: loaded.source === 'remote',
+            data: loaded.preferences,
+            source: loaded.source,
+            message: loaded.error,
+          });
           break;
         }
         case 'SAVE_PREFERENCES': {
@@ -575,6 +650,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         case 'COPILOT_SESSION_CLOSE': {
           await closeSessionComplete();
+          const naukriTabId = sender.tab?.id ?? getActiveWorkTabId();
+          await openCosmoDashboardAndCloseNaukri(naukriTabId);
+          sendResponse({ ok: true });
+          break;
+        }
+        case 'COPILOT_SESSION_APPLY_MORE': {
+          await continueSessionForMoreApplies();
           sendResponse({ ok: true });
           break;
         }

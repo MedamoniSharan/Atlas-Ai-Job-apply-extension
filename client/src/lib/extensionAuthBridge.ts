@@ -1,7 +1,9 @@
+import type { JobPreferences } from '@cosmo/shared';
 import { API_BASE } from './endpoints';
 
 const MESSAGE_SOURCE = 'cosmo-web';
 const MESSAGE_TYPE = 'COSMO_AUTH_SYNC';
+const PREFS_MESSAGE_TYPE = 'COSMO_PREFS_SYNC';
 
 type AuthSyncMessage = {
   source: typeof MESSAGE_SOURCE;
@@ -9,6 +11,12 @@ type AuthSyncMessage = {
   accessToken: string | null;
   refreshToken: string | null;
   apiBaseUrl: string;
+};
+
+type PrefsSyncMessage = {
+  source: typeof MESSAGE_SOURCE;
+  type: typeof PREFS_MESSAGE_TYPE;
+  preferences: JobPreferences;
 };
 
 function postAuthMessage(
@@ -34,4 +42,14 @@ export function syncAuthToExtension(tokens: {
 
 export function clearAuthFromExtension(): void {
   postAuthMessage(null, null);
+}
+
+/** Push dashboard prefs into the extension cache so scan/apply don't wait on a GET. */
+export function syncPreferencesToExtension(preferences: JobPreferences): void {
+  const message: PrefsSyncMessage = {
+    source: MESSAGE_SOURCE,
+    type: PREFS_MESSAGE_TYPE,
+    preferences,
+  };
+  window.postMessage(message, window.location.origin);
 }

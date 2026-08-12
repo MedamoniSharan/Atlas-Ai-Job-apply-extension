@@ -149,3 +149,9 @@ export function googleLoginUrl(apiBaseUrl: string): string {
   const web = resolveWebBase(apiBaseUrl).replace(/\/$/, '');
   return `${web}/login?next=${encodeURIComponent('/dashboard')}`;
 }
+
+/** Cosmo applications dashboard (local or production, matching the API). */
+export function dashboardUrl(apiBaseUrl: string): string {
+  const web = resolveWebBase(apiBaseUrl).replace(/\/$/, '');
+  return `${web}/dashboard`;
+}

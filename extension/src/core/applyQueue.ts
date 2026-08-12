@@ -1,5 +1,8 @@
 import type { JobPayload } from '@cosmo/shared';
 import {
+  APPLY_BATCH_BETWEEN_JOBS_MAX_MS,
+  APPLY_DWELL_READY_MAX_MS,
+  APPLY_NAV_SLOW_MAX_MS,
   handleBlockedPage,
   paceModeFromStealth,
   pacedWait,
@@ -14,10 +17,9 @@ import {
 import {
   ApplyQueueItem,
   getApplyQueue,
-  getCachedPreferences,
   setApplyQueue,
 } from './storageManager';
-import { lookupAppliedJobs } from './apiClient';
+import { loadPreferences, lookupAppliedJobs } from './apiClient';
 import { logger } from './logger';
 import {
   appendCopilotLog,
@@ -132,7 +134,7 @@ export async function processApplyQueue(
   processing = true;
 
   try {
-    const prefs = await getCachedPreferences();
+    const prefs = await loadPreferences();
     if (!prefs.autoApplyEnabled) {
       return { processed: 0, message: 'Auto-apply is disabled.' };
     }
@@ -211,8 +213,16 @@ export async function processApplyQueue(
 
         await waitForTabComplete(activeTabId);
         const mode = paceModeFromStealth(false);
-        await pacedWait(mode, 'nav', { jobTitle: item.title });
-        await pacedWait(mode, 'dwell', { jobTitle: item.title });
+        await pacedWait(mode, 'nav', {
+          jobTitle: item.title,
+          maxMs: APPLY_NAV_SLOW_MAX_MS,
+          label: 'Opening job',
+        });
+        await pacedWait(mode, 'dwell', {
+          jobTitle: item.title,
+          maxMs: APPLY_DWELL_READY_MAX_MS,
+          label: 'About to apply',
+        });
 
         const block = await sendToTab<{ blocked?: boolean; reason?: string }>(
           activeTabId,
@@ -378,6 +388,8 @@ export async function processApplyQueue(
 
       await pacedWait(paceModeFromStealth(false), 'betweenJobs', {
         jobTitle: item.title,
+        maxMs: APPLY_BATCH_BETWEEN_JOBS_MAX_MS,
+        label: 'Next job',
       });
       queue = await getApplyQueue();
     }
