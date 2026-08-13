@@ -5,7 +5,20 @@
 @theme {
   --color-background: #ffffff;
   --color-foreground: #121212;
+  --color-card: #ffffff;
+  --color-card-foreground: #121212;
   --color-muted: #f4f4f2;
   --color-muted-foreground: #777169;
   --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #15362b;
+  --color-primary: #15362b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f4f4f2;
+  --color-secondary-foreground: #121212;
+  --color-accent: #f4f4f2;
+  --color-accent-foreground: #121212;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }

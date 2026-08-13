@@ -5,8 +5,20 @@ Each folder is one Lambda: `Handler: lambda_function.lambda_handler`.
 
 In the Lambda console, create every function with **Runtime → Python 3.14**.
 
-Runtime needs only the **AWS SDK (boto3)** which is built into Lambda. JWT (HS256) and
-passwords (PBKDF2) use the Python stdlib — no PyJWT/bcrypt layer required.
+Runtime needs only the **AWS SDK (boto3)** which is built into Lambda for most functions.
+JWT (HS256) and passwords (PBKDF2) use the Python stdlib — no PyJWT/bcrypt layer required.
+
+**Exception — `cosmo-billing`:** invoice PDFs use **ReportLab**. Package it into the
+deployment zip (or attach a layer):
+
+```bash
+cd lambdas/cosmo-billing
+pip install -r requirements.txt -t package
+cp lambda_function.py invoice_pdf.py package/
+cd package && zip -r ../cosmo-billing.zip .
+```
+
+Then upload `cosmo-billing.zip` as the function code.
 
 ## DynamoDB tables
 

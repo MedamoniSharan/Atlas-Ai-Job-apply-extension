@@ -527,6 +527,8 @@ def list_public_offers(event: Dict[str, Any]) -> Dict[str, Any]:
                 "message": o.get("message"),
                 "couponCode": o.get("couponCode"),
                 "linkUrl": o.get("linkUrl"),
+                "showBird": bool(o.get("showBird", True)),
+                "showFlag": bool(o.get("showFlag", True)),
                 "active": bool(o.get("active", True)),
                 "startsAt": o.get("startsAt"),
                 "endsAt": o.get("endsAt"),
@@ -802,6 +804,7 @@ def next_invoice_number() -> str:
 
 
 def invoice_text(payload: Dict[str, Any]) -> bytes:
+    """Legacy plain-text receipt (kept for debugging only)."""
     lines = [
         "COSMO TAX INVOICE",
         f"Invoice: {payload.get('invoiceNumber')}",
@@ -818,13 +821,22 @@ def invoice_text(payload: Dict[str, Any]) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def build_invoice_pdf_bytes(payload: Dict[str, Any]) -> bytes:
+    from invoice_pdf import build_invoice_pdf
+
+    return build_invoice_pdf(payload)
+
+
 def upload_invoice(invoice_number: str, payload: Dict[str, Any]) -> str:
-    key = f"invoices/{invoice_number}.txt"
+    """Generate branded PDF invoice and store in S3 as invoices/{number}.pdf."""
+    key = f"invoices/{invoice_number}.pdf"
+    body = build_invoice_pdf_bytes(payload)
     s3.put_object(
         Bucket=INVOICES_BUCKET,
         Key=key,
-        Body=invoice_text(payload),
-        ContentType="text/plain; charset=utf-8",
+        Body=body,
+        ContentType="application/pdf",
+        ContentDisposition=f'inline; filename="{invoice_number}.pdf"',
     )
     return key
 
@@ -832,7 +844,14 @@ def upload_invoice(invoice_number: str, payload: Dict[str, Any]) -> str:
 def presign_invoice(key: str, expires: int = 3600) -> str:
     return s3.generate_presigned_url(
         "get_object",
-        Params={"Bucket": INVOICES_BUCKET, "Key": key},
+        Params={
+            "Bucket": INVOICES_BUCKET,
+            "Key": key,
+            "ResponseContentType": "application/pdf"
+            if key.endswith(".pdf")
+            else "text/plain; charset=utf-8",
+            "ResponseContentDisposition": f'inline; filename="{key.split("/")[-1]}"',
+        },
         ExpiresIn=expires,
     )
 
@@ -1720,46 +1739,50 @@ def get_invoice(event: Dict[str, Any], user_id: str, payment_id: str) -> Dict[st
     if payment.get("status") != "paid" or not payment.get("invoiceNumber"):
         return err(event, "Invoice not ready", 404, "INVOICE_NOT_READY")
 
-    key = invoice_object_key(payment) or f"invoices/{payment['invoiceNumber']}.txt"
+    inv = payment["invoiceNumber"]
+    key = invoice_object_key(payment) or f"invoices/{inv}.pdf"
     user = get_user_by_id(user_id)
-    try:
-        s3.head_object(Bucket=INVOICES_BUCKET, Key=key)
-    except Exception:
-        # Try .txt if .pdf missing, else generate placeholder
-        tried = key
-        if key.endswith(".pdf"):
-            alt = key[:-4] + ".txt"
-            try:
-                s3.head_object(Bucket=INVOICES_BUCKET, Key=alt)
-                key = alt
-                tried = None
-            except Exception:
-                pass
-        if tried is not None:
-            key = upload_invoice(
-                payment["invoiceNumber"],
-                {
-                    "invoiceNumber": payment["invoiceNumber"],
-                    "customerName": (user or {}).get("name"),
-                    "customerEmail": (user or {}).get("email"),
-                    "plan": payment.get("plan"),
-                    "amountPaise": payment.get("amountPaise"),
-                    "currency": payment.get("currency", "INR"),
-                    "periodStart": payment.get("createdAt"),
-                    "periodEnd": payment.get("updatedAt"),
-                    "razorpayOrderId": payment.get("razorpayOrderId")
-                    or payment.get("razorpaySubscriptionId")
-                    or "",
-                    "razorpayPaymentId": payment.get("razorpayPaymentId") or "",
-                    "paidAt": payment.get("updatedAt") or payment.get("createdAt"),
-                },
-            )
-            payment["invoiceS3Key"] = key
-            payment["updatedAt"] = now_iso()
-            put_payment(payment)
+
+    def _payload_for_regen() -> Dict[str, Any]:
+        return {
+            "invoiceNumber": inv,
+            "customerName": (user or {}).get("name"),
+            "customerEmail": (user or {}).get("email"),
+            "plan": payment.get("plan"),
+            "amountPaise": payment.get("amountPaise"),
+            "currency": payment.get("currency", "INR"),
+            "periodStart": payment.get("createdAt"),
+            "periodEnd": payment.get("updatedAt"),
+            "razorpayOrderId": payment.get("razorpayOrderId")
+            or payment.get("razorpaySubscriptionId")
+            or "",
+            "razorpayPaymentId": payment.get("razorpayPaymentId") or "",
+            "paidAt": payment.get("updatedAt") or payment.get("createdAt"),
+        }
+
+    needs_regen = False
+    # Always prefer PDF; regenerate if missing or legacy .txt
+    if key.endswith(".txt"):
+        needs_regen = True
+        key = f"invoices/{inv}.pdf"
+    else:
+        try:
+            s3.head_object(Bucket=INVOICES_BUCKET, Key=key)
+        except Exception:
+            needs_regen = True
+
+    if needs_regen:
+        key = upload_invoice(inv, _payload_for_regen())
+        payment["invoiceS3Key"] = key
+        payment["invoicePath"] = key
+        payment["updatedAt"] = now_iso()
+        put_payment(payment)
 
     url = presign_invoice(key)
-    return ok(event, {"url": url, "invoiceNumber": payment.get("invoiceNumber"), "key": key})
+    return ok(
+        event,
+        {"url": url, "invoiceNumber": payment.get("invoiceNumber"), "key": key},
+    )
 
 
 def upsert_subscription_from_razorpay(

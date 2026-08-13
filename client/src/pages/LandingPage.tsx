@@ -5,7 +5,8 @@ import { LandingTextLoop } from '../components/LandingTextLoop';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { LandingTutorialSection } from '../components/LandingTutorialSection';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
-import { PricingPlans } from '../components/PricingPlans';
+import Pricing from '../components/ui/pricing-01';
+import { IndependenceOfferRibbon } from '../components/IndependenceOfferRibbon';
 import { OfferTicker } from '../components/OfferTicker';
 import { RateUsSection } from '../components/RateUsSection';
 import { SeoHead } from '../components/SeoHead';
@@ -53,11 +54,13 @@ export function LandingPage() {
 
       <JobSearchSteps />
 
+      <IndependenceOfferRibbon />
+
       <LandingTutorialSection />
 
       <TestimonialMasonry />
 
-      <PricingPlans />
+      <Pricing />
 
       <RateUsSection />
 

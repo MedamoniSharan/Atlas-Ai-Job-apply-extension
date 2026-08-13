@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, Eye, FileText, Sparkles, X } from 'lucide-react';
+import { Download, Eye, FileText, X } from 'lucide-react';
 import {
   DEFAULT_PLAN_FEATURES,
   PLAN_DISPLAY_NAMES,
@@ -18,6 +18,8 @@ import {
 } from '../lib/razorpayCheckout';
 import { useAuthStore } from '../store/authStore';
 import { CosmosLoader } from '../components/CosmosLogo';
+import { ProfilePricingPlans } from '../components/ProfilePricingPlans';
+import confetti from 'canvas-confetti';
 
 function formatInr(amountPaise: number): string {
   return `₹${(amountPaise / 100).toFixed(0)}`;
@@ -38,6 +40,20 @@ export function ProfilePage() {
   const [previewTitle, setPreviewTitle] = useState('Invoice preview');
   const [couponCode, setCouponCode] = useState('');
   const [couponHint, setCouponHint] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponDiscounts, setCouponDiscounts] = useState<
+    Partial<
+      Record<
+        PaidPlan,
+        {
+          originalAmountPaise: number;
+          finalAmountPaise: number;
+          label: string;
+        }
+      >
+    >
+  >({});
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['billing', 'me'],
@@ -69,6 +85,7 @@ export function ProfilePage() {
       return {
         tier,
         name: p?.name || PLAN_DISPLAY_NAMES[tier],
+        description: p?.description,
         amountPaise:
           p?.amountPaise ??
           (tier === 'free' ? 0 : PLAN_PRICES_PAISE[tier as PaidPlan]),
@@ -80,9 +97,70 @@ export function ProfilePage() {
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hash !== '#plans') return;
+    const el = document.getElementById('plans');
+    if (!el) return;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [isLoading]);
+
+  async function applyCoupon() {
+    const code = couponCode.trim();
+    if (!code) {
+      setCouponError('Enter a coupon code');
+      setCouponHint(null);
+      setCouponDiscounts({});
+      return;
+    }
+
+    setCouponBusy(true);
+    setCouponError(null);
+    setCouponHint(null);
+
+    const next: typeof couponDiscounts = {};
+    const labels: string[] = [];
+    let lastError: string | null = null;
+
+    for (const paid of ['pro', 'max'] as PaidPlan[]) {
+      const preview = await validateCoupon(code, paid);
+      if (preview.success) {
+        next[paid] = {
+          originalAmountPaise: preview.data.originalAmountPaise,
+          finalAmountPaise: preview.data.finalAmountPaise,
+          label: preview.data.label,
+        };
+        labels.push(`${paid === 'pro' ? 'Pro' : 'Max'}: ${preview.data.label}`);
+      } else {
+        lastError = preview.message || 'Invalid coupon';
+      }
+    }
+
+    if (Object.keys(next).length === 0) {
+      setCouponDiscounts({});
+      setCouponHint(null);
+      setCouponError(lastError || 'Coupon does not apply to any plan');
+    } else {
+      setCouponDiscounts(next);
+      setCouponHint(labels.join(' · '));
+      setCouponError(null);
+      confetti({
+        particleCount: 55,
+        spread: 55,
+        origin: { y: 0.4 },
+        colors: ['#15362b', '#34d399', '#f59e0b', '#ffffff'],
+        disableForReducedMotion: true,
+      });
+    }
+    setCouponBusy(false);
+  }
 
   async function upgrade(plan: PaidPlan) {
     setBusyPlan(plan);
@@ -90,10 +168,24 @@ export function ProfilePage() {
     setLastPaymentId(null);
     try {
       const code = couponCode.trim();
-      if (code) {
+      if (code && !couponDiscounts[plan]) {
         const preview = await validateCoupon(code, plan);
-        if (preview.success) setCouponHint(preview.data.label);
-        else setCouponHint(preview.message || 'Invalid coupon');
+        if (preview.success) {
+          setCouponDiscounts((prev) => ({
+            ...prev,
+            [plan]: {
+              originalAmountPaise: preview.data.originalAmountPaise,
+              finalAmountPaise: preview.data.finalAmountPaise,
+              label: preview.data.label,
+            },
+          }));
+          setCouponHint(preview.data.label);
+          setCouponError(null);
+        } else {
+          setCouponError(preview.message || 'Invalid coupon');
+          setBusyPlan(null);
+          return;
+        }
       }
       const result = await startPlanCheckout(plan, code || undefined);
       setLastPaymentId(result.paymentId);
@@ -140,7 +232,7 @@ export function ProfilePage() {
     try {
       const url = await previewPaymentInvoice(paymentId);
       setPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
         return url;
       });
       setPreviewTitle(title ?? 'Invoice preview');
@@ -167,7 +259,7 @@ export function ProfilePage() {
 
   function closePreview() {
     setPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
       return null;
     });
   }
@@ -193,9 +285,6 @@ export function ProfilePage() {
   const plan = data.plan;
   const planLabel = PLAN_DISPLAY_NAMES[plan];
   const payments = data.payments ?? [];
-  const freeCard = planCards.find((p) => p.tier === 'free')!;
-  const proCard = planCards.find((p) => p.tier === 'pro')!;
-  const maxCard = planCards.find((p) => p.tier === 'max')!;
 
   return (
     <div className="dash">
@@ -226,7 +315,7 @@ export function ProfilePage() {
         </Link>
       </div>
 
-      <div className="panel profile-plan">
+      <div className="panel profile-plan" id="plans">
         <div className="profile-plan__head">
           <h2>Your plan</h2>
           <p className="muted">
@@ -301,118 +390,24 @@ export function ProfilePage() {
           </div>
         ) : null}
 
-        <div className="pricing-coupon profile-plan__coupon">
-          <label>
-            Coupon code
-            <input
-              value={couponCode}
-              onChange={(e) => {
-                setCouponCode(e.target.value.toUpperCase());
-                setCouponHint(null);
-              }}
-              placeholder="Optional"
-              autoComplete="off"
-            />
-          </label>
-          {couponHint ? <p className="pricing-coupon__hint">{couponHint}</p> : null}
-        </div>
-
-        <div className="profile-plan__grid">
-          <article
-            className={`profile-plan__option${plan === 'free' ? ' is-current' : ''}`}
-          >
-            <div className="profile-plan__option-top">
-              <h3>{freeCard.name}</h3>
-              <strong>{formatInr(freeCard.amountPaise)}</strong>
-            </div>
-            <ul>
-              {freeCard.features.map((f) => (
-                <li key={f}>
-                  <Check size={14} strokeWidth={2.2} aria-hidden />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            {plan === 'free' ? (
-              <span className="profile-plan__current">Current plan</span>
-            ) : null}
-          </article>
-
-          <article
-            className={`profile-plan__option${plan === 'pro' ? ' is-current' : ''}`}
-          >
-            <div className="profile-plan__option-top">
-              <h3>
-                {proCard.name}
-                <Sparkles size={14} strokeWidth={2} aria-hidden />
-              </h3>
-              <strong>
-                {formatInr(proCard.amountPaise)}
-                <span>/mo</span>
-              </strong>
-            </div>
-            <ul>
-              {proCard.features.map((f) => (
-                <li key={f}>
-                  <Check size={14} strokeWidth={2.2} aria-hidden />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            {plan === 'pro' ? (
-              <span className="profile-plan__current">Current plan</span>
-            ) : plan === 'max' ? null : (
-              <button
-                type="button"
-                className="dash-btn dash-btn--primary"
-                disabled={busyPlan !== null}
-                onClick={() => void upgrade('pro')}
-              >
-                {busyPlan === 'pro' ? (
-                  <CosmosLoader label="" size={20} className="cosmos-loader--inline" />
-                ) : (
-                  `Upgrade to ${proCard.name}`
-                )}
-              </button>
-            )}
-          </article>
-
-          <article
-            className={`profile-plan__option${plan === 'max' ? ' is-current' : ''}`}
-          >
-            <div className="profile-plan__option-top">
-              <h3>{maxCard.name}</h3>
-              <strong>
-                {formatInr(maxCard.amountPaise)}
-                <span>/mo</span>
-              </strong>
-            </div>
-            <ul>
-              {maxCard.features.map((f) => (
-                <li key={f}>
-                  <Check size={14} strokeWidth={2.2} aria-hidden />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            {plan === 'max' ? (
-              <span className="profile-plan__current">Current plan</span>
-            ) : (
-              <button
-                type="button"
-                className="dash-btn dash-btn--primary"
-                disabled={busyPlan !== null}
-                onClick={() => void upgrade('max')}
-              >
-                {busyPlan === 'max' ? (
-                  <CosmosLoader label="" size={20} className="cosmos-loader--inline" />
-                ) : (
-                  `Upgrade to ${maxCard.name}`
-                )}
-              </button>
-            )}
-          </article>
-        </div>
+        <ProfilePricingPlans
+          currentPlan={plan}
+          planCards={planCards}
+          couponCode={couponCode}
+          couponHint={couponHint}
+          couponError={couponError}
+          couponBusy={couponBusy}
+          couponDiscounts={couponDiscounts}
+          busyPlan={busyPlan}
+          onCouponChange={(code) => {
+            setCouponCode(code);
+            setCouponHint(null);
+            setCouponError(null);
+            setCouponDiscounts({});
+          }}
+          onApplyCoupon={() => void applyCoupon()}
+          onUpgrade={(paid) => void upgrade(paid)}
+        />
       </div>
 
       <div className="panel profile-invoices">

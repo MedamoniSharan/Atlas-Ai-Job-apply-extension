@@ -520,6 +520,8 @@ export type PublicSiteOffer = {
   message: string;
   couponCode?: string | null;
   linkUrl?: string | null;
+  showBird?: boolean;
+  showFlag?: boolean;
   active: boolean;
   startsAt?: string | null;
   endsAt?: string | null;
@@ -847,6 +849,8 @@ export type AdminSiteOffer = {
   message: string;
   couponCode?: string | null;
   linkUrl?: string | null;
+  showBird?: boolean;
+  showFlag?: boolean;
   active: boolean;
   startsAt?: string | null;
   endsAt?: string | null;
@@ -982,10 +986,17 @@ export async function submitUninstallFeedback(body: {
   );
 }
 
-export async function fetchInvoiceBlob(
+type InvoiceLink = {
+  url: string;
+  invoiceNumber?: string;
+  /** true when url is a blob: object URL we must revoke later */
+  revoke: boolean;
+};
+
+async function resolveInvoiceLink(
   paymentId: string,
   mode: 'inline' | 'attachment' = 'attachment'
-): Promise<Blob> {
+): Promise<InvoiceLink> {
   const token = useAuthStore.getState().accessToken;
   const qs = mode === 'inline' ? '?inline=1' : '';
   const res = await fetch(
@@ -997,22 +1008,67 @@ export async function fetchInvoiceBlob(
   if (!res.ok) {
     throw new Error('Failed to load invoice');
   }
-  return res.blob();
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  // Local Node server streams PDF bytes.
+  if (
+    contentType.includes('application/pdf') ||
+    contentType.includes('application/octet-stream')
+  ) {
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob), revoke: true };
+  }
+
+  // Production billing lambda returns JSON with a pre-signed S3 URL.
+  // Never fetch that S3 URL from the browser (CORS). Use it directly.
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) {
+    let body: ApiResponse<{ url?: string; invoiceNumber?: string }> | null =
+      null;
+    try {
+      body = JSON.parse(trimmed) as ApiResponse<{
+        url?: string;
+        invoiceNumber?: string;
+      }>;
+    } catch {
+      body = null;
+    }
+    if (body?.success && body.data?.url) {
+      return {
+        url: body.data.url,
+        invoiceNumber: body.data.invoiceNumber,
+        revoke: false,
+      };
+    }
+    throw new Error(body?.message || 'Invoice URL missing');
+  }
+
+  // Plain-text invoice fallback from API.
+  const blob = new Blob([text], { type: contentType || 'text/plain' });
+  return { url: URL.createObjectURL(blob), revoke: true };
 }
 
 export async function downloadInvoice(paymentId: string): Promise<void> {
-  const blob = await fetchInvoiceBlob(paymentId, 'attachment');
-  const url = URL.createObjectURL(blob);
+  const link = await resolveInvoiceLink(paymentId, 'attachment');
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `cosmo-invoice-${paymentId}.pdf`;
+  a.href = link.url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  if (link.revoke) {
+    a.download = `cosmo-invoice-${link.invoiceNumber || paymentId}.pdf`;
+  }
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  if (link.revoke) {
+    window.setTimeout(() => URL.revokeObjectURL(link.url), 1_000);
+  }
 }
 
+/** Returns URL for iframe preview. May be blob: or https:// (S3 pre-sign). */
 export async function previewInvoice(paymentId: string): Promise<string> {
-  const blob = await fetchInvoiceBlob(paymentId, 'inline');
-  return URL.createObjectURL(blob);
+  const link = await resolveInvoiceLink(paymentId, 'inline');
+  return link.url;
 }
