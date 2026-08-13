@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { HelmetProvider } from 'react-helmet-async';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { Analytics } from '@vercel/analytics/react';
 import { AppLayout } from './App';
 import { AdminLayout } from './admin/AdminLayout';
 import { AdminOverviewPage } from './admin/AdminOverviewPage';
@@ -42,9 +43,14 @@ import './admin/admin.css';
 const queryClient = new QueryClient();
 const googleId = googleClientId();
 
-function RouteSpeedInsights() {
+function RouteVercelMetrics() {
   const location = useLocation();
-  return <SpeedInsights route={location.pathname} />;
+  return (
+    <>
+      <Analytics path={location.pathname} />
+      <SpeedInsights route={location.pathname} />
+    </>
+  );
 }
 
 const app = (
@@ -91,7 +97,7 @@ const app = (
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-        <RouteSpeedInsights />
+        <RouteVercelMetrics />
       </BrowserRouter>
     </QueryClientProvider>
   </HelmetProvider>
