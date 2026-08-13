@@ -8,12 +8,13 @@ In the Lambda console, create every function with **Runtime → Python 3.14**.
 Runtime needs only the **AWS SDK (boto3)** which is built into Lambda for most functions.
 JWT (HS256) and passwords (PBKDF2) use the Python stdlib — no PyJWT/bcrypt layer required.
 
-**Exception — `cosmo-billing`:** invoice PDFs use **ReportLab**. Package it into the
-deployment zip (or attach a layer):
+**Exception — `cosmo-billing`:** invoice PDFs use **ReportLab**. This function runs on
+**Python 3.12** (ReportLab wheels). Package deps into the deployment zip (or attach a layer):
 
 ```bash
 cd lambdas/cosmo-billing
-pip install -r requirements.txt -t package
+pip install -r requirements.txt -t package \
+  --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.12
 cp lambda_function.py invoice_pdf.py package/
 cd package && zip -r ../cosmo-billing.zip .
 ```
