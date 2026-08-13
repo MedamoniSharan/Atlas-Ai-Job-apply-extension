@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 INK = "#121212"
@@ -16,6 +19,19 @@ LINE = "#e5e5e5"
 SOFT = "#f4f4f2"
 WHITE = "#ffffff"
 BRAND_MUTED = "#c5d4ce"
+
+# DejaVu includes ₹ (Helvetica does not). Bundled under fonts/.
+_FONT_DIR = Path(__file__).resolve().parent / "fonts"
+_FONTS_READY = False
+
+
+def _ensure_fonts() -> None:
+    global _FONTS_READY
+    if _FONTS_READY:
+        return
+    pdfmetrics.registerFont(TTFont("DejaVu", str(_FONT_DIR / "DejaVuSans.ttf")))
+    pdfmetrics.registerFont(TTFont("DejaVu-Bold", str(_FONT_DIR / "DejaVuSans-Bold.ttf")))
+    _FONTS_READY = True
 
 # Cosmo mark path (viewBox 0 0 24 24) — same as client CosmosLogo
 COSMO_MARK_PATH = (
@@ -75,8 +91,7 @@ def _parse_date(value: Any) -> Optional[datetime]:
 
 
 def format_inr(amount_paise: int) -> str:
-    # Helvetica has no ₹ glyph in ReportLab; use Rs. for reliable embedding.
-    return f"Rs. {(amount_paise / 100):.2f}"
+    return f"₹{(amount_paise / 100):.2f}"
 
 
 def format_date(value: Any) -> str:
@@ -127,6 +142,7 @@ def _draw_cosmo_mark(c: canvas.Canvas, x: float, y: float, size: float, color: s
 
 def build_invoice_pdf(payload: Dict[str, Any]) -> bytes:
     """Render a branded Cosmo tax invoice PDF and return bytes."""
+    _ensure_fonts()
     invoice_number = str(payload.get("invoiceNumber") or "COSMO-UNKNOWN")
     customer_name = str(payload.get("customerName") or "Customer")
     customer_email = str(payload.get("customerEmail") or "")
@@ -142,6 +158,7 @@ def build_invoice_pdf(payload: Dict[str, Any]) -> bytes:
         or "—"
     )
     payment_id = str(payload.get("razorpayPaymentId") or "—")
+    amount_text = format_inr(amount_paise)
 
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
@@ -271,8 +288,8 @@ def build_invoice_pdf(payload: Dict[str, Any]) -> bytes:
     c.setFillColor(INK)
     c.setFont("Helvetica", 10)
     c.drawString(left + 250, y - 10, period)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawRightString(right - 12, y - 10, format_inr(amount_paise))
+    c.setFont("DejaVu-Bold", 11)
+    c.drawRightString(right - 12, y - 10, amount_text)
 
     # —— Totals ——
     y = y - row_h - 10
@@ -281,9 +298,11 @@ def build_invoice_pdf(payload: Dict[str, Any]) -> bytes:
     c.setFont("Helvetica", 10)
     c.drawString(totals_x, y, "Subtotal")
     c.setFillColor(INK)
-    c.drawRightString(right, y, format_inr(amount_paise))
+    c.setFont("DejaVu", 10)
+    c.drawRightString(right, y, amount_text)
     y -= 18
     c.setFillColor(MUTED)
+    c.setFont("Helvetica", 10)
     c.drawString(totals_x, y, "Tax / GST")
     c.setFillColor(INK)
     c.drawRightString(right, y, "Included")
@@ -294,8 +313,8 @@ def build_invoice_pdf(payload: Dict[str, Any]) -> bytes:
     c.setFont("Helvetica-Bold", 12)
     c.drawString(totals_x, y + 6, "Total paid")
     c.setFillColor(BRAND)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(right - 4, y + 5, format_inr(amount_paise))
+    c.setFont("DejaVu-Bold", 14)
+    c.drawRightString(right - 4, y + 5, amount_text)
 
     # —— Payment details ——
     y -= 56

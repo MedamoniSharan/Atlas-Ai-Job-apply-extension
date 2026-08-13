@@ -52,6 +52,8 @@ COUPON_REDEMPTIONS_TABLE = os.environ.get(
 APPLY_COUNTERS_TABLE = os.environ.get("APPLY_COUNTERS_TABLE", "CosmoApplyCounters")
 APPLICATIONS_TABLE = os.environ.get("APPLICATIONS_TABLE", "CosmoApplications")
 INVOICES_BUCKET = os.environ.get("INVOICES_BUCKET", "cosmo-invoices")
+# Bump when PDF layout/currency formatting changes so get_invoice regenerates.
+INVOICE_TEMPLATE_VERSION = "2"
 JWT_ACCESS_SECRET = os.environ.get("JWT_ACCESS_SECRET", "dev-access-secret-change-me")
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
@@ -837,6 +839,7 @@ def upload_invoice(invoice_number: str, payload: Dict[str, Any]) -> str:
         Body=body,
         ContentType="application/pdf",
         ContentDisposition=f'inline; filename="{invoice_number}.pdf"',
+        Metadata={"cosmo-invoice-version": INVOICE_TEMPLATE_VERSION},
     )
     return key
 
@@ -1761,13 +1764,16 @@ def get_invoice(event: Dict[str, Any], user_id: str, payment_id: str) -> Dict[st
         }
 
     needs_regen = False
-    # Always prefer PDF; regenerate if missing or legacy .txt
+    # Always prefer PDF; regenerate if missing, legacy .txt, or stale template
     if key.endswith(".txt"):
         needs_regen = True
         key = f"invoices/{inv}.pdf"
     else:
         try:
-            s3.head_object(Bucket=INVOICES_BUCKET, Key=key)
+            head = s3.head_object(Bucket=INVOICES_BUCKET, Key=key)
+            meta = head.get("Metadata") or {}
+            if meta.get("cosmo-invoice-version") != INVOICE_TEMPLATE_VERSION:
+                needs_regen = True
         except Exception:
             needs_regen = True
 
