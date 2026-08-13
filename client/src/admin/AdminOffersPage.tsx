@@ -1,4 +1,4 @@
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createAdminOffer,
@@ -11,6 +11,38 @@ import { CosmosLoader } from '../components/CosmosLogo';
 
 const MAX_IMAGE_BYTES = 120_000;
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
+
+/** datetime-local value from ISO (browser local timezone). */
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromDatetimeLocal(value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+function formatEndsLabel(iso: string | null | undefined): string {
+  if (!iso) return 'no sale end';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'no sale end';
+  return `Sale Ends ${new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(d)} IST`;
+}
 
 async function fileToDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) {
@@ -148,6 +180,7 @@ export function AdminOffersPage() {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['admin', 'offers'],
@@ -200,6 +233,7 @@ export function AdminOffersPage() {
       return res.data;
     },
     onSuccess: () => {
+      setEditingId(null);
       void queryClient.invalidateQueries({ queryKey: ['admin', 'offers'] });
       void queryClient.invalidateQueries({ queryKey: ['public', 'offers'] });
     },
@@ -210,7 +244,8 @@ export function AdminOffersPage() {
       const res = await deleteAdminOffer(offerId);
       if (!res.success) throw new Error(res.message);
     },
-    onSuccess: () => {
+    onSuccess: (_data, offerId) => {
+      if (editingId === offerId) setEditingId(null);
       void queryClient.invalidateQueries({ queryKey: ['admin', 'offers'] });
       void queryClient.invalidateQueries({ queryKey: ['public', 'offers'] });
     },
@@ -229,6 +264,7 @@ export function AdminOffersPage() {
     const bits = [
       o.couponCode ? `Code ${o.couponCode}` : null,
       `priority ${o.priority ?? 0}`,
+      formatEndsLabel(o.endsAt),
       o.imageUrl ? 'custom icon' : 'default bird',
       o.showBird !== false ? 'image on' : 'image off',
       o.showFlag !== false ? 'flag' : 'no flag',
@@ -245,9 +281,10 @@ export function AdminOffersPage() {
   return (
     <div className="admin-page">
       <p className="admin-note">
-        Offers drive the top ticker and mid-page print ribbons. For the image
-        carousel under the navbar, use <strong>Banners</strong>. Off = don’t
-        show this offer.
+        Offers drive the top ticker and mid-page print ribbons. The ticker{' '}
+        <strong>Sale Ends</strong> countdown uses this offer’s <strong>Ends</strong>{' '}
+        date from admin. For the image carousel under the navbar, use{' '}
+        <strong>Banners</strong>. Off = don’t show this offer.
       </p>
 
       <form className="admin-panel" onSubmit={onSubmit}>
@@ -301,7 +338,7 @@ export function AdminOffersPage() {
             />
           </label>
           <label className="admin-field">
-            Ends
+            Ends (Sale Ends on ticker)
             <input
               type="datetime-local"
               value={endsAt}
@@ -352,103 +389,204 @@ export function AdminOffersPage() {
           </p>
         ) : (
           <ul className="admin-list">
-            {data.map((o) => (
-              <li key={o.offerId} className="admin-list__row admin-offer-row">
-                <div className="admin-offer-row__main">
-                  <div className="admin-offer-row__title">
-                    {o.imageUrl ? (
-                      <img
-                        className="admin-offer-thumb"
-                        src={o.imageUrl}
-                        alt=""
-                        width={28}
-                        height={28}
-                        draggable={false}
-                      />
-                    ) : null}
-                    <strong>{o.message}</strong>
-                    <span
-                      className={`admin-offer-pill ${
-                        o.active ? 'admin-offer-pill--on' : 'admin-offer-pill--off'
-                      }`}
-                    >
-                      {o.active ? 'Showing' : 'Hidden'}
-                    </span>
-                  </div>
-                  <p className="muted">{badgeBits(o)}</p>
-                  <OfferImageDropzone
-                    value={o.imageUrl ?? null}
-                    disabled={patch.isPending}
-                    onChange={(next) =>
-                      patch.mutate({
-                        offerId: o.offerId,
-                        body: { imageUrl: next },
-                      })
-                    }
-                  />
-                </div>
-                <div className="admin-list__actions">
-                  <label
-                    className="admin-toggle"
-                    title="Off = don’t show this offer (ticker + print ribbons)"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!o.active}
+            {data.map((o) =>
+              editingId === o.offerId ? (
+                <OfferScheduleEdit
+                  key={o.offerId}
+                  offer={o}
+                  busy={patch.isPending}
+                  onCancel={() => setEditingId(null)}
+                  onSave={(body) =>
+                    patch.mutate({ offerId: o.offerId, body })
+                  }
+                />
+              ) : (
+                <li key={o.offerId} className="admin-list__row admin-offer-row">
+                  <div className="admin-offer-row__main">
+                    <div className="admin-offer-row__title">
+                      {o.imageUrl ? (
+                        <img
+                          className="admin-offer-thumb"
+                          src={o.imageUrl}
+                          alt=""
+                          width={28}
+                          height={28}
+                          draggable={false}
+                        />
+                      ) : null}
+                      <strong>{o.message}</strong>
+                      <span
+                        className={`admin-offer-pill ${
+                          o.active
+                            ? 'admin-offer-pill--on'
+                            : 'admin-offer-pill--off'
+                        }`}
+                      >
+                        {o.active ? 'Showing' : 'Hidden'}
+                      </span>
+                    </div>
+                    <p className="muted">{badgeBits(o)}</p>
+                    <OfferImageDropzone
+                      value={o.imageUrl ?? null}
                       disabled={patch.isPending}
-                      onChange={() =>
+                      onChange={(next) =>
                         patch.mutate({
                           offerId: o.offerId,
-                          body: { active: !o.active },
+                          body: { imageUrl: next },
                         })
                       }
                     />
-                    <span className="admin-toggle__ui" aria-hidden />
-                    <span className="admin-toggle__label">
-                      {o.active ? 'Show offer' : "Don't show offer"}
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    className="dash-btn dash-btn--ghost"
-                    onClick={() =>
-                      patch.mutate({
-                        offerId: o.offerId,
-                        body: { showBird: o.showBird === false },
-                      })
-                    }
-                  >
-                    {o.showBird === false ? 'Icon on' : 'Icon off'}
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-btn dash-btn--ghost"
-                    onClick={() =>
-                      patch.mutate({
-                        offerId: o.offerId,
-                        body: { showFlag: o.showFlag === false },
-                      })
-                    }
-                  >
-                    {o.showFlag === false ? 'Flag on' : 'Flag off'}
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-btn dash-btn--ghost"
-                    onClick={() => {
-                      if (window.confirm('Delete this offer?')) {
-                        remove.mutate(o.offerId);
+                  </div>
+                  <div className="admin-list__actions">
+                    <label
+                      className="admin-toggle"
+                      title="Off = don’t show this offer (ticker + print ribbons)"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!o.active}
+                        disabled={patch.isPending}
+                        onChange={() =>
+                          patch.mutate({
+                            offerId: o.offerId,
+                            body: { active: !o.active },
+                          })
+                        }
+                      />
+                      <span className="admin-toggle__ui" aria-hidden />
+                      <span className="admin-toggle__label">
+                        {o.active ? 'Show offer' : "Don't show offer"}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn--ghost"
+                      disabled={patch.isPending}
+                      onClick={() => setEditingId(o.offerId)}
+                    >
+                      Edit schedule
+                    </button>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn--ghost"
+                      onClick={() =>
+                        patch.mutate({
+                          offerId: o.offerId,
+                          body: { showBird: o.showBird === false },
+                        })
                       }
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
+                    >
+                      {o.showBird === false ? 'Icon on' : 'Icon off'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn--ghost"
+                      onClick={() =>
+                        patch.mutate({
+                          offerId: o.offerId,
+                          body: { showFlag: o.showFlag === false },
+                        })
+                      }
+                    >
+                      {o.showFlag === false ? 'Flag on' : 'Flag off'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn--ghost"
+                      onClick={() => {
+                        if (window.confirm('Delete this offer?')) {
+                          remove.mutate(o.offerId);
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              )
+            )}
           </ul>
         )}
       </div>
     </div>
+  );
+}
+
+function OfferScheduleEdit({
+  offer,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  offer: AdminSiteOffer;
+  busy: boolean;
+  onSave: (body: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [startsLocal, setStartsLocal] = useState(() =>
+    toDatetimeLocal(offer.startsAt)
+  );
+  const [endsLocal, setEndsLocal] = useState(() => toDatetimeLocal(offer.endsAt));
+
+  useEffect(() => {
+    setStartsLocal(toDatetimeLocal(offer.startsAt));
+    setEndsLocal(toDatetimeLocal(offer.endsAt));
+  }, [offer]);
+
+  return (
+    <li className="admin-list__row admin-offer-row admin-banner-edit">
+      <div className="admin-offer-row__main">
+        <div className="admin-offer-row__title">
+          <strong>Edit schedule — {offer.message}</strong>
+          <span className="admin-offer-pill admin-offer-pill--on">Editing</span>
+        </div>
+        <p className="muted">
+          Ends feeds the top ticker “Sale Ends” countdown. Clear Ends to hide it.
+        </p>
+        <div className="admin-limits-grid">
+          <label className="admin-field">
+            Starts
+            <input
+              type="datetime-local"
+              value={startsLocal}
+              disabled={busy}
+              onChange={(e) => setStartsLocal(e.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            Ends (Sale Ends on ticker)
+            <input
+              type="datetime-local"
+              value={endsLocal}
+              disabled={busy}
+              onChange={(e) => setEndsLocal(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="admin-list__actions admin-banner-edit__actions">
+          <button
+            type="button"
+            className="dash-btn dash-btn--primary"
+            disabled={busy}
+            onClick={() =>
+              onSave({
+                startsAt: fromDatetimeLocal(startsLocal),
+                endsAt: fromDatetimeLocal(endsLocal),
+              })
+            }
+          >
+            {busy ? 'Saving…' : 'Save schedule'}
+          </button>
+          <button
+            type="button"
+            className="dash-btn dash-btn--ghost"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </li>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPublicOffers, type PublicSiteOffer } from '../lib/api';
 
@@ -43,11 +44,52 @@ function IndianFlag({ className }: { className?: string }) {
   );
 }
 
-function OfferSegment({ offer }: { offer: PublicSiteOffer }) {
+function formatSaleEndsAt(endsAt: string): string {
+  const end = new Date(endsAt);
+  if (Number.isNaN(end.getTime())) return '';
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(end);
+}
+
+function formatSaleCountdown(endsAt: string, nowMs: number): string {
+  const end = new Date(endsAt).getTime();
+  if (Number.isNaN(end)) return '';
+  const remaining = end - nowMs;
+  if (remaining <= 0) return 'Sale ended';
+
+  const totalSec = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m`;
+  }
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function OfferSegment({
+  offer,
+  nowMs,
+}: {
+  offer: PublicSiteOffer;
+  nowMs: number;
+}) {
   const code = offer.couponCode?.trim();
   const showBird = offer.showBird !== false;
   const showFlag = offer.showFlag !== false;
   const birdSrc = offer.imageUrl?.trim() || FREEDOM_BIRD_SRC;
+  const endsAt = offer.endsAt?.trim();
+  const endsLabel = endsAt ? formatSaleEndsAt(endsAt) : '';
+  const countdown = endsAt ? formatSaleCountdown(endsAt, nowMs) : '';
 
   return (
     <span className="offer-banner__segment">
@@ -70,6 +112,15 @@ function OfferSegment({ offer }: { offer: PublicSiteOffer }) {
             — use code <strong>{code}</strong>
           </span>
         ) : null}
+        {endsAt && endsLabel ? (
+          <span className="offer-banner__ends">
+            {' '}
+            — Sale Ends: <strong>{countdown || endsLabel}</strong>
+            {countdown && countdown !== 'Sale ended' ? (
+              <span className="offer-banner__ends-date"> ({endsLabel} IST)</span>
+            ) : null}
+          </span>
+        ) : null}
       </span>
       {showFlag ? <IndianFlag className="offer-banner__flag" /> : null}
     </span>
@@ -77,6 +128,7 @@ function OfferSegment({ offer }: { offer: PublicSiteOffer }) {
 }
 
 export function OfferTicker() {
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const { data: offers = [] } = useQuery({
     queryKey: ['public', 'offers'],
     queryFn: async () => {
@@ -88,6 +140,14 @@ export function OfferTicker() {
     refetchInterval: 60_000,
   });
 
+  const hasCountdown = offers.some((o) => !!o.endsAt?.trim());
+
+  useEffect(() => {
+    if (!hasCountdown) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [hasCountdown]);
+
   if (!offers.length) return null;
 
   const primary = offers[0];
@@ -95,14 +155,20 @@ export function OfferTicker() {
   const label = offers
     .map((o) => {
       const code = o.couponCode?.trim();
-      return code ? `${o.message} — use code ${code}` : o.message;
+      const base = code ? `${o.message} — use code ${code}` : o.message;
+      const ends = o.endsAt?.trim() ? formatSaleEndsAt(o.endsAt) : '';
+      return ends ? `${base} — Sale Ends: ${ends} IST` : base;
     })
     .join('. ');
 
   const half = (offset: number) =>
     offers.flatMap((offer, i) =>
       Array.from({ length: Math.max(2, Math.ceil(4 / offers.length)) }, (_, j) => (
-        <OfferSegment key={`${offset}-${i}-${j}`} offer={offer} />
+        <OfferSegment
+          key={`${offset}-${i}-${j}`}
+          offer={offer}
+          nowMs={nowMs}
+        />
       ))
     );
 

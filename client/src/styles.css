@@ -10705,6 +10705,19 @@ textarea {
 .offer-banner__link:hover .offer-banner__code strong {
   text-decoration: underline;
 }
+.offer-banner__ends {
+  color: rgba(255, 255, 255, 0.88);
+}
+.offer-banner__ends strong {
+  color: #ffd089;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.offer-banner__ends-date {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 500;
+}
 @keyframes offer-banner-scroll {
   from {
     transform: translateX(0);
