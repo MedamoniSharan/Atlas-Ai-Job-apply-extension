@@ -237,48 +237,48 @@ function PlanCard({
       <Card
         className={cn(
           BG_BY_TIER[card.tier],
-          'relative h-full w-full rounded-[1.75rem] border-0 p-5 text-foreground shadow-none ring-0 sm:p-6',
+          'relative h-full w-full rounded-[1.75rem] border-0 p-5 text-foreground shadow-none ring-0 sm:p-7',
           isCurrent && 'ring-2 ring-black/80',
         )}
       >
         {isCurrent ? (
-          <span className="absolute top-4 right-4 rounded-full bg-black px-2.5 py-0.5 text-[10px] font-semibold text-white">
+          <span className="absolute top-4 right-4 rounded-full bg-black px-2.5 py-1 text-xs font-semibold text-white">
             Current
           </span>
         ) : discount ? (
-          <span className="absolute top-4 right-4 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+          <span className="absolute top-4 right-4 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
             {discount.label}
           </span>
         ) : showYearlySave ? (
-          <span className="absolute top-4 right-4 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+          <span className="absolute top-4 right-4 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
             15% off
           </span>
         ) : null}
 
-        <CardContent className="flex h-full w-full flex-col items-start gap-5 self-stretch p-0 sm:flex-row sm:gap-6">
-          <div className="flex flex-col items-start gap-4 self-stretch sm:w-[42%] sm:min-w-[10.5rem]">
-            <div className="flex flex-col gap-2">
-              <Badge className="h-7 w-fit rounded-full border-0 bg-black px-3 py-1 text-sm font-medium leading-5 text-white hover:bg-black">
+        <CardContent className="flex h-full w-full flex-col items-start gap-5 self-stretch p-0 sm:flex-row sm:gap-7">
+          <div className="flex flex-col items-start gap-4 self-stretch sm:w-[42%] sm:min-w-[11rem]">
+            <div className="flex flex-col gap-2.5">
+              <Badge className="h-8 w-fit rounded-full border-0 bg-black px-3.5 py-1 text-base font-medium leading-5 text-white hover:bg-black">
                 {card.name}
               </Badge>
-              <p className="max-w-56 text-sm font-normal leading-snug text-muted-foreground">
+              <p className="max-w-64 text-base font-normal leading-relaxed text-muted-foreground">
                 {card.description || DESC_BY_TIER[card.tier]}
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3.5">
               <div>
                 {strikeMonthly != null && strikeMonthly > price ? (
-                  <p className="mb-0.5 text-sm text-muted-foreground line-through">
+                  <p className="mb-0.5 text-base text-muted-foreground line-through">
                     ₹{frequency === 'yearly' ? yearlyPerMonth(strikeMonthly) : strikeMonthly}
                     /month
                   </p>
                 ) : null}
-                <p className="flex items-end text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <p className="flex items-end text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
                   {price === 0 ? (
                     <>
                       ₹0
-                      <span className="pb-0.5 text-sm font-normal text-muted-foreground">
+                      <span className="pb-1 text-base font-normal text-muted-foreground">
                         /forever
                       </span>
                     </>
@@ -293,14 +293,14 @@ function PlanCard({
                           easing: 'ease-out',
                         }}
                       />
-                      <span className="pb-0.5 text-sm font-normal text-muted-foreground">
+                      <span className="pb-1 text-base font-normal text-muted-foreground">
                         /month
                       </span>
                     </>
                   )}
                 </p>
                 {price > 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1.5 text-sm text-muted-foreground">
                     {discount
                       ? `Coupon applied · billed monthly at checkout`
                       : frequency === 'yearly'
@@ -311,7 +311,7 @@ function PlanCard({
               </div>
 
               {isCurrent ? (
-                <span className="inline-flex h-11 items-center rounded-full border border-black/10 bg-white px-4 text-sm font-medium text-muted-foreground">
+                <span className="inline-flex h-12 items-center rounded-full border border-black/10 bg-white px-5 text-base font-medium text-muted-foreground">
                   Current plan
                 </span>
               ) : canUpgrade ? (
@@ -319,7 +319,7 @@ function PlanCard({
                   type="button"
                   disabled={busyPlan !== null}
                   onClick={() => onUpgrade(card.tier as PaidPlan)}
-                  className="inline-flex h-11 w-full max-w-[15rem] items-center justify-center gap-2 rounded-full border-0 bg-black px-5 text-sm font-medium text-white no-underline shadow-none hover:bg-black/90 hover:text-white disabled:opacity-60"
+                  className="inline-flex h-12 w-full max-w-[16rem] items-center justify-center gap-2 rounded-full border-0 bg-black px-5 text-base font-medium text-white no-underline shadow-none hover:bg-black/90 hover:text-white disabled:opacity-60"
                 >
                   {busyPlan === card.tier ? (
                     <CosmosLoader
@@ -330,7 +330,7 @@ function PlanCard({
                   ) : (
                     <>
                       Upgrade to {card.name}
-                      <ArrowUpRight size={16} aria-hidden />
+                      <ArrowUpRight size={17} aria-hidden />
                     </>
                   )}
                 </Button>
@@ -338,18 +338,18 @@ function PlanCard({
             </div>
           </div>
 
-          <div className="flex grow flex-col items-start gap-2.5 self-stretch sm:border-l sm:border-black/10 sm:pl-6">
-            <p className="text-sm font-medium text-foreground sm:text-base">
+          <div className="flex grow flex-col items-start gap-3 self-stretch sm:border-l sm:border-black/10 sm:pl-7">
+            <p className="text-base font-medium text-foreground sm:text-lg">
               Features
             </p>
-            <ul className="flex flex-col items-start gap-2 self-stretch">
+            <ul className="flex flex-col items-start gap-2.5 self-stretch">
               {card.features.map((feature) => (
                 <li
                   key={feature}
-                  className="flex items-center gap-2.5 text-sm font-normal tracking-normal text-foreground"
+                  className="flex items-center gap-2.5 text-base font-normal leading-snug tracking-normal text-foreground"
                 >
                   <Check
-                    size={15}
+                    size={17}
                     className="shrink-0 text-foreground"
                     aria-hidden
                   />

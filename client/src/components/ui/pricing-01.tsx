@@ -129,11 +129,11 @@ function PricingCard({
       <Card
         className={cn(
           plan.plan_bg_color,
-          'relative h-full w-full rounded-[1.75rem] border-0 p-5 text-foreground shadow-none ring-0 sm:p-6',
+          'relative h-full w-full rounded-[1.75rem] border-0 p-5 text-foreground shadow-none ring-0 sm:p-7',
         )}
       >
         {showYearlySave ? (
-          <span className="absolute top-4 right-4 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+          <span className="absolute top-4 right-4 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
             {Math.round(
               ((plan.plan_price.monthly - plan.plan_price.yearly) /
                 plan.plan_price.monthly) *
@@ -142,23 +142,23 @@ function PricingCard({
             % off
           </span>
         ) : null}
-        <CardContent className="flex h-full w-full flex-col items-start gap-5 self-stretch p-0 sm:flex-row sm:gap-6">
-          <div className="flex flex-col items-start gap-4 self-stretch sm:w-[42%] sm:min-w-[10.5rem]">
-            <div className="flex flex-col gap-2">
-              <Badge className="h-7 w-fit rounded-full border-0 bg-black px-3 py-1 text-sm font-medium leading-5 text-white hover:bg-black">
+        <CardContent className="flex h-full w-full flex-col items-start gap-5 self-stretch p-0 sm:flex-row sm:gap-7">
+          <div className="flex flex-col items-start gap-4 self-stretch sm:w-[42%] sm:min-w-[11rem]">
+            <div className="flex flex-col gap-2.5">
+              <Badge className="h-8 w-fit rounded-full border-0 bg-black px-3.5 py-1 text-base font-medium leading-5 text-white hover:bg-black">
                 {plan.plan_name}
               </Badge>
-              <p className="max-w-56 text-sm font-normal leading-snug text-muted-foreground">
+              <p className="max-w-64 text-base font-normal leading-relaxed text-muted-foreground">
                 {plan.plan_descp}
               </p>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3.5">
               <div>
-                <p className="flex items-end text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <p className="flex items-end text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
                   {price === 0 ? (
                     <>
                       ₹0
-                      <span className="pb-0.5 text-sm font-normal text-muted-foreground">
+                      <span className="pb-1 text-base font-normal text-muted-foreground">
                         /forever
                       </span>
                     </>
@@ -173,14 +173,14 @@ function PricingCard({
                           easing: 'ease-out',
                         }}
                       />
-                      <span className="pb-0.5 text-sm font-normal text-muted-foreground">
+                      <span className="pb-1 text-base font-normal text-muted-foreground">
                         /month
                       </span>
                     </>
                   )}
                 </p>
                 {price > 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1.5 text-sm text-muted-foreground">
                     {frequency === 'yearly'
                       ? `≈ ₹${price * 12}/year · 15% less than monthly × 12`
                       : 'billed monthly'}
@@ -189,32 +189,32 @@ function PricingCard({
               </div>
               <Button
                 asChild
-                className="group relative h-11 w-full max-w-[14rem] cursor-pointer overflow-hidden rounded-full border border-black/5 bg-white p-1 pe-12 ps-5 text-sm font-medium text-black no-underline shadow-sm transition-all duration-500 hover:bg-white hover:pe-5 hover:ps-12 hover:text-black hover:no-underline"
+                className="group relative h-12 w-full max-w-[15rem] cursor-pointer overflow-hidden rounded-full border border-black/5 bg-white p-1 pe-12 ps-5 text-base font-medium text-black no-underline shadow-sm transition-all duration-500 hover:bg-white hover:pe-5 hover:ps-12 hover:text-black hover:no-underline"
               >
                 <Link to={plan.plan_href}>
                   <span className="relative z-10 transition-all duration-500">
                     {plan.plan_cta}
                   </span>
-                  <div className="absolute right-1 flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-all duration-500 group-hover:right-[calc(100%-40px)] group-hover:rotate-45">
-                    <ArrowUpRight size={15} aria-hidden />
+                  <div className="absolute right-1 flex h-10 w-10 items-center justify-center rounded-full bg-black text-white transition-all duration-500 group-hover:right-[calc(100%-44px)] group-hover:rotate-45">
+                    <ArrowUpRight size={16} aria-hidden />
                   </div>
                 </Link>
               </Button>
             </div>
           </div>
 
-          <div className="flex grow flex-col items-start gap-2.5 self-stretch sm:border-l sm:border-black/10 sm:pl-6">
-            <p className="text-sm font-medium text-foreground sm:text-base">
+          <div className="flex grow flex-col items-start gap-3 self-stretch sm:border-l sm:border-black/10 sm:pl-7">
+            <p className="text-base font-medium text-foreground sm:text-lg">
               Features
             </p>
-            <ul className="flex flex-col items-start gap-2 self-stretch">
+            <ul className="flex flex-col items-start gap-2.5 self-stretch">
               {plan.plan_feature.map((feature) => (
                 <li
                   key={feature}
-                  className="flex items-center gap-2.5 text-sm font-normal tracking-normal text-foreground"
+                  className="flex items-center gap-2.5 text-base font-normal leading-snug tracking-normal text-foreground"
                 >
                   <Check
-                    size={15}
+                    size={17}
                     className="shrink-0 text-foreground"
                     aria-hidden
                   />
@@ -326,14 +326,14 @@ export default function Pricing() {
           >
             <Badge
               variant="outline"
-              className="h-7 w-fit rounded-full border-black/15 bg-transparent px-3 py-1 text-sm font-normal leading-5 text-foreground"
+              className="h-8 w-fit rounded-full border-black/15 bg-transparent px-3.5 py-1 text-base font-normal leading-5 text-foreground"
             >
               Pricing
             </Badge>
-            <div className="mx-auto max-w-xs text-center sm:max-w-xl">
+            <div className="mx-auto max-w-sm text-center sm:max-w-2xl">
               <h2
                 id="pricing-heading"
-                className="text-3xl font-medium tracking-tight text-foreground sm:text-5xl"
+                className="text-4xl font-medium tracking-tight text-foreground sm:text-5xl"
               >
                 Pick the plan that fits your job search
               </h2>

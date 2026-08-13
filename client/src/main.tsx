@@ -1,9 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { HelmetProvider } from 'react-helmet-async';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AppLayout } from './App';
 import { AdminLayout } from './admin/AdminLayout';
 import { AdminOverviewPage } from './admin/AdminOverviewPage';
@@ -40,6 +41,11 @@ import './admin/admin.css';
 
 const queryClient = new QueryClient();
 const googleId = googleClientId();
+
+function RouteSpeedInsights() {
+  const location = useLocation();
+  return <SpeedInsights route={location.pathname} />;
+}
 
 const app = (
   <HelmetProvider>
@@ -85,6 +91,7 @@ const app = (
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <RouteSpeedInsights />
       </BrowserRouter>
     </QueryClientProvider>
   </HelmetProvider>

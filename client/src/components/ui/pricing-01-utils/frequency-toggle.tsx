@@ -37,7 +37,7 @@ export function FrequencyToggle({
             aria-pressed={selected}
             onClick={() => setFrequency(option.value)}
             className={cn(
-              'relative z-10 m-0 inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-transparent px-5 text-sm font-medium shadow-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-black/20',
+              'relative z-10 m-0 inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-transparent px-6 text-base font-medium shadow-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-black/20',
               selected ? 'text-white' : 'text-[#8b8f98] hover:text-foreground',
             )}
           >
@@ -52,7 +52,7 @@ export function FrequencyToggle({
             {option.badge ? (
               <span
                 className={cn(
-                  'relative z-10 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none',
+                  'relative z-10 rounded-full px-2.5 py-1 text-xs font-semibold leading-none',
                   selected
                     ? 'bg-white/15 text-white'
                     : 'bg-[#15362b] text-white',
