@@ -1,4 +1,4 @@
-/** Session ceiling: stop when applied + skipped reaches this. */
+/** Prefer collecting this many preference-matched jobs before apply. */
 export const SCAN_MATCH_TARGET = 30;
 
 export function sessionProcessedCount(state: {
@@ -9,24 +9,23 @@ export function sessionProcessedCount(state: {
 }
 
 /**
- * Plain-language wait copy while Cosmo scans the current title/keyword filter.
- * Apply starts after this list; the session stops around 30 applied+skipped.
+ * Plain-language wait copy while Cosmo is still scanning (not applying yet).
+ * Do not invent a 1:00 countdown — scan can take longer on thin searches.
  */
-export function scanWaitMessage(opts: {
-  matched: number;
-  target?: number;
-  keyword?: string;
-}): string {
-  const n = Math.max(0, Math.floor(opts.matched));
-  const goal = Math.max(1, Math.floor(opts.target ?? SCAN_MATCH_TARGET));
-  const kw = opts.keyword?.trim();
-  const label = kw ? `“${kw}”` : 'this search';
-
+export function scanWaitMessage(
+  matched: number,
+  target: number = SCAN_MATCH_TARGET
+): string {
+  const n = Math.max(0, Math.floor(matched));
+  const goal = Math.max(1, Math.floor(target));
   if (n <= 0) {
-    return `Scanning ${label} — apply this list next. Stopping around ${goal} applied+skipped.`;
+    return `Please wait until ${goal} jobs match (~1 minute). Apply has not started yet.`;
   }
   if (n >= goal) {
-    return `${n} matched on ${label} — applying now.`;
+    return `${goal} jobs matched — starting applies now.`;
   }
-  return `${n} matched on ${label} — then apply, then another title/keyword.`;
+  if (n >= goal - 5) {
+    return `Almost there — ${n}/${goal} matched. Apply starts next.`;
+  }
+  return `${n}/${goal} matched — please wait. Apply starts after ${goal} matches (~1 minute).`;
 }

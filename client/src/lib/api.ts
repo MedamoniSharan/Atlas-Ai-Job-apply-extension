@@ -520,6 +520,7 @@ export type PublicSiteOffer = {
   message: string;
   couponCode?: string | null;
   linkUrl?: string | null;
+  imageUrl?: string | null;
   showBird?: boolean;
   showFlag?: boolean;
   active: boolean;
@@ -530,6 +531,19 @@ export type PublicSiteOffer = {
 
 export async function fetchPublicOffers() {
   return request<PublicSiteOffer[]>('/api/v1/billing/offers', undefined, false);
+}
+
+export type PublicSiteBanner = {
+  bannerId: string;
+  imageUrl: string;
+  linkUrl?: string | null;
+  altText?: string | null;
+  active: boolean;
+  priority?: number;
+};
+
+export async function fetchPublicBanners() {
+  return request<PublicSiteBanner[]>('/api/v1/billing/banners', undefined, false);
 }
 
 export async function validateCoupon(code: string, plan: PaidPlan) {
@@ -849,6 +863,7 @@ export type AdminSiteOffer = {
   message: string;
   couponCode?: string | null;
   linkUrl?: string | null;
+  imageUrl?: string | null;
   showBird?: boolean;
   showFlag?: boolean;
   active: boolean;
@@ -882,6 +897,42 @@ export async function updateAdminOffer(
 
 export async function deleteAdminOffer(offerId: string) {
   return request(`/api/v1/admin/offers/${offerId}`, { method: 'DELETE' });
+}
+
+export type AdminSiteBanner = {
+  bannerId: string;
+  imageUrl: string;
+  linkUrl?: string | null;
+  altText?: string | null;
+  active: boolean;
+  priority?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchAdminBanners() {
+  return request<AdminSiteBanner[]>('/api/v1/admin/banners');
+}
+
+export async function createAdminBanner(body: Record<string, unknown>) {
+  return request<AdminSiteBanner>('/api/v1/admin/banners', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateAdminBanner(
+  bannerId: string,
+  body: Record<string, unknown>
+) {
+  return request<AdminSiteBanner>(`/api/v1/admin/banners/${bannerId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteAdminBanner(bannerId: string) {
+  return request(`/api/v1/admin/banners/${bannerId}`, { method: 'DELETE' });
 }
 
 export type AdminCoupon = {

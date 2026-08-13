@@ -53,7 +53,6 @@ import {
 import {
   SCAN_MATCH_TARGET,
   scanWaitMessage,
-  sessionProcessedCount,
 } from './scanWait';
 import { isBlocked } from './safetyStorage';
 import {
@@ -1081,16 +1080,11 @@ const MAX_SCAN_PAGES = 40;
 /** Stop after this many consecutive pages that add zero new matches. */
 const MAX_EMPTY_PAGES = 3;
 
-async function publishScanWait(
-  matched: number,
-  options?: { target?: number; keyword?: string }
-): Promise<void> {
-  const target = options?.target ?? SCAN_BATCH_SIZE;
-  const keyword =
-    options?.keyword ?? (await getCopilotState()).keyword ?? '';
+async function publishScanWait(matched: number, target?: number): Promise<void> {
+  const goal = target ?? SCAN_BATCH_SIZE;
   await setCopilotState({
     runPhase: 'scan',
-    paceLabel: scanWaitMessage({ matched, target, keyword }),
+    paceLabel: scanWaitMessage(matched, goal),
     paceRemainingMs: null,
   });
 }
@@ -1168,9 +1162,9 @@ async function collectPreferenceMatches(opts: {
   const batch = opts.into ?? [];
   let listCardsSeen = 0;
 
-  await publishScanWait(batch.length, { target });
+  await publishScanWait(batch.length, target);
   await appendCopilotLog(
-    `${prefix}: ${scanWaitMessage({ matched: batch.length, target })}`,
+    `${prefix}: ${scanWaitMessage(batch.length, target)}`,
     'info'
   );
 
@@ -1265,7 +1259,7 @@ async function collectPreferenceMatches(opts: {
       ]);
       batch.push(job);
       addedThisRound += 1;
-      await publishScanWait(batch.length, { target });
+      await publishScanWait(batch.length, target);
     }
 
     await appendCopilotLog(
@@ -1286,119 +1280,7 @@ async function collectPreferenceMatches(opts: {
   return { batch, listCardsSeen };
 }
 
-/**
- * Scan this title/keyword search (auto next-page) until `target` matches
- * or pages run out. Never asks the user to click Next. Never starts apply.
- */
-async function collectUntilMatchedBatch(opts: {
-  tabId: number;
-  searchUrl: string;
-  stealth: boolean;
-  prefs: JobPreferences;
-  seenKeys: Set<string>;
-  scannedKeys: Set<string>;
-  pending?: SearchResultJob[];
-  logPrefix?: string;
-  /** Max matches for this filter (remaining session cap). */
-  target?: number;
-}): Promise<SearchResultJob[]> {
-  const batch = [...(opts.pending ?? [])];
-  const prefix = opts.logPrefix ?? 'Scan';
-  const target = Math.max(1, opts.target ?? SCAN_BATCH_SIZE);
-  let emptyPages = 0;
-
-  for (
-    let page = 0;
-    page < MAX_SCAN_PAGES && batch.length < target;
-    page++
-  ) {
-    if (!(await waitWhilePaused())) break;
-    if (!(await ensureNaukriLoggedIn(opts.tabId))) break;
-
-    if (page > 0) {
-      await publishScanWait(batch.length, { target });
-      await appendCopilotLog(
-        `${prefix}: ${scanWaitMessage({ matched: batch.length, target })} Auto next page…`,
-        'info'
-      );
-      const next = await goToNextSearchPage(opts.tabId);
-      if (!next.ok) {
-        await appendCopilotLog(
-          next.reason || `No more pages — still at ${batch.length}/${target}`,
-          'warn'
-        );
-        break;
-      }
-    }
-
-    const before = batch.length;
-    const { listCardsSeen } = await collectPreferenceMatches({
-      tabId: opts.tabId,
-      searchUrl: opts.searchUrl,
-      stealth: opts.stealth,
-      prefs: opts.prefs,
-      seenKeys: opts.seenKeys,
-      scannedKeys: opts.scannedKeys,
-      into: batch,
-      target,
-      logPrefix: `${prefix} p${page + 1}`,
-    });
-    await notePageScanned();
-    await reportScanSession('running');
-    if (batch.length >= target) break;
-
-    // Past the last real page (or empty search): stop immediately —
-    // do not burn MAX_EMPTY_PAGES on invented -jobs-N URLs.
-    if (listCardsSeen === 0) {
-      await appendCopilotLog(
-        page === 0
-          ? `${prefix}: empty search results — no pages to scan`
-          : `${prefix}: no jobs after page advance — treating as last page (${batch.length}/${target})`,
-        'warn'
-      );
-      break;
-    }
-
-    if (batch.length === before) {
-      emptyPages += 1;
-      await appendCopilotLog(
-        `${prefix}: page added 0 new matches (${emptyPages}/${MAX_EMPTY_PAGES} empty)`,
-        'warn'
-      );
-      if (emptyPages >= MAX_EMPTY_PAGES) {
-        await appendCopilotLog(
-          `${prefix}: stopping after ${MAX_EMPTY_PAGES} empty pages — ${batch.length}/${target}`,
-          'warn'
-        );
-        break;
-      }
-    } else {
-      emptyPages = 0;
-    }
-  }
-
-  const ready = batch.slice(0, target);
-  const scannedTotal = (await getCopilotState()).scanned;
-  if (ready.length >= target) {
-    await appendCopilotLog(
-      `This search is ready — scanned ${scannedTotal} jobs, matched ${ready.length}/${target}. Applying this list…`,
-      'success'
-    );
-  } else if (ready.length > 0) {
-    await appendCopilotLog(
-      `This search exhausted at ${ready.length}/${target} matched (scanned ${scannedTotal}) — applying what was found.`,
-      'warn'
-    );
-  } else {
-    await appendCopilotLog(
-      `No preference matches on this search after scanning ${scannedTotal} jobs — next title/keyword.`,
-      'warn'
-    );
-  }
-  return ready;
-}
-
-/** Phase 2: apply collected matches one by one (full 30 batch, or whatever was found). */
+/** Apply collected matches one by one (short settle — not full humanPace). */
 async function applyCollectedJobs(opts: {
   tabId: number;
   jobs: SearchResultJob[];
@@ -1414,7 +1296,9 @@ async function applyCollectedJobs(opts: {
   }
 
   await appendCopilotLog(
-    `Applying ${jobs.length} matched job(s) from this search…`,
+    jobs.length >= SCAN_BATCH_SIZE
+      ? `Applying ${jobs.length} matched job(s) quickly…`
+      : `Applying ${jobs.length} matched job(s) found (under ${SCAN_BATCH_SIZE} target)…`,
     'success'
   );
   await setCopilotState({
@@ -1455,6 +1339,115 @@ async function applyCollectedJobs(opts: {
   }
   await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
   return 'ok';
+}
+
+/**
+ * Phase 1: scan this title/keyword (auto next-page) until `target` matches
+ * or pages run out. Never asks Next. Never starts apply.
+ */
+async function collectUntilMatchedBatch(opts: {
+  tabId: number;
+  searchUrl: string;
+  stealth: boolean;
+  prefs: JobPreferences;
+  seenKeys: Set<string>;
+  scannedKeys: Set<string>;
+  pending?: SearchResultJob[];
+  logPrefix?: string;
+  target?: number;
+}): Promise<SearchResultJob[]> {
+  const batch = [...(opts.pending ?? [])];
+  const prefix = opts.logPrefix ?? 'Scan';
+  const target = Math.max(1, opts.target ?? SCAN_BATCH_SIZE);
+  let emptyPages = 0;
+
+  for (
+    let page = 0;
+    page < MAX_SCAN_PAGES && batch.length < target;
+    page++
+  ) {
+    if (!(await waitWhilePaused())) break;
+    if (!(await ensureNaukriLoggedIn(opts.tabId))) break;
+
+    if (page > 0) {
+      await publishScanWait(batch.length, target);
+      await appendCopilotLog(
+        `${prefix}: ${scanWaitMessage(batch.length, target)} Auto next page…`,
+        'info'
+      );
+      const next = await goToNextSearchPage(opts.tabId);
+      if (!next.ok) {
+        await appendCopilotLog(
+          next.reason || `No more pages — still at ${batch.length}/${target}`,
+          'warn'
+        );
+        break;
+      }
+    }
+
+    const before = batch.length;
+    const { listCardsSeen } = await collectPreferenceMatches({
+      tabId: opts.tabId,
+      searchUrl: opts.searchUrl,
+      stealth: opts.stealth,
+      prefs: opts.prefs,
+      seenKeys: opts.seenKeys,
+      scannedKeys: opts.scannedKeys,
+      into: batch,
+      target,
+      logPrefix: `${prefix} p${page + 1}`,
+    });
+    await notePageScanned();
+    await reportScanSession('running');
+    if (batch.length >= target) break;
+
+    if (listCardsSeen === 0) {
+      await appendCopilotLog(
+        page === 0
+          ? `${prefix}: empty search results — no pages to scan`
+          : `${prefix}: no jobs after page advance — treating as last page (${batch.length}/${target})`,
+        'warn'
+      );
+      break;
+    }
+
+    if (batch.length === before) {
+      emptyPages += 1;
+      await appendCopilotLog(
+        `${prefix}: page added 0 new matches (${emptyPages}/${MAX_EMPTY_PAGES} empty)`,
+        'warn'
+      );
+      if (emptyPages >= MAX_EMPTY_PAGES) {
+        await appendCopilotLog(
+          `${prefix}: stopping after ${MAX_EMPTY_PAGES} empty pages — ${batch.length}/${target}`,
+          'warn'
+        );
+        break;
+      }
+    } else {
+      emptyPages = 0;
+    }
+  }
+
+  const ready = batch.slice(0, target);
+  const scannedTotal = (await getCopilotState()).scanned;
+  if (ready.length >= target) {
+    await appendCopilotLog(
+      `Matched batch ready — scanned ${scannedTotal} jobs, matched ${ready.length}/${target}. Starting applies…`,
+      'success'
+    );
+  } else if (ready.length > 0) {
+    await appendCopilotLog(
+      `Scan exhausted at ${ready.length}/${target} matched (scanned ${scannedTotal}) — will apply what was found.`,
+      'warn'
+    );
+  } else {
+    await appendCopilotLog(
+      `No preference matches after scanning ${scannedTotal} jobs — nothing to apply on this search.`,
+      'warn'
+    );
+  }
+  return ready;
 }
 
 export async function stopBot(): Promise<void> {
@@ -1613,39 +1606,25 @@ export async function runBot(handlers: BotHandlers): Promise<{
     const seenKeys = new Set<string>();
     const scannedKeys = new Set<string>();
     let hitLimit = false;
-    let anyMatched = false;
-    let queriesTried = 0;
+    let batch: SearchResultJob[] = [];
 
-    await publishScanWait(0, { keyword: firstQuery.keyword });
+    // Phase 1: collect up to 30 matched jobs (apply has not started yet).
+    await publishScanWait(0);
+    await appendCopilotLog(scanWaitMessage(0, SCAN_BATCH_SIZE), 'info');
     await appendCopilotLog(
-      scanWaitMessage({ matched: 0, keyword: firstQuery.keyword }),
-      'info'
-    );
-    await appendCopilotLog(
-      `Will rotate random title/keyword searches (keep salary/location/work-mode filters). Stop around ${SCAN_BATCH_SIZE} applied+skipped.`,
+      `Will try up to ${searchPlan.length} search combinations until ${SCAN_BATCH_SIZE} matches, then apply quickly…`,
       'info'
     );
 
-    for (let qi = 0; qi < searchPlan.length; qi++) {
-      let processed = sessionProcessedCount(await getCopilotState());
-      if (processed >= SCAN_BATCH_SIZE) {
-        await appendCopilotLog(
-          `Reached ${processed} applied+skipped — stopping near ${SCAN_BATCH_SIZE}.`,
-          'success'
-        );
-        break;
-      }
-
-      const remaining = SCAN_BATCH_SIZE - processed;
+    for (let qi = 0; qi < searchPlan.length && batch.length < SCAN_BATCH_SIZE; qi++) {
       const query = searchPlan[qi]!;
       searchUrl = query.url;
-      queriesTried += 1;
       await setCopilotState({ keyword: query.keyword });
-      await publishScanWait(0, { target: remaining, keyword: query.keyword });
+      await publishScanWait(batch.length);
       await appendCopilotLog(
         `Search ${qi + 1}/${searchPlan.length} [${query.kind}]: "${query.keyword}"${
           query.location ? ` in ${query.location}` : ' (India-wide)'
-        } — scan this filter, then apply (${processed}/${SCAN_BATCH_SIZE} processed)`,
+        } (${batch.length}/${SCAN_BATCH_SIZE} matched so far — apply after scan)`,
         'success'
       );
 
@@ -1664,43 +1643,41 @@ export async function runBot(handlers: BotHandlers): Promise<{
         return { ok: false, message: 'Stopped while applying Naukri filters.' };
       }
 
-      const filterBatch = await collectUntilMatchedBatch({
+      const before = batch.length;
+      batch = await collectUntilMatchedBatch({
         tabId: tab.id,
         searchUrl,
         stealth,
         prefs,
         seenKeys,
         scannedKeys,
-        pending: [],
-        target: remaining,
+        pending: batch,
+        target: SCAN_BATCH_SIZE,
         logPrefix: `Scan “${query.keyword}”`,
       });
 
-      if (filterBatch.length === 0) {
+      if (batch.length >= SCAN_BATCH_SIZE) break;
+      if (batch.length === before) {
         await appendCopilotLog(
-          `No matches for "${query.keyword}"${
+          `No new matches for "${query.keyword}"${
             query.location ? ` / ${query.location}` : ''
-          } — next random title/keyword…`,
+          } — trying next title/location…`,
           'warn'
         );
-        continue;
-      }
-
-      processed = sessionProcessedCount(await getCopilotState());
-      if (processed >= SCAN_BATCH_SIZE) {
+      } else {
         await appendCopilotLog(
-          `Reached ${processed} applied+skipped — stopping near ${SCAN_BATCH_SIZE}.`,
-          'success'
+          `Still ${batch.length}/${SCAN_BATCH_SIZE} — switching to next title/location…`,
+          'info'
         );
-        break;
       }
-      const toApply = filterBatch.slice(0, SCAN_BATCH_SIZE - processed);
-      if (toApply.length === 0) continue;
+    }
 
-      anyMatched = true;
+    // Phase 2: apply the collected batch quickly (job → next job).
+    if (batch.length > 0) {
+      await publishScanWait(batch.length);
       const applyOutcome = await applyCollectedJobs({
         tabId: tab.id,
-        jobs: toApply,
+        jobs: batch.slice(0, SCAN_BATCH_SIZE),
         prefs,
         handlers,
         searchUrl,
@@ -1708,56 +1685,43 @@ export async function runBot(handlers: BotHandlers): Promise<{
       });
       if (applyOutcome === 'stop' || applyOutcome === 'limit') {
         hitLimit = true;
-        break;
       }
-
-      processed = sessionProcessedCount(await getCopilotState());
-      if (processed >= SCAN_BATCH_SIZE) {
-        await appendCopilotLog(
-          `Reached ${processed} applied+skipped — stopping near ${SCAN_BATCH_SIZE}.`,
-          'success'
-        );
-        break;
-      }
-      await appendCopilotLog(
-        `${processed}/${SCAN_BATCH_SIZE} processed — next random title/keyword…`,
-        'info'
-      );
-    }
-
-    if (!anyMatched) {
+    } else {
       await raiseCopilotToast(
         'No matches found',
-        `Tried ${queriesTried} title/keyword search(es). Broaden prefs and Start again.`
+        `Tried ${searchPlan.length} title/location search(es). Broaden prefs and Start again.`
       );
     }
 
     const finalState = await getCopilotState();
     const appliedAny = finalState.applied > 0;
-    const processedFinal = sessionProcessedCount(finalState);
-    const hitCeiling = processedFinal >= SCAN_BATCH_SIZE;
+    const allApplied =
+      batch.length > 0 &&
+      finalState.applied >= batch.length &&
+      !hitLimit;
     await appendCopilotLog(
-      `Done — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped} (${processedFinal} processed)`,
+      allApplied
+        ? `All ${batch.length} matched job(s) applied — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`
+        : `Done — scanned ${finalState.scanned}, matched ${finalState.matched}, applied ${finalState.applied}, skipped ${finalState.skipped}`,
       'success'
     );
 
     await raiseCopilotToast(
       appliedAny
-        ? hitCeiling
-          ? 'Around 30 jobs processed'
-          : `Applied ${finalState.applied} job(s)`
-        : anyMatched
+        ? batch.length >= SCAN_BATCH_SIZE
+          ? 'All jobs matched and applied'
+          : `Applied ${finalState.applied} of ${batch.length} matches`
+        : batch.length > 0
           ? 'Session finished'
           : 'No matches found',
       appliedAny
-        ? `Applied ${finalState.applied}, skipped ${finalState.skipped}. Review them on your Cosmo dashboard.`
-        : anyMatched
+        ? `Matched and applied ${finalState.applied} job(s). Review them on your Cosmo dashboard.`
+        : batch.length > 0
           ? `Matched ${finalState.matched}, no new applies this round.`
-          : `No preference matches across ${queriesTried} search(es).`
+          : `Auto page scan found 0/${SCAN_BATCH_SIZE} — nothing to apply.`
     );
 
-    // Session complete — auto-scan already walked pages; no "Next page" prompt.
-    if (!hitLimit || appliedAny || finalState.matched > 0 || anyMatched) {
+    if (!hitLimit || appliedAny || finalState.matched > 0 || batch.length > 0) {
       await setCopilotState({
         running: false,
         paused: false,
@@ -1770,7 +1734,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
           matched: finalState.matched,
           skipped: finalState.skipped,
           at: new Date().toISOString(),
-          allApplied: appliedAny,
+          allApplied: allApplied || appliedAny,
         },
       });
     } else {

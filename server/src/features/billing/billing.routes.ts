@@ -13,6 +13,7 @@ import { requireAuth, AuthedRequest } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import * as billingService from './billing.service';
 import * as offerService from './offer.service';
+import * as bannerService from './banner.service';
 import { listPublicPlans } from './planConfig.service';
 
 export const billingRouter = Router();
@@ -29,6 +30,14 @@ billingRouter.get(
   '/offers',
   asyncHandler(async (_req, res) => {
     const data = await offerService.listActiveOffers();
+    res.json(ok(data));
+  })
+);
+
+billingRouter.get(
+  '/banners',
+  asyncHandler(async (_req, res) => {
+    const data = await bannerService.listActiveBanners();
     res.json(ok(data));
   })
 );

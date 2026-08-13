@@ -1,23 +1,20 @@
 ---
-description: Cosmo scans one title/keyword filter, applies it, then rotates — stop near 30 processed
+description: Cosmo scans toward 30 matches, then applies quickly
 alwaysApply: true
 ---
 
-# Rule 2 — Per-filter scan + apply, stop near 30 processed
+# Rule 2 — Scan toward 30, then apply what was found
 
-**Session ceiling:** stop when `applied + skipped >= 30` (already-applied / company-site count as skipped).
+**Scan target:** Prefer collecting up to **30 preference-matched** jobs before apply.
 
-- Shuffle **titles, keywords, and locations** each session — do not always start with the first preference chip.
-- For **one** title/keyword search at a time:
-  - Keep Naukri sidebar filters (salary / work mode / cities) via All Filters.
-  - Scroll and **auto next-page** this list. **Never ask** the user to click “Next page”.
-  - Then **apply** that filter’s matches (short settle, job → next job).
-  - If the list is thin, still apply every match found — do not block on a full 30 for that search.
-- Then switch to another random title/keyword (sidebar filters stay) and repeat.
-- Do **not** start another search once `applied + skipped >= 30`.
-- Cap each filter’s queue to the remaining room (`30 - processed`) so one fat search cannot queue 80 jobs.
-- If a search matches 0, skip apply and try the next title/keyword.
-- If the whole plan matches 0, do not apply; report that nothing matched.
+- Phase 1: open All Filters, apply prefs, scan/scroll and **auto next-page** until `matched >= 30` or pages/search plan are exhausted. **Never ask** the user to click “Next page”.
+  - Tell the user apply has **not** started yet: wait until 30 jobs match (~1 minute). Keep `matched/30` visible (panel status, notice, toast).
+- Phase 2: apply the queued matches one by one with a **short settle** (not full humanPace slowdown).
+  - Navigate **job → next job** — do not return to the search list between applies.
+  - Cap `betweenJobs` (~0.6–1.2s). Skip read pauses and the 2-minute session break during the batch.
+  - If `matched >= 30`, apply the batch of 30.
+  - If scan exhausts with `0 < matched < 30`, **still apply** every match found — do not block apply on a full 30.
+  - If `matched === 0`, do not apply; report that nothing matched.
 - When the session finishes, ask **Apply more** or **Close — view dashboard**. Close must close the Naukri work tab and open the Cosmo dashboard (reuse an existing Cosmo tab when possible). Do not prompt for another Next page.
-- Never invent extra result pages past real pagination.
+- Never invent extra result pages past real pagination while filling the batch.
 - Single Naukri work tab only.

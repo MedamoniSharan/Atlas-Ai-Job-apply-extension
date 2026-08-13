@@ -13,6 +13,7 @@ Tables:
     GSI RazorpaySubIndex    PK=razorpaySubscriptionId
   CosmoPlanConfigs      PK=tier
   CosmoSiteOffers       PK=offerId
+  CosmoSiteBanners      PK=bannerId
   CosmoCoupons          PK=code
   CosmoCouponRedemptions PK=code  SK=redemptionSk  (userId#paymentId)
   CosmoApplyCounters    PK=userId  SK=periodKey
@@ -45,6 +46,7 @@ PAYMENTS_TABLE = os.environ.get("PAYMENTS_TABLE", "CosmoPayments")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE", "CosmoSubscriptions")
 PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
 SITE_OFFERS_TABLE = os.environ.get("SITE_OFFERS_TABLE", "CosmoSiteOffers")
+SITE_BANNERS_TABLE = os.environ.get("SITE_BANNERS_TABLE", "CosmoSiteBanners")
 COUPONS_TABLE = os.environ.get("COUPONS_TABLE", "CosmoCoupons")
 COUPON_REDEMPTIONS_TABLE = os.environ.get(
     "COUPON_REDEMPTIONS_TABLE", "CosmoCouponRedemptions"
@@ -132,6 +134,7 @@ payments_tbl = dynamodb.Table(PAYMENTS_TABLE)
 subs_tbl = dynamodb.Table(SUBSCRIPTIONS_TABLE)
 plans_tbl = dynamodb.Table(PLAN_CONFIGS_TABLE)
 offers_tbl = dynamodb.Table(SITE_OFFERS_TABLE)
+banners_tbl = dynamodb.Table(SITE_BANNERS_TABLE)
 coupons_tbl = dynamodb.Table(COUPONS_TABLE)
 redemptions_tbl = dynamodb.Table(COUPON_REDEMPTIONS_TABLE)
 counters_tbl = dynamodb.Table(APPLY_COUNTERS_TABLE)
@@ -529,6 +532,7 @@ def list_public_offers(event: Dict[str, Any]) -> Dict[str, Any]:
                 "message": o.get("message"),
                 "couponCode": o.get("couponCode"),
                 "linkUrl": o.get("linkUrl"),
+                "imageUrl": o.get("imageUrl"),
                 "showBird": bool(o.get("showBird", True)),
                 "showFlag": bool(o.get("showFlag", True)),
                 "active": bool(o.get("active", True)),
@@ -539,6 +543,30 @@ def list_public_offers(event: Dict[str, Any]) -> Dict[str, Any]:
             for o in live
         ],
         "Offers",
+    )
+
+
+def list_public_banners(event: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        items = banners_tbl.scan().get("Items") or []
+    except Exception:
+        items = []
+    live = [b for b in items if bool(b.get("active", True))]
+    live.sort(key=lambda b: _as_int(b.get("priority"), 0), reverse=True)
+    return ok(
+        event,
+        [
+            {
+                "bannerId": b.get("bannerId"),
+                "imageUrl": b.get("imageUrl") or "",
+                "linkUrl": b.get("linkUrl"),
+                "altText": b.get("altText"),
+                "active": bool(b.get("active", True)),
+                "priority": _as_int(b.get("priority"), 0),
+            }
+            for b in live
+        ],
+        "Banners",
     )
 
 
@@ -2076,6 +2104,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return list_public_plans(event)
     if action == "listOffers":
         return list_public_offers(event)
+    if action == "listBanners":
+        return list_public_banners(event)
     if action == "validateCoupon":
         return with_auth(event, lambda e, uid: validate_coupon_handler(e, uid, body))
     if action == "createOrder":
@@ -2099,6 +2129,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return list_public_plans(event)
     if path.endswith("/billing/offers") and method == "GET":
         return list_public_offers(event)
+    if path.endswith("/billing/banners") and method == "GET":
+        return list_public_banners(event)
     if path.endswith("/billing/validate-coupon") and method == "POST":
         return with_auth(event, lambda e, uid: validate_coupon_handler(e, uid, body))
 

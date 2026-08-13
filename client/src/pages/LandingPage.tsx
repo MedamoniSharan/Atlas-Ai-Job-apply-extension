@@ -7,6 +7,7 @@ import { LandingTutorialSection } from '../components/LandingTutorialSection';
 import { CosmosDreamFooter } from '../components/CosmosDreamFooter';
 import Pricing from '../components/ui/pricing-01';
 import { IndependenceOfferRibbon } from '../components/IndependenceOfferRibbon';
+import { LandingHeroCarousel } from '../components/LandingHeroCarousel';
 import { OfferTicker } from '../components/OfferTicker';
 import { RateUsSection } from '../components/RateUsSection';
 import { SeoHead } from '../components/SeoHead';
@@ -43,6 +44,8 @@ export function LandingPage() {
       />
       <OfferTicker />
       <LandingNavbar />
+
+      <LandingHeroCarousel />
 
       <HeroAutoApply />
 

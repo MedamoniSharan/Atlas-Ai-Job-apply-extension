@@ -13,6 +13,9 @@ function toPublic(doc: ISiteOffer | Record<string, unknown>): SiteOffer {
     message: d.message,
     couponCode: d.couponCode ?? null,
     linkUrl: d.linkUrl ?? null,
+    imageUrl: d.imageUrl ?? null,
+    showBird: d.showBird !== false,
+    showFlag: d.showFlag !== false,
     active: d.active,
     startsAt: d.startsAt ? new Date(d.startsAt).toISOString() : null,
     endsAt: d.endsAt ? new Date(d.endsAt).toISOString() : null,
@@ -71,6 +74,9 @@ export async function createOffer(
     message: input.message,
     couponCode: input.couponCode ?? null,
     linkUrl,
+    imageUrl: input.imageUrl ?? null,
+    showBird: input.showBird ?? true,
+    showFlag: input.showFlag ?? true,
     active: input.active ?? true,
     startsAt: parseOptionalDate(input.startsAt) ?? null,
     endsAt: parseOptionalDate(input.endsAt) ?? null,
@@ -93,6 +99,11 @@ export async function updateOffer(
   if (input.linkUrl !== undefined) {
     doc.linkUrl = input.linkUrl === '' ? null : input.linkUrl;
   }
+  if (input.imageUrl !== undefined) {
+    doc.imageUrl = input.imageUrl === '' ? null : input.imageUrl;
+  }
+  if (input.showBird !== undefined) doc.showBird = input.showBird;
+  if (input.showFlag !== undefined) doc.showFlag = input.showFlag;
   if (input.active !== undefined) doc.active = input.active;
   if (input.priority !== undefined) doc.priority = input.priority;
   if (input.startsAt !== undefined) {

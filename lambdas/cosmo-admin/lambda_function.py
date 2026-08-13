@@ -10,6 +10,7 @@ Tables:
   CosmoSubscriptions   PK=subscriptionId  GSI UserSubsIndex (userId, createdAt)
   CosmoPlanConfigs     PK=tier
   CosmoSiteOffers      PK=offerId
+  CosmoSiteBanners     PK=bannerId
   CosmoCoupons         PK=code
   CosmoCouponRedemptions PK=redemptionId (user/code usage tracking)
   CosmoAdminAudit      PK=auditId  GSI CreatedAtIndex (entityType, createdAt)
@@ -40,6 +41,7 @@ PAYMENTS_TABLE = os.environ.get("PAYMENTS_TABLE", "CosmoPayments")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE", "CosmoSubscriptions")
 PLAN_CONFIGS_TABLE = os.environ.get("PLAN_CONFIGS_TABLE", "CosmoPlanConfigs")
 SITE_OFFERS_TABLE = os.environ.get("SITE_OFFERS_TABLE", "CosmoSiteOffers")
+SITE_BANNERS_TABLE = os.environ.get("SITE_BANNERS_TABLE", "CosmoSiteBanners")
 COUPONS_TABLE = os.environ.get("COUPONS_TABLE", "CosmoCoupons")
 COUPON_REDEMPTIONS_TABLE = os.environ.get("COUPON_REDEMPTIONS_TABLE", "CosmoCouponRedemptions")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "CosmoAdminAudit")
@@ -110,6 +112,7 @@ payments_tbl = ddb.Table(PAYMENTS_TABLE)
 subs_tbl = ddb.Table(SUBSCRIPTIONS_TABLE)
 plans_tbl = ddb.Table(PLAN_CONFIGS_TABLE)
 offers_tbl = ddb.Table(SITE_OFFERS_TABLE)
+banners_tbl = ddb.Table(SITE_BANNERS_TABLE)
 coupons_tbl = ddb.Table(COUPONS_TABLE)
 audit_tbl = ddb.Table(AUDIT_TABLE)
 feedback_tbl = ddb.Table(UNINSTALL_FEEDBACK_TABLE)
@@ -1083,6 +1086,9 @@ def offer_public(o: Dict[str, Any]) -> Dict[str, Any]:
         "message": o.get("message") or "",
         "couponCode": o.get("couponCode"),
         "linkUrl": o.get("linkUrl"),
+        "imageUrl": o.get("imageUrl"),
+        "showBird": bool(o.get("showBird", True)),
+        "showFlag": bool(o.get("showFlag", True)),
         "active": bool(o.get("active", True)),
         "startsAt": o.get("startsAt"),
         "endsAt": o.get("endsAt"),
@@ -1111,6 +1117,9 @@ def create_offer(event: Dict[str, Any], aid: str, body: Dict[str, Any]) -> Dict[
         "message": message,
         "couponCode": (str(coupon_code).strip() or None) if coupon_code is not None else None,
         "linkUrl": (str(link_url).strip() or None) if link_url is not None else None,
+        "imageUrl": (str(body.get("imageUrl")).strip() or None) if body.get("imageUrl") else None,
+        "showBird": bool(body.get("showBird", True)),
+        "showFlag": bool(body.get("showFlag", True)),
         "active": bool(body.get("active", True)),
         "startsAt": body.get("startsAt"),
         "endsAt": body.get("endsAt"),
@@ -1127,7 +1136,7 @@ def update_offer(event: Dict[str, Any], aid: str, offer_id: str, body: Dict[str,
     offer = offers_tbl.get_item(Key={"offerId": offer_id}).get("Item")
     if not offer:
         return err(event, "Offer not found", 404, "NOT_FOUND")
-    fields = ("message", "couponCode", "linkUrl", "active", "startsAt", "endsAt", "priority")
+    fields = ("message", "couponCode", "linkUrl", "imageUrl", "showBird", "showFlag", "active", "startsAt", "endsAt", "priority")
     before = {k: offer.get(k) for k in fields}
     updates = {"updatedAt": now_iso()}
     if "message" in body:
@@ -1141,6 +1150,13 @@ def update_offer(event: Dict[str, Any], aid: str, offer_id: str, body: Dict[str,
     if "linkUrl" in body:
         raw = body.get("linkUrl")
         updates["linkUrl"] = (str(raw).strip() or None) if raw is not None else None
+    if "imageUrl" in body:
+        raw = body.get("imageUrl")
+        updates["imageUrl"] = (str(raw).strip() or None) if raw is not None else None
+    if "showBird" in body and body["showBird"] is not None:
+        updates["showBird"] = bool(body["showBird"])
+    if "showFlag" in body and body["showFlag"] is not None:
+        updates["showFlag"] = bool(body["showFlag"])
     if "active" in body and body["active"] is not None:
         updates["active"] = bool(body["active"])
     if "startsAt" in body:
@@ -1169,6 +1185,93 @@ def delete_offer(event: Dict[str, Any], aid: str, offer_id: str) -> Dict[str, An
     offers_tbl.delete_item(Key={"offerId": offer_id})
     write_audit(aid, "offer.delete", "offer", offer_id, before, {"deleted": True}, client_ip(event))
     return ok(event, {"offerId": offer_id, "deleted": True}, "Offer deleted")
+
+
+def banner_public(b: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "bannerId": b.get("bannerId"),
+        "imageUrl": b.get("imageUrl") or "",
+        "linkUrl": b.get("linkUrl"),
+        "altText": b.get("altText"),
+        "active": bool(b.get("active", True)),
+        "priority": as_int(b.get("priority")),
+        "createdAt": b.get("createdAt"),
+        "updatedAt": b.get("updatedAt"),
+    }
+
+
+def list_banners(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
+    items = scan_all(banners_tbl)
+    items.sort(key=lambda x: (as_int(x.get("priority")), x.get("createdAt") or ""), reverse=True)
+    return ok(event, [banner_public(b) for b in items])
+
+
+def create_banner(event: Dict[str, Any], aid: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    image_url = str(body.get("imageUrl") or "").strip()
+    if not image_url:
+        return err(event, "imageUrl is required", 400, "VALIDATION_ERROR")
+    now = now_iso()
+    banner_id = str(uuid.uuid4())
+    link_url = body.get("linkUrl")
+    alt_text = body.get("altText")
+    item = {
+        "bannerId": banner_id,
+        "imageUrl": image_url,
+        "linkUrl": (str(link_url).strip() or None) if link_url is not None else None,
+        "altText": (str(alt_text).strip() or None) if alt_text is not None else None,
+        "active": bool(body.get("active", True)),
+        "priority": as_int(body.get("priority")),
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    banners_tbl.put_item(Item=item)
+    write_audit(aid, "banner.create", "banner", banner_id, None, banner_public(item), client_ip(event))
+    return ok(event, banner_public(item), "Banner created")
+
+
+def update_banner(event: Dict[str, Any], aid: str, banner_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    banner = banners_tbl.get_item(Key={"bannerId": banner_id}).get("Item")
+    if not banner:
+        return err(event, "Banner not found", 404, "NOT_FOUND")
+    fields = ("imageUrl", "linkUrl", "altText", "active", "priority")
+    before = {k: banner.get(k) for k in fields}
+    updates = {"updatedAt": now_iso()}
+    if "imageUrl" in body:
+        image_url = str(body.get("imageUrl") or "").strip()
+        if not image_url:
+            return err(event, "imageUrl is required", 400, "VALIDATION_ERROR")
+        updates["imageUrl"] = image_url
+    if "linkUrl" in body:
+        raw = body.get("linkUrl")
+        updates["linkUrl"] = (str(raw).strip() or None) if raw is not None else None
+    if "altText" in body:
+        raw = body.get("altText")
+        updates["altText"] = (str(raw).strip() or None) if raw is not None else None
+    if "active" in body and body["active"] is not None:
+        updates["active"] = bool(body["active"])
+    if "priority" in body and body["priority"] is not None:
+        updates["priority"] = as_int(body["priority"])
+    names = {f"#{k}": k for k in updates}
+    vals = {f":{k}": v for k, v in updates.items()}
+    banners_tbl.update_item(
+        Key={"bannerId": banner_id},
+        UpdateExpression="SET " + ", ".join(f"{n}={v}" for n, v in zip(names, vals)),
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=vals,
+    )
+    banner.update(updates)
+    write_audit(aid, "banner.update", "banner", banner_id, before, {k: banner.get(k) for k in fields}, client_ip(event))
+    return ok(event, banner_public(banner), "Banner updated")
+
+
+def delete_banner(event: Dict[str, Any], aid: str, banner_id: str) -> Dict[str, Any]:
+    banner = banners_tbl.get_item(Key={"bannerId": banner_id}).get("Item")
+    if not banner:
+        return err(event, "Banner not found", 404, "NOT_FOUND")
+    before = banner_public(banner)
+    banners_tbl.delete_item(Key={"bannerId": banner_id})
+    write_audit(aid, "banner.delete", "banner", banner_id, before, {"deleted": True}, client_ip(event))
+    return ok(event, {"bannerId": banner_id, "deleted": True}, "Banner deleted")
 
 
 def coupon_public(c: Dict[str, Any]) -> Dict[str, Any]:
@@ -1378,6 +1481,7 @@ _RE_SUB = re.compile(r"/admin/subscriptions/([^/]+)/(cancel|extend)$")
 _RE_PAY = re.compile(r"/admin/payments/([^/]+)(?:/(reconcile|invoice))?$")
 _RE_PLAN = re.compile(r"/admin/plans/([^/]+)$")
 _RE_OFFER = re.compile(r"/admin/offers/([^/]+)$")
+_RE_BANNER = re.compile(r"/admin/banners/([^/]+)$")
 _RE_COUPON = re.compile(r"/admin/coupons/([^/]+)$")
 
 
@@ -1412,6 +1516,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "listAudit": list_audit,
         "listUninstallFeedback": list_uninstall_feedback,
         "listOffers": list_offers,
+        "listBanners": list_banners,
         "listCoupons": list_coupons,
     }
     if action in actions:
@@ -1447,6 +1552,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return update_offer(event, admin_id, body.get("offerId") or body.get("id") or "", body)
     if action == "deleteOffer":
         return delete_offer(event, admin_id, body.get("offerId") or body.get("id") or "")
+    if action == "createBanner":
+        return create_banner(event, admin_id, body)
+    if action == "updateBanner":
+        return update_banner(event, admin_id, body.get("bannerId") or body.get("id") or "", body)
+    if action == "deleteBanner":
+        return delete_banner(event, admin_id, body.get("bannerId") or body.get("id") or "")
     if action == "createCoupon":
         return create_coupon(event, admin_id, body)
     if action == "updateCoupon":
@@ -1464,13 +1575,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         ("/admin/feedback/uninstall", "GET"): list_uninstall_feedback,
         ("/admin/offers", "GET"): list_offers,
         ("/admin/offers", "POST"): create_offer,
+        ("/admin/banners", "GET"): list_banners,
+        ("/admin/banners", "POST"): create_banner,
         ("/admin/coupons", "GET"): list_coupons,
         ("/admin/coupons", "POST"): create_coupon,
     }
     for suffix, mth in list(rest.keys()):
         if path.endswith(suffix) and method == mth:
             handler = rest[(suffix, mth)]
-            if mth == "POST" and suffix in ("/admin/offers", "/admin/coupons"):
+            if mth == "POST" and suffix in ("/admin/offers", "/admin/banners", "/admin/coupons"):
                 return handler(event, admin_id, body)
             return handler(event, admin_id)
 
@@ -1525,6 +1638,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return update_offer(event, admin_id, oid, body)
         if method == "DELETE":
             return delete_offer(event, admin_id, oid)
+
+    m = _RE_BANNER.search(path)
+    if m:
+        bid = m.group(1)
+        if method == "GET":
+            banner = banners_tbl.get_item(Key={"bannerId": bid}).get("Item")
+            if not banner:
+                return err(event, "Banner not found", 404, "NOT_FOUND")
+            return ok(event, banner_public(banner))
+        if method == "PATCH":
+            return update_banner(event, admin_id, bid, body)
+        if method == "DELETE":
+            return delete_banner(event, admin_id, bid)
 
     m = _RE_COUPON.search(path)
     if m:

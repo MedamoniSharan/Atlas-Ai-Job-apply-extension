@@ -6151,6 +6151,68 @@ textarea {
 }
 
 /* Auto-Apply Agent hero */
+.landing-hero-carousel {
+  width: 100%;
+  padding: 8px 24px 4px;
+}
+.landing-hero-carousel__frame {
+  position: relative;
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #f3f4f6;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+.landing-hero-carousel__link {
+  display: block;
+  line-height: 0;
+}
+.landing-hero-carousel__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: cover;
+  object-position: center;
+}
+.landing-hero-carousel__dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.landing-hero-carousel__dot {
+  pointer-events: auto;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.landing-hero-carousel__dot.is-active {
+  background: #ffffff;
+  width: 18px;
+}
+@media (max-width: 640px) {
+  .landing-hero-carousel {
+    padding: 4px 14px 0;
+  }
+  .landing-hero-carousel__frame {
+    border-radius: 14px;
+  }
+  .landing-hero-carousel__img {
+    max-height: 140px;
+  }
+}
+
 .hero-agent {
   width: 100%;
   padding: 12px 24px 36px;
@@ -10676,7 +10738,7 @@ textarea {
   }
 }
 
-/* Crossed Independence Day ribbons (between Get Started + install) */
+/* Crossed offer chorus ribbons (hero + mid-page print section) */
 .independence-ribbon {
   position: relative;
   z-index: 1;
@@ -10685,6 +10747,16 @@ textarea {
   padding: 3rem 0 3.5rem;
   overflow: hidden;
   background: transparent;
+}
+.independence-ribbon--hero {
+  margin: 0;
+  padding: 1.75rem 0 2rem;
+}
+.independence-ribbon--hero .independence-ribbon__stage {
+  height: 5.5rem;
+}
+.independence-ribbon--hero .independence-ribbon__band {
+  font-size: clamp(0.85rem, 1.4vw, 1.05rem);
 }
 .independence-ribbon__link {
   display: block;
@@ -10723,8 +10795,15 @@ textarea {
     padding: 2.25rem 0 2.75rem;
     margin-bottom: 0.75rem;
   }
+  .independence-ribbon--hero {
+    padding: 1.25rem 0 1.5rem;
+    margin-bottom: 0;
+  }
   .independence-ribbon__stage {
     height: 5.5rem;
+  }
+  .independence-ribbon--hero .independence-ribbon__stage {
+    height: 4.75rem;
   }
   .independence-ribbon__band--saffron {
     top: 0.65rem;

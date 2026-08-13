@@ -1480,11 +1480,7 @@ export function mountCopilotPanel() {
           : 'Applying…');
     } else if (state.running && state.runPhase === 'scan') {
       statusLabelEl.textContent =
-        state.paceLabel ||
-        scanWaitMessage({
-          matched: state.matched || 0,
-          keyword: state.keyword,
-        });
+        state.paceLabel || scanWaitMessage(state.matched || 0);
     } else if (state.running) {
       statusLabelEl.textContent = 'Scanning jobs…';
     } else {
@@ -1501,13 +1497,9 @@ export function mountCopilotPanel() {
       (state.paceRemainingMs ?? 0) > 0;
     if (scanWait) {
       showPaceToast(
-        state.paceLabel ||
-          scanWaitMessage({
-            matched: state.matched || 0,
-            keyword: state.keyword,
-          }),
+        state.paceLabel || scanWaitMessage(state.matched || 0),
         0,
-        'Stopping around 30 applied+skipped'
+        'Apply starts after 30 matches'
       );
     } else if (pacing) {
       showPaceToast(
@@ -1689,11 +1681,7 @@ export function mountCopilotPanel() {
       noticeEl.classList.add('show');
       noticeEl.classList.remove('is-alert', 'flash');
       noticeEl.textContent =
-        state.paceLabel ||
-        scanWaitMessage({
-          matched: state.matched || 0,
-          keyword: state.keyword,
-        });
+        state.paceLabel || scanWaitMessage(state.matched || 0);
     } else {
       noticeEl.classList.remove('show', 'is-alert', 'flash');
       noticeEl.textContent = '';
@@ -1744,6 +1732,40 @@ export function mountCopilotPanel() {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  function startCopilotSession() {
+    setCollapsed(false);
+    chrome.runtime.sendMessage({ type: 'GET_SAFETY_STATUS' }, (res) => {
+      if (res?.blocked) {
+        noticeEl.classList.add('show', 'is-alert');
+        noticeEl.textContent =
+          'Naukri verification cooldown active — wait before starting a new session.';
+        return;
+      }
+      chrome.runtime.sendMessage(
+        {
+          type: 'COPILOT_START',
+          consentAccepted: true,
+          consentVersion: CONSENT_VERSION,
+        },
+        (startRes) => {
+          const err = chrome.runtime.lastError;
+          if (err || startRes?.ok === false) {
+            noticeEl.classList.add('show', 'is-alert');
+            noticeEl.textContent =
+              startRes?.message ||
+              err?.message ||
+              'Could not start co-pilot. Check you are signed into Cosmo.';
+            void refresh();
+            return;
+          }
+          noticeEl.classList.remove('show', 'is-alert');
+          noticeEl.textContent = '';
+          void refresh();
+        }
+      );
+    });
+  }
+
   consentCheck.addEventListener('change', () => {
     consentStartBtn.disabled = !consentCheck.checked;
   });
@@ -1751,40 +1773,14 @@ export function mountCopilotPanel() {
   consentCancelBtn.addEventListener('click', () => showConsentModal(false));
 
   consentStartBtn.addEventListener('click', () => {
-    if (!consentCheck.checked) return;
-    consentStartBtn.disabled = true;
-    chrome.runtime.sendMessage(
-      {
-        type: 'COPILOT_START',
-        consentAccepted: true,
-        consentVersion: CONSENT_VERSION,
-      },
-      (res) => {
-        const err = chrome.runtime.lastError;
-        if (err || res?.ok === false) {
-          showConsentModal(false);
-          noticeEl.classList.add('show', 'is-alert');
-          noticeEl.textContent =
-            res?.message ||
-            err?.message ||
-            'Could not start co-pilot. Check you are signed into Cosmo.';
-          consentStartBtn.disabled = !consentCheck.checked;
-          void refresh();
-          return;
-        }
-        showConsentModal(false);
-        noticeEl.classList.remove('show', 'is-alert');
-        noticeEl.textContent = '';
-        void refresh();
-      }
-    );
+    showConsentModal(false);
+    startCopilotSession();
   });
 
   doneMoreBtn.addEventListener('click', () => {
     showDoneModal(false);
     chrome.runtime.sendMessage({ type: 'COPILOT_SESSION_APPLY_MORE' }, () => {
-      showConsentModal(true);
-      void refresh();
+      startCopilotSession();
     });
   });
 
@@ -1803,16 +1799,7 @@ export function mountCopilotPanel() {
   });
 
   startBtn.addEventListener('click', () => {
-    setCollapsed(false);
-    chrome.runtime.sendMessage({ type: 'GET_SAFETY_STATUS' }, (res) => {
-      if (res?.blocked) {
-        noticeEl.classList.add('show', 'is-alert');
-        noticeEl.textContent =
-          'Naukri verification cooldown active — wait before starting a new session.';
-        return;
-      }
-      showConsentModal(true);
-    });
+    startCopilotSession();
   });
   pauseBtn.addEventListener('click', async () => {
     const state = await getCopilotState();

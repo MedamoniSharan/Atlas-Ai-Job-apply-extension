@@ -3,6 +3,7 @@ import {
   adminAuditQuerySchema,
   adminCreateCouponSchema,
   adminCreateSiteOfferSchema,
+  adminCreateSiteBannerSchema,
   adminExtendSubscriptionSchema,
   adminMetricsQuerySchema,
   adminPatchUserSchema,
@@ -13,6 +14,7 @@ import {
   adminUpdateCouponSchema,
   adminUpdatePlanSchema,
   adminUpdateSiteOfferSchema,
+  adminUpdateSiteBannerSchema,
   adminUsersQuerySchema,
   ok,
   planTierSchema,
@@ -29,6 +31,7 @@ import * as billingService from '../billing/billing.service';
 import * as couponService from '../billing/coupon.service';
 import * as feedbackService from '../feedback/feedback.service';
 import * as offerService from '../billing/offer.service';
+import * as bannerService from '../billing/banner.service';
 
 export const adminRouter = Router();
 
@@ -288,6 +291,43 @@ adminRouter.delete(
   asyncHandler(async (req: AuthedRequest, res) => {
     const data = await offerService.deleteOffer(String(req.params.id));
     res.json(ok(data, 'Offer deleted'));
+  })
+);
+
+adminRouter.get(
+  '/banners',
+  asyncHandler(async (_req, res) => {
+    const data = await bannerService.listBannersAdmin();
+    res.json(ok(data));
+  })
+);
+
+adminRouter.post(
+  '/banners',
+  validateBody(adminCreateSiteBannerSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await bannerService.createBanner(req.body);
+    res.status(201).json(ok(data, 'Banner created'));
+  })
+);
+
+adminRouter.patch(
+  '/banners/:id',
+  validateBody(adminUpdateSiteBannerSchema),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await bannerService.updateBanner(
+      String(req.params.id),
+      req.body
+    );
+    res.json(ok(data, 'Banner updated'));
+  })
+);
+
+adminRouter.delete(
+  '/banners/:id',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const data = await bannerService.deleteBanner(String(req.params.id));
+    res.json(ok(data, 'Banner deleted'));
   })
 );
 

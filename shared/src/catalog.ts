@@ -54,11 +54,32 @@ export const DEFAULT_COMPARE_AT_PAISE: Record<'pro' | 'max', number> = {
   max: 79900,
 };
 
+/** https URL or data:image… for uploaded banner art. */
+const offerImageUrlSchema = z
+  .string()
+  .max(350_000)
+  .nullable()
+  .optional()
+  .refine(
+    (v) =>
+      v == null ||
+      v === '' ||
+      /^https?:\/\//i.test(v) ||
+      /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
+    { message: 'imageUrl must be an http(s) or data:image URL' }
+  );
+
 export const siteOfferSchema = z.object({
   offerId: z.string(),
   message: z.string().min(1).max(280),
   couponCode: z.string().max(40).nullable().optional(),
   linkUrl: z.string().url().nullable().optional(),
+  /** Custom ticker mark (drag-drop). Falls back to default bird when empty. */
+  imageUrl: offerImageUrlSchema,
+  /** Show the freedom-bird / custom image mark in the site banner. */
+  showBird: z.boolean().default(true),
+  /** Show one Indian flag in the site banner. */
+  showFlag: z.boolean().default(true),
   active: z.boolean(),
   startsAt: z.string().datetime().nullable().optional(),
   endsAt: z.string().datetime().nullable().optional(),
@@ -76,6 +97,11 @@ export const adminCreateSiteOfferSchema = z.object({
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
     .transform((v) => (v === '' || v === undefined ? null : v)),
+  imageUrl: offerImageUrlSchema.transform((v) =>
+    v === '' || v === undefined ? null : v
+  ),
+  showBird: z.boolean().default(true),
+  showFlag: z.boolean().default(true),
   active: z.boolean().default(true),
   startsAt: z.string().datetime().optional().nullable(),
   endsAt: z.string().datetime().optional().nullable(),
@@ -90,6 +116,59 @@ export const adminUpdateSiteOfferSchema = adminCreateSiteOfferSchema.partial();
 
 export type AdminUpdateSiteOfferInput = z.infer<
   typeof adminUpdateSiteOfferSchema
+>;
+
+/** Landing hero carousel slide (Admin → Banners). */
+export const siteBannerSchema = z.object({
+  bannerId: z.string(),
+  imageUrl: z
+    .string()
+    .min(1)
+    .max(350_000)
+    .refine(
+      (v) =>
+        /^https?:\/\//i.test(v) ||
+        /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
+      { message: 'imageUrl must be an http(s) or data:image URL' }
+    ),
+  linkUrl: z.string().url().nullable().optional(),
+  altText: z.string().max(160).nullable().optional(),
+  active: z.boolean(),
+  priority: z.number().int().default(0),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export type SiteBanner = z.infer<typeof siteBannerSchema>;
+
+export const adminCreateSiteBannerSchema = z.object({
+  imageUrl: z
+    .string()
+    .min(1)
+    .max(350_000)
+    .refine(
+      (v) =>
+        /^https?:\/\//i.test(v) ||
+        /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
+      { message: 'imageUrl must be an http(s) or data:image URL' }
+    ),
+  linkUrl: z
+    .union([z.string().url(), z.literal(''), z.null()])
+    .optional()
+    .transform((v) => (v === '' || v === undefined ? null : v)),
+  altText: z.string().max(160).optional().nullable(),
+  active: z.boolean().default(true),
+  priority: z.number().int().default(0),
+});
+
+export type AdminCreateSiteBannerInput = z.infer<
+  typeof adminCreateSiteBannerSchema
+>;
+
+export const adminUpdateSiteBannerSchema = adminCreateSiteBannerSchema.partial();
+
+export type AdminUpdateSiteBannerInput = z.infer<
+  typeof adminUpdateSiteBannerSchema
 >;
 
 export const couponTypeSchema = z.enum(['percent', 'fixedPaise']);

@@ -47,17 +47,19 @@ function OfferSegment({ offer }: { offer: PublicSiteOffer }) {
   const code = offer.couponCode?.trim();
   const showBird = offer.showBird !== false;
   const showFlag = offer.showFlag !== false;
+  const birdSrc = offer.imageUrl?.trim() || FREEDOM_BIRD_SRC;
 
   return (
     <span className="offer-banner__segment">
       {showBird ? (
         <img
           className="offer-banner__bird"
-          src={FREEDOM_BIRD_SRC}
+          src={birdSrc}
           alt=""
           width={34}
           height={36}
           decoding="async"
+          draggable={false}
         />
       ) : null}
       <span className="offer-banner__text">

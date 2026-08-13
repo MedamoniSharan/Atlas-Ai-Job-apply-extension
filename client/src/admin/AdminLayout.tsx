@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import {
   CreditCard,
+  Image,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -30,6 +31,7 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/payments')) return 'Payments';
   if (pathname.startsWith('/admin/plans')) return 'Plans';
   if (pathname.startsWith('/admin/offers')) return 'Offers';
+  if (pathname.startsWith('/admin/banners')) return 'Banners';
   if (pathname.startsWith('/admin/coupons')) return 'Coupons';
   if (pathname.startsWith('/admin/audit')) return 'Audit log';
   if (pathname.startsWith('/admin/feedback')) return 'Uninstall feedback';
@@ -118,6 +120,10 @@ export function AdminLayout() {
           <NavLink to="/admin/offers" className="admin-sidebar__link">
             <Tag size={17} strokeWidth={1.9} aria-hidden />
             Offers
+          </NavLink>
+          <NavLink to="/admin/banners" className="admin-sidebar__link">
+            <Image size={17} strokeWidth={1.9} aria-hidden />
+            Banners
           </NavLink>
           <NavLink to="/admin/coupons" className="admin-sidebar__link">
             <Percent size={17} strokeWidth={1.9} aria-hidden />

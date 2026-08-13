@@ -8,10 +8,10 @@
   --admin-line: #e5e5e5;
   --admin-brand: #111111;
   --admin-accent: #111111;
+  --admin-sidebar-w: 240px;
   height: 100vh;
   height: 100dvh;
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  display: block;
   background: var(--admin-bg);
   color: var(--admin-ink);
   overflow: hidden;
@@ -22,16 +22,22 @@
 }
 
 .admin-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--admin-sidebar-w);
+  z-index: 20;
   background: var(--admin-brand);
   color: #fdfcfc;
   display: flex;
   flex-direction: column;
   padding: 1.1rem 0.85rem;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow-y: auto;
-  position: sticky;
-  top: 0;
+  overscroll-behavior: contain;
 }
 
 .admin-sidebar__brand {
@@ -107,6 +113,7 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
+  margin-left: var(--admin-sidebar-w);
   overflow: hidden;
 }
 
@@ -501,6 +508,186 @@
   margin-bottom: 0.65rem;
 }
 
+.admin-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-check-row .admin-check {
+  margin-bottom: 0;
+}
+
+.admin-offer-row {
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.admin-offer-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-offer-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-offer-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.admin-offer-thumb--wide {
+  width: 56px;
+  height: 28px;
+  object-fit: cover;
+}
+
+.admin-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  margin-top: 0.35rem;
+  padding: 0.75rem;
+  border: 1.5px dashed #c8c8c8;
+  border-radius: 12px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.admin-dropzone--wide {
+  min-height: 120px;
+}
+
+.admin-dropzone:hover,
+.admin-dropzone.is-dragging {
+  border-color: #111;
+  background: #f3f3f3;
+}
+
+.admin-dropzone.has-image {
+  border-style: solid;
+}
+
+.admin-dropzone__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+  text-align: center;
+}
+
+.admin-dropzone__preview {
+  max-height: 72px;
+  max-width: 160px;
+  object-fit: contain;
+}
+
+.admin-dropzone__preview--wide {
+  max-height: 96px;
+  max-width: 100%;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.admin-offer-row .admin-dropzone {
+  margin-top: 0.65rem;
+  min-height: 72px;
+}
+
+.admin-offer-row .admin-field {
+  margin-bottom: 0;
+}
+
+.admin-offer-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.admin-offer-pill--on {
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
+}
+
+.admin-offer-pill--off {
+  background: rgba(100, 116, 139, 0.16);
+  color: #64748b;
+}
+
+.admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--admin-ink, #0f172a);
+}
+
+.admin-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.admin-toggle__ui {
+  width: 2.4rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: #cbd5e1;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.admin-toggle__ui::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.admin-toggle input:checked + .admin-toggle__ui {
+  background: #16a34a;
+}
+
+.admin-toggle input:checked + .admin-toggle__ui::after {
+  transform: translateX(1.1rem);
+}
+
+.admin-toggle input:focus-visible + .admin-toggle__ui {
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
+
+.admin-toggle input:disabled + .admin-toggle__ui {
+  opacity: 0.55;
+}
+
 .admin-note {
   margin: 0;
   font-size: 0.85rem;
@@ -556,7 +743,7 @@
 
 @media (max-width: 860px) {
   .admin-shell {
-    grid-template-columns: 1fr;
+    --admin-sidebar-w: 0px;
   }
 
   .admin-sidebar {
@@ -594,6 +781,7 @@
   }
 
   .admin-shell__main {
+    margin-left: 0;
     height: 100%;
   }
 }
