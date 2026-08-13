@@ -118,6 +118,17 @@ export type AdminUpdateSiteOfferInput = z.infer<
   typeof adminUpdateSiteOfferSchema
 >;
 
+/** http(s) URL or site-relative path like /#pricing */
+const bannerLinkUrlSchema = z
+  .union([
+    z.string().url(),
+    z.string().regex(/^\/[\w#?&=./%-]*$/, 'Must be a URL or path starting with /'),
+    z.literal(''),
+    z.null(),
+  ])
+  .optional()
+  .transform((v) => (v === '' || v === undefined ? null : v));
+
 /** Landing hero carousel slide (Admin → Banners). */
 export const siteBannerSchema = z.object({
   bannerId: z.string(),
@@ -131,7 +142,18 @@ export const siteBannerSchema = z.object({
         /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
       { message: 'imageUrl must be an http(s) or data:image URL' }
     ),
-  linkUrl: z.string().url().nullable().optional(),
+  linkUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (v) =>
+        v == null ||
+        v === '' ||
+        /^https?:\/\//i.test(v) ||
+        /^\//.test(v),
+      { message: 'linkUrl must be http(s) or a path starting with /' }
+    ),
   altText: z.string().max(160).nullable().optional(),
   active: z.boolean(),
   priority: z.number().int().default(0),
@@ -152,10 +174,7 @@ export const adminCreateSiteBannerSchema = z.object({
         /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
       { message: 'imageUrl must be an http(s) or data:image URL' }
     ),
-  linkUrl: z
-    .union([z.string().url(), z.literal(''), z.null()])
-    .optional()
-    .transform((v) => (v === '' || v === undefined ? null : v)),
+  linkUrl: bannerLinkUrlSchema,
   altText: z.string().max(160).optional().nullable(),
   active: z.boolean().default(true),
   priority: z.number().int().default(0),

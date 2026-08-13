@@ -6159,6 +6159,7 @@ textarea {
   position: relative;
   width: min(1040px, 100%);
   margin: 0 auto;
+  aspect-ratio: 5 / 2;
   border-radius: 18px;
   overflow: hidden;
   background: #f3f4f6;
@@ -6166,15 +6167,17 @@ textarea {
 }
 .landing-hero-carousel__link {
   display: block;
+  width: 100%;
+  height: 100%;
   line-height: 0;
 }
 .landing-hero-carousel__img {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 220px;
+  height: 100%;
   object-fit: cover;
   object-position: center;
+  background: #f3f4f6;
 }
 .landing-hero-carousel__dots {
   position: absolute;
@@ -6207,9 +6210,6 @@ textarea {
   }
   .landing-hero-carousel__frame {
     border-radius: 14px;
-  }
-  .landing-hero-carousel__img {
-    max-height: 140px;
   }
 }
 
