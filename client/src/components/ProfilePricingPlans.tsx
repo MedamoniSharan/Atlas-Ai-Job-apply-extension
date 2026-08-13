@@ -6,11 +6,17 @@ import {
   FrequencyToggle,
 } from '@/components/ui/pricing-01-utils/frequency-toggle';
 import { cn } from '@/lib/utils';
-import type { PaidPlan, PlanTier } from '@cosmo/shared';
+import {
+  yearlyPerMonthRupees,
+  type BillingFrequency,
+  type PaidPlan,
+  type PlanTier,
+} from '@cosmo/shared';
 import NumberFlow from '@number-flow/react';
 import confetti from 'canvas-confetti';
 import { ArrowUpRight, Check } from 'lucide-react';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CosmosLoader } from './CosmosLogo';
 
 export type ProfilePlanCard = {
@@ -39,11 +45,6 @@ const DESC_BY_TIER: Record<PlanTier, string> = {
   max: 'Maximum applies and scans for heavy usage.',
 };
 
-function yearlyPerMonth(monthlyRupees: number): number {
-  if (monthlyRupees <= 0) return 0;
-  return Math.round(monthlyRupees * 0.85);
-}
-
 function paiseToRupees(paise: number): number {
   return Math.round(paise / 100);
 }
@@ -70,8 +71,8 @@ type ProfilePricingPlansProps = {
   couponDiscounts: Partial<Record<PaidPlan, CouponDiscountPreview>>;
   busyPlan: PaidPlan | null;
   onCouponChange: (code: string) => void;
-  onApplyCoupon: () => void;
-  onUpgrade: (plan: PaidPlan) => void;
+  onApplyCoupon: (frequency: BillingFrequency) => void;
+  onUpgrade: (plan: PaidPlan, frequency: BillingFrequency) => void;
 };
 
 export function ProfilePricingPlans({
@@ -87,11 +88,18 @@ export function ProfilePricingPlans({
   onApplyCoupon,
   onUpgrade,
 }: ProfilePricingPlansProps) {
-  const [frequency, setFrequency] = useState<FREQUENCY>('monthly');
+  const [searchParams] = useSearchParams();
+  const billingParam = searchParams.get('billing');
+  const initialFrequency: FREQUENCY =
+    billingParam === 'yearly' ? 'yearly' : 'monthly';
+  const [frequency, setFrequency] = useState<FREQUENCY>(initialFrequency);
 
   function onFrequencyChange(next: FREQUENCY) {
     setFrequency(next);
     if (next === 'yearly') fireYearlyConfetti();
+    if (couponCode.trim()) {
+      onApplyCoupon(next);
+    }
   }
 
   const ordered = (['free', 'pro', 'max'] as PlanTier[])
@@ -121,7 +129,7 @@ export function ProfilePricingPlans({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  onApplyCoupon();
+                  onApplyCoupon(frequency);
                 }
               }}
               placeholder="Optional — e.g. INDY40"
@@ -131,7 +139,7 @@ export function ProfilePricingPlans({
             <Button
               type="button"
               disabled={couponBusy || !couponCode.trim()}
-              onClick={onApplyCoupon}
+              onClick={() => onApplyCoupon(frequency)}
               className="h-auto shrink-0 rounded-xl bg-black px-4 text-sm font-medium text-white hover:bg-black/90 disabled:opacity-50"
             >
               {couponBusy ? (
@@ -208,20 +216,38 @@ function PlanCard({
   currentPlan: PlanTier;
   busyPlan: PaidPlan | null;
   discount?: CouponDiscountPreview;
-  onUpgrade: (plan: PaidPlan) => void;
+  onUpgrade: (plan: PaidPlan, frequency: BillingFrequency) => void;
   className?: string;
 }) {
   const catalogMonthly = paiseToRupees(card.amountPaise);
-  const discountedMonthly = discount
-    ? paiseToRupees(discount.finalAmountPaise)
-    : null;
-  const baseMonthly = discountedMonthly ?? catalogMonthly;
-  const price =
-    frequency === 'yearly' ? yearlyPerMonth(baseMonthly) : baseMonthly;
-  const strikeMonthly =
-    discount && discount.finalAmountPaise < discount.originalAmountPaise
-      ? paiseToRupees(discount.originalAmountPaise)
-      : null;
+  const catalogYearlyPerMonth = yearlyPerMonthRupees(catalogMonthly);
+
+  let price: number;
+  let strikeMonthly: number | null = null;
+  let yearTotal: number | null = null;
+
+  if (discount) {
+    const finalRupees = paiseToRupees(discount.finalAmountPaise);
+    const originalRupees = paiseToRupees(discount.originalAmountPaise);
+    if (frequency === 'yearly') {
+      price = Math.round(finalRupees / 12);
+      yearTotal = finalRupees;
+      if (originalRupees > finalRupees) {
+        strikeMonthly = Math.round(originalRupees / 12);
+      }
+    } else {
+      price = finalRupees;
+      if (originalRupees > finalRupees) {
+        strikeMonthly = originalRupees;
+      }
+    }
+  } else if (frequency === 'yearly') {
+    price = catalogYearlyPerMonth;
+    yearTotal = catalogYearlyPerMonth * 12;
+  } else {
+    price = catalogMonthly;
+  }
+
   const isCurrent = currentPlan === card.tier;
   const canUpgrade =
     (card.tier === 'pro' && currentPlan === 'free') ||
@@ -230,7 +256,7 @@ function PlanCard({
     !discount &&
     frequency === 'yearly' &&
     catalogMonthly > 0 &&
-    yearlyPerMonth(catalogMonthly) < catalogMonthly;
+    catalogYearlyPerMonth < catalogMonthly;
 
   return (
     <div className={cn('w-full', className)}>
@@ -270,8 +296,7 @@ function PlanCard({
               <div>
                 {strikeMonthly != null && strikeMonthly > price ? (
                   <p className="mb-0.5 text-base text-muted-foreground line-through">
-                    ₹{frequency === 'yearly' ? yearlyPerMonth(strikeMonthly) : strikeMonthly}
-                    /month
+                    ₹{strikeMonthly}/month
                   </p>
                 ) : null}
                 <p className="flex items-end text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
@@ -301,10 +326,10 @@ function PlanCard({
                 </p>
                 {price > 0 ? (
                   <p className="mt-1.5 text-sm text-muted-foreground">
-                    {discount
-                      ? `Coupon applied · billed monthly at checkout`
-                      : frequency === 'yearly'
-                        ? `≈ ₹${price * 12}/year · display only`
+                    {frequency === 'yearly' && yearTotal != null
+                      ? `₹${yearTotal}/year billed yearly at checkout`
+                      : discount
+                        ? `Coupon applied · billed monthly at checkout`
                         : 'billed monthly'}
                   </p>
                 ) : null}
@@ -318,7 +343,7 @@ function PlanCard({
                 <Button
                   type="button"
                   disabled={busyPlan !== null}
-                  onClick={() => onUpgrade(card.tier as PaidPlan)}
+                  onClick={() => onUpgrade(card.tier as PaidPlan, frequency)}
                   className="inline-flex h-12 w-full max-w-[16rem] items-center justify-center gap-2 rounded-full border-0 bg-black px-5 text-base font-medium text-white no-underline shadow-none hover:bg-black/90 hover:text-white disabled:opacity-60"
                 >
                   {busyPlan === card.tier ? (

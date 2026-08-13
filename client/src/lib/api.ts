@@ -407,7 +407,8 @@ export async function verifyBillingPayment(payload: {
 
 export async function createSubscription(
   plan: PaidPlan,
-  couponCode?: string
+  couponCode?: string,
+  billingFrequency: 'monthly' | 'yearly' = 'monthly'
 ) {
   return request<{
     subscriptionId: string;
@@ -415,6 +416,7 @@ export async function createSubscription(
     keyId: string;
     plan: PaidPlan;
     amountPaise: number;
+    billingFrequency?: 'monthly' | 'yearly';
     originalAmountPaise?: number;
     discountPaise?: number;
     couponCode?: string | null;
@@ -422,6 +424,7 @@ export async function createSubscription(
     method: 'POST',
     body: JSON.stringify({
       plan,
+      billingFrequency,
       ...(couponCode ? { couponCode } : {}),
     }),
   });
@@ -546,7 +549,11 @@ export async function fetchPublicBanners() {
   return request<PublicSiteBanner[]>('/api/v1/billing/banners', undefined, false);
 }
 
-export async function validateCoupon(code: string, plan: PaidPlan) {
+export async function validateCoupon(
+  code: string,
+  plan: PaidPlan,
+  billingFrequency: 'monthly' | 'yearly' = 'monthly'
+) {
   return request<{
     code: string;
     plan: PaidPlan;
@@ -556,7 +563,7 @@ export async function validateCoupon(code: string, plan: PaidPlan) {
     label: string;
   }>('/api/v1/billing/validate-coupon', {
     method: 'POST',
-    body: JSON.stringify({ code, plan }),
+    body: JSON.stringify({ code, plan, billingFrequency }),
   });
 }
 

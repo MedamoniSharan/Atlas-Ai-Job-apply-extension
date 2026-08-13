@@ -10,6 +10,7 @@ import { fetchPublicPlans } from '@/lib/api';
 import {
   DEFAULT_PLAN_FEATURES,
   PLAN_PRICES_PAISE,
+  yearlyPerMonthRupees,
   type PaidPlan,
 } from '@cosmo/shared';
 import NumberFlow from '@number-flow/react';
@@ -36,8 +37,7 @@ type PricingPlan = {
 
 /** ~15% off vs paying monthly × 12. */
 function yearlyPerMonth(monthlyRupees: number): number {
-  if (monthlyRupees <= 0) return 0;
-  return Math.round(monthlyRupees * 0.85);
+  return yearlyPerMonthRupees(monthlyRupees);
 }
 
 function paiseToRupees(paise: number): number {
@@ -102,6 +102,15 @@ const cardVariants: Variants = {
   }),
 };
 
+function plansCheckoutPath(frequency: FREQUENCY): string {
+  const billing = frequency === 'yearly' ? 'yearly' : 'monthly';
+  return `/profile?billing=${billing}#plans`;
+}
+
+function plansUpgradeHref(frequency: FREQUENCY): string {
+  return `/login?next=${encodeURIComponent(plansCheckoutPath(frequency))}`;
+}
+
 function PricingCard({
   plan,
   index,
@@ -116,6 +125,8 @@ function PricingCard({
   const price = plan.plan_price[frequency];
   const showYearlySave =
     frequency === 'yearly' && plan.plan_price.monthly > plan.plan_price.yearly;
+  const ctaHref =
+    plan.tier === 'free' ? plan.plan_href : plansUpgradeHref(frequency);
 
   return (
     <motion.div
@@ -182,7 +193,7 @@ function PricingCard({
                 {price > 0 ? (
                   <p className="mt-1.5 text-sm text-muted-foreground">
                     {frequency === 'yearly'
-                      ? `≈ ₹${price * 12}/year · 15% less than monthly × 12`
+                      ? `₹${price * 12}/year · billed yearly at checkout`
                       : 'billed monthly'}
                   </p>
                 ) : null}
@@ -191,7 +202,7 @@ function PricingCard({
                 asChild
                 className="group relative h-12 w-full max-w-[15rem] cursor-pointer overflow-hidden rounded-full border border-black/5 bg-white p-1 pe-12 ps-5 text-base font-medium text-black no-underline shadow-sm transition-all duration-500 hover:bg-white hover:pe-5 hover:ps-12 hover:text-black hover:no-underline"
               >
-                <Link to={plan.plan_href}>
+                <Link to={ctaHref}>
                   <span className="relative z-10 transition-all duration-500">
                     {plan.plan_cta}
                   </span>

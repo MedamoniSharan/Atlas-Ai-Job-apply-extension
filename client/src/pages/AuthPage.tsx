@@ -209,12 +209,17 @@ export function AuthPage({ mode }: { mode: Mode }) {
       !next.startsWith('//') &&
       !next.includes('://')
     ) {
-      const [pathname, hash] = next.split('#');
-      navigate({
-        pathname: pathname || '/',
-        hash: hash || undefined,
-      });
-      return;
+      try {
+        const url = new URL(next, window.location.origin);
+        navigate({
+          pathname: url.pathname,
+          search: url.search || undefined,
+          hash: url.hash || undefined,
+        });
+        return;
+      } catch {
+        // Fall through to default destination.
+      }
     }
     navigate(isNewAccount ? '/get-extension' : '/dashboard');
   }

@@ -89,14 +89,15 @@ export type CheckoutResult = {
 
 export async function startPlanCheckout(
   plan: PaidPlan,
-  couponCode?: string
+  couponCode?: string,
+  billingFrequency: 'monthly' | 'yearly' = 'monthly'
 ): Promise<CheckoutResult> {
   await loadRazorpayScript();
   if (!window.Razorpay) {
     throw new Error('Razorpay Checkout failed to load');
   }
 
-  const subRes = await createSubscription(plan, couponCode);
+  const subRes = await createSubscription(plan, couponCode, billingFrequency);
   if (!subRes.success) {
     throw new Error(subRes.message || 'Could not create subscription');
   }
@@ -116,6 +117,11 @@ export async function startPlanCheckout(
     throw new Error('Invalid Razorpay key returned by server');
   }
 
+  const planName = plan === 'pro' ? 'Premium' : 'UltraMag';
+  const periodLabel =
+    billingFrequency === 'yearly' ? 'yearly subscription' : 'monthly subscription';
+  const amountRupees = Math.round((sub.amountPaise ?? 0) / 100);
+
   return new Promise<CheckoutResult>((resolve, reject) => {
     let settled = false;
 
@@ -123,9 +129,9 @@ export async function startPlanCheckout(
       key,
       name: 'Cosmo',
       description:
-        plan === 'pro'
-          ? 'Premium — monthly subscription'
-          : 'UltraMag — monthly subscription',
+        amountRupees > 0
+          ? `${planName} — ${periodLabel} · ₹${amountRupees}`
+          : `${planName} — ${periodLabel}`,
       image: '/favicon.svg',
       subscription_id: sub.subscriptionId,
       prefill: {
@@ -134,6 +140,7 @@ export async function startPlanCheckout(
       },
       notes: {
         plan,
+        billingFrequency,
         product: 'cosmo-job-assistant',
       },
       remember_customer: true,

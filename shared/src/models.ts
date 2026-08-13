@@ -69,12 +69,30 @@ export type VerifyBillingPaymentInput = z.infer<
   typeof verifyBillingPaymentSchema
 >;
 
+export const billingFrequencySchema = z.enum(['monthly', 'yearly']);
+
+export type BillingFrequency = z.infer<typeof billingFrequencySchema>;
+
 export const createSubscriptionSchema = z.object({
   plan: paidPlanSchema,
   couponCode: z.string().min(1).max(40).optional(),
+  billingFrequency: billingFrequencySchema.optional().default('monthly'),
 });
 
 export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
+
+/** Effective ₹/month shown for yearly (≈15% off monthly). */
+export function yearlyPerMonthRupees(monthlyRupees: number): number {
+  if (monthlyRupees <= 0) return 0;
+  return Math.round(monthlyRupees * 0.85);
+}
+
+/** Annual charge in paise matching the yearly UI (per-month × 12). */
+export function yearlyChargePaise(monthlyPaise: number): number {
+  if (monthlyPaise <= 0) return 0;
+  const monthlyRupees = Math.round(monthlyPaise / 100);
+  return yearlyPerMonthRupees(monthlyRupees) * 12 * 100;
+}
 
 export const verifySubscriptionSchema = z.object({
   razorpay_payment_id: z.string().min(1),
@@ -105,8 +123,8 @@ export const subscriptionStatusSchema = z.enum([
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
 export const PLAN_PRICES_PAISE = {
-  pro: 9900,
-  max: 29900,
+  pro: 29900,
+  max: 39900,
 } as const satisfies Record<PaidPlan, number>;
 
 export const PLAN_DISPLAY_NAMES = {

@@ -6,6 +6,7 @@ import {
   DEFAULT_PLAN_FEATURES,
   PLAN_DISPLAY_NAMES,
   PLAN_PRICES_PAISE,
+  type BillingFrequency,
   type PaidPlan,
   type PlanTier,
 } from '@cosmo/shared';
@@ -112,7 +113,7 @@ export function ProfilePage() {
     return () => window.clearTimeout(timer);
   }, [isLoading]);
 
-  async function applyCoupon() {
+  async function applyCoupon(frequency: BillingFrequency = 'monthly') {
     const code = couponCode.trim();
     if (!code) {
       setCouponError('Enter a coupon code');
@@ -130,7 +131,7 @@ export function ProfilePage() {
     let lastError: string | null = null;
 
     for (const paid of ['pro', 'max'] as PaidPlan[]) {
-      const preview = await validateCoupon(code, paid);
+      const preview = await validateCoupon(code, paid, frequency);
       if (preview.success) {
         next[paid] = {
           originalAmountPaise: preview.data.originalAmountPaise,
@@ -162,14 +163,14 @@ export function ProfilePage() {
     setCouponBusy(false);
   }
 
-  async function upgrade(plan: PaidPlan) {
+  async function upgrade(plan: PaidPlan, frequency: BillingFrequency = 'monthly') {
     setBusyPlan(plan);
     setStatus(null);
     setLastPaymentId(null);
     try {
       const code = couponCode.trim();
       if (code && !couponDiscounts[plan]) {
-        const preview = await validateCoupon(code, plan);
+        const preview = await validateCoupon(code, plan, frequency);
         if (preview.success) {
           setCouponDiscounts((prev) => ({
             ...prev,
@@ -187,7 +188,7 @@ export function ProfilePage() {
           return;
         }
       }
-      const result = await startPlanCheckout(plan, code || undefined);
+      const result = await startPlanCheckout(plan, code || undefined, frequency);
       setLastPaymentId(result.paymentId);
       setStatus(
         `${plan === 'pro' ? 'Premium' : 'UltraMag'} subscription is active until ${new Date(result.planExpiresAt).toLocaleDateString('en-IN')}. Invoice ${result.invoiceNumber} is ready.`
@@ -405,8 +406,8 @@ export function ProfilePage() {
             setCouponError(null);
             setCouponDiscounts({});
           }}
-          onApplyCoupon={() => void applyCoupon()}
-          onUpgrade={(paid) => void upgrade(paid)}
+          onApplyCoupon={(frequency) => void applyCoupon(frequency)}
+          onUpgrade={(paid, frequency) => void upgrade(paid, frequency)}
         />
       </div>
 

@@ -11,6 +11,7 @@ export interface ISubscription extends Document {
   razorpayPlanId?: string;
   couponCode?: string | null;
   amountPaise?: number | null;
+  billingFrequency?: 'monthly' | 'yearly';
   currentPeriodStart?: Date | null;
   currentPeriodEnd?: Date | null;
   cancelAtPeriodEnd: boolean;
@@ -52,6 +53,11 @@ const subscriptionSchema = new Schema<ISubscription>(
     razorpayPlanId: { type: String },
     couponCode: { type: String, default: null },
     amountPaise: { type: Number, default: null },
+    billingFrequency: {
+      type: String,
+      enum: ['monthly', 'yearly'],
+      default: 'monthly',
+    },
     currentPeriodStart: { type: Date, default: null },
     currentPeriodEnd: { type: Date, default: null },
     cancelAtPeriodEnd: { type: Boolean, default: false },

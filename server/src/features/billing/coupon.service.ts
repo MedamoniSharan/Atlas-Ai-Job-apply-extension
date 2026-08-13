@@ -1,7 +1,9 @@
 import {
   computeCouponDiscount,
+  yearlyChargePaise,
   type AdminCreateCouponInput,
   type AdminUpdateCouponInput,
+  type BillingFrequency,
   type Coupon,
   type PaidPlan,
   type ValidateCouponResult,
@@ -141,7 +143,8 @@ export async function deleteCoupon(
 export async function validateCoupon(
   userId: string,
   code: string,
-  plan: PaidPlan
+  plan: PaidPlan,
+  billingFrequency: BillingFrequency = 'monthly'
 ): Promise<ValidateCouponResult> {
   const normalized = code.trim().toUpperCase();
   const coupon = await CouponModel.findOne({ code: normalized });
@@ -171,7 +174,11 @@ export async function validateCoupon(
     );
   }
 
-  const originalAmountPaise = await getPaidPlanAmount(plan);
+  const monthlyPaise = await getPaidPlanAmount(plan);
+  const originalAmountPaise =
+    billingFrequency === 'yearly'
+      ? yearlyChargePaise(monthlyPaise)
+      : monthlyPaise;
   const { discountPaise, finalAmountPaise } = computeCouponDiscount(
     originalAmountPaise,
     coupon.type,

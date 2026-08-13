@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { paidPlanSchema, planTierSchema } from './models';
+import {
+  billingFrequencySchema,
+  paidPlanSchema,
+  planTierSchema,
+} from './models';
 
 export const planLimitsSchema = z.object({
   monthlyApplies: z.number().int().min(0),
@@ -50,8 +54,8 @@ export const DEFAULT_PLAN_FEATURES: Record<
 };
 
 export const DEFAULT_COMPARE_AT_PAISE: Record<'pro' | 'max', number> = {
-  pro: 29900,
-  max: 79900,
+  pro: 39900,
+  max: 59900,
 };
 
 /** https URL or data:image… for uploaded banner art. */
@@ -246,6 +250,7 @@ export type AdminUpdateCouponInput = z.infer<typeof adminUpdateCouponSchema>;
 export const validateCouponSchema = z.object({
   code: z.string().min(1).max(40),
   plan: paidPlanSchema,
+  billingFrequency: billingFrequencySchema.optional().default('monthly'),
 });
 
 export type ValidateCouponInput = z.infer<typeof validateCouponSchema>;

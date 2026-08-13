@@ -5,6 +5,8 @@ import {
   PLAN_PRICES_PAISE,
   getEffectivePlan,
   getIstMonthBounds,
+  yearlyChargePaise,
+  type BillingFrequency,
   type CancelSubscriptionInput,
   type CreateBillingOrderInput,
   type CreateSubscriptionInput,
@@ -34,7 +36,14 @@ import {
 } from './planConfig.service';
 import { SubscriptionModel } from './subscription.model';
 
-const SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles
+const MONTHLY_SUBSCRIPTION_TOTAL_COUNT = 120; // 10 years of monthly cycles
+const YEARLY_SUBSCRIPTION_TOTAL_COUNT = 10; // 10 years of yearly cycles
+
+function defaultPeriodMs(frequency: BillingFrequency): number {
+  return frequency === 'yearly'
+    ? 365 * 24 * 60 * 60 * 1000
+    : 30 * 24 * 60 * 60 * 1000;
+}
 
 function razorpayAppError(error: unknown, fallback: string): AppError {
   const err = error as {
@@ -183,7 +192,8 @@ async function ensureRazorpayCustomer(userId: string) {
 async function createRazorpayPlanAtAmount(
   plan: PaidPlan,
   amountPaise: number,
-  notes: Record<string, string> = {}
+  notes: Record<string, string> = {},
+  billingFrequency: BillingFrequency = 'monthly'
 ): Promise<string> {
   const cfg = await getPlanConfig(plan);
   if (!amountPaise || amountPaise <= 0) {
@@ -195,17 +205,18 @@ async function createRazorpayPlanAtAmount(
   }
 
   const razorpay = getRazorpay();
+  const periodLabel = billingFrequency === 'yearly' ? 'yearly' : 'monthly';
   try {
     const created = await razorpay.plans.create({
-      period: 'monthly',
+      period: billingFrequency,
       interval: 1,
       item: {
-        name: `Cosmo ${cfg.name}`,
+        name: `Cosmo ${cfg.name}${billingFrequency === 'yearly' ? ' (Yearly)' : ''}`,
         amount: amountPaise,
         currency: 'INR',
-        description: cfg.description || `${cfg.name} monthly`,
+        description: cfg.description || `${cfg.name} ${periodLabel}`,
       },
-      notes: { tier: plan, ...notes },
+      notes: { tier: plan, billingFrequency, ...notes },
     });
     return created.id;
   } catch (error) {
@@ -413,7 +424,12 @@ export async function validateCouponForUser(
   userId: string,
   input: ValidateCouponInput
 ) {
-  return couponService.validateCoupon(userId, input.code, input.plan);
+  return couponService.validateCoupon(
+    userId,
+    input.code,
+    input.plan,
+    input.billingFrequency ?? 'monthly'
+  );
 }
 
 export async function createSubscription(
@@ -430,25 +446,42 @@ export async function createSubscription(
     throw new AppError('Plan is not available', 400, 'PLAN_INACTIVE');
   }
 
-  let amountPaise = planCfg.amountPaise;
+  const billingFrequency: BillingFrequency =
+    input.billingFrequency ?? 'monthly';
+  const catalogMonthlyPaise = planCfg.amountPaise;
+  const catalogChargePaise =
+    billingFrequency === 'yearly'
+      ? yearlyChargePaise(catalogMonthlyPaise)
+      : catalogMonthlyPaise;
+
+  let amountPaise = catalogChargePaise;
   let couponCode: string | null = null;
   if (input.couponCode) {
     const validated = await couponService.validateCoupon(
       userId,
       input.couponCode,
-      input.plan
+      input.plan,
+      billingFrequency
     );
     amountPaise = validated.finalAmountPaise;
     couponCode = validated.code;
   }
 
-  const razorpayPlanId =
-    couponCode && amountPaise !== planCfg.amountPaise
-      ? await createRazorpayPlanAtAmount(input.plan, amountPaise, {
-          coupon: couponCode,
-          discounted: '1',
-        })
-      : await ensureRazorpayPlanId(input.plan);
+  const needsCustomPlan =
+    billingFrequency === 'yearly' ||
+    Boolean(couponCode && amountPaise !== catalogChargePaise);
+
+  const razorpayPlanId = needsCustomPlan
+    ? await createRazorpayPlanAtAmount(
+        input.plan,
+        amountPaise,
+        {
+          ...(couponCode ? { coupon: couponCode, discounted: '1' } : {}),
+          billingFrequency,
+        },
+        billingFrequency
+      )
+    : await ensureRazorpayPlanId(input.plan);
   const razorpay = getRazorpay();
 
   // Cancel any open created Razorpay drafts for this user locally
@@ -460,15 +493,21 @@ export async function createSubscription(
   const notes: Record<string, string> = {
     userId,
     plan: input.plan,
+    billingFrequency,
   };
   if (couponCode) notes.couponCode = couponCode;
+
+  const totalCount =
+    billingFrequency === 'yearly'
+      ? YEARLY_SUBSCRIPTION_TOTAL_COUNT
+      : MONTHLY_SUBSCRIPTION_TOTAL_COUNT;
 
   let subscription: { id: string };
   try {
     // Razorpay runtime accepts customer_id; SDK typings omit it.
     subscription = (await razorpay.subscriptions.create({
       plan_id: razorpayPlanId,
-      total_count: SUBSCRIPTION_TOTAL_COUNT,
+      total_count: totalCount,
       customer_notify: 1,
       quantity: 1,
       notes,
@@ -488,6 +527,7 @@ export async function createSubscription(
     razorpayPlanId,
     couponCode,
     amountPaise,
+    billingFrequency,
     source: 'razorpay',
     cancelAtPeriodEnd: false,
   });
@@ -498,6 +538,7 @@ export async function createSubscription(
     keyId: env.razorpayKeyId,
     plan: input.plan,
     amountPaise,
+    billingFrequency,
   };
 }
 
@@ -528,9 +569,10 @@ export async function verifySubscription(
   }
 
   const now = new Date();
+  const frequency: BillingFrequency = sub.billingFrequency ?? 'monthly';
   const periodEnd =
     sub.currentPeriodEnd ??
-    new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    new Date(now.getTime() + defaultPeriodMs(frequency));
 
   if (sub.status === 'created' || sub.status === 'authenticated') {
     sub.status = 'active';
