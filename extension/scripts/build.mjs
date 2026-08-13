@@ -8,11 +8,11 @@ import { writeZipFromDirectory } from './zipDirectory.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
+/** Single Chromium package — Chrome Web Store upload + site download. */
 const clientPublicZip = path.resolve(
   root,
   '../client/public/cosmo-chrome-extension.zip'
 );
-const edgeZip = path.resolve(root, '../client/public/cosmo-edge-extension.zip');
 const firefoxZip = path.resolve(root, '../cosmo-agent-firefox.zip');
 const watch = process.argv.includes('--watch');
 const release = process.argv.includes('--release');
@@ -245,9 +245,7 @@ if (watch) {
 
   if (release || firefox) {
     writeZipFromDirectory(dist, clientPublicZip);
-    // Edge Add-ons accepts the same Chromium MV3 package; keep a dedicated zip name.
-    writeZipFromDirectory(dist, edgeZip);
-    targets.push(path.relative(root, clientPublicZip), path.relative(root, edgeZip));
+    targets.push(path.relative(root, clientPublicZip));
 
     writeManifest('firefox');
     writeZipFromDirectory(dist, firefoxZip);

@@ -91,7 +91,7 @@ export type CopilotState = {
    * scanning stays fast with no pace toast.
    */
   runPhase?: 'idle' | 'scan' | 'apply';
-  /** Shown when a browse session finishes — next page vs close. */
+  /** Shown when a browse session finishes — Apply more vs close. */
   sessionComplete?: SessionCompletePrompt | null;
   currentTitle?: string;
   lastMessage?: string;

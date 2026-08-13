@@ -1,20 +1,19 @@
 ---
-description: Cosmo scans toward 30 matches, then applies quickly
+description: Cosmo keeps scanning/applying until applied+skipped = 30
 alwaysApply: true
 ---
 
-# Rule 2 — Scan toward 30, then apply what was found
+# Rule 2 — Continuous until applied + skipped = 30
 
-**Scan target:** Prefer collecting up to **30 preference-matched** jobs before apply.
+**Session ceiling:** Keep going until `applied + skipped >= 30` (or results are truly exhausted).
 
-- Phase 1: open All Filters, apply prefs, scan/scroll and **auto next-page** until `matched >= 30` or pages/search plan are exhausted. **Never ask** the user to click “Next page”.
-  - Tell the user apply has **not** started yet: wait until 30 jobs match (~1 minute). Keep `matched/30` visible (panel status, notice, toast).
-- Phase 2: apply the queued matches one by one with a **short settle** (not full humanPace slowdown).
-  - Navigate **job → next job** — do not return to the search list between applies.
+- Apply Naukri **All Filters once** per search, then run continuously — **never** ask the user to click Next page or Apply more mid-run.
+- Flow: **filters → scan (auto next-page) → apply queued matches → continue** until `applied + skipped >= 30`.
+  - Do not end a session while matched jobs are still **Queued**.
   - Cap `betweenJobs` (~0.6–1.2s). Skip read pauses and the 2-minute session break during the batch.
-  - If `matched >= 30`, apply the batch of 30.
-  - If scan exhausts with `0 < matched < 30`, **still apply** every match found — do not block apply on a full 30.
-  - If `matched === 0`, do not apply; report that nothing matched.
-- When the session finishes, ask **Apply more** or **Close — view dashboard**. Close must close the Naukri work tab and open the Cosmo dashboard (reuse an existing Cosmo tab when possible). Do not prompt for another Next page.
-- Never invent extra result pages past real pagination while filling the batch.
+  - Navigate **job → next job** — do not return to the search list between applies.
+  - If pages/searches exhaust with `0 < processed < 30`, stop after applying every match found — do not block on a full 30.
+  - If nothing matched, do not apply; report that nothing matched.
+- Show **Apply more** / **Close — view dashboard** only when the session is actually finished (hit 30 or exhausted). Close must close the Naukri work tab and open the Cosmo dashboard (reuse an existing Cosmo tab when possible).
+- Never invent extra result pages past real pagination.
 - Single Naukri work tab only.

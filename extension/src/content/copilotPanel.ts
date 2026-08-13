@@ -1480,7 +1480,12 @@ export function mountCopilotPanel() {
           : 'Applying…');
     } else if (state.running && state.runPhase === 'scan') {
       statusLabelEl.textContent =
-        state.paceLabel || scanWaitMessage(state.matched || 0);
+        state.paceLabel ||
+        scanWaitMessage(
+          state.matched || 0,
+          undefined,
+          (state.applied || 0) + (state.skipped || 0)
+        );
     } else if (state.running) {
       statusLabelEl.textContent = 'Scanning jobs…';
     } else {
@@ -1497,9 +1502,14 @@ export function mountCopilotPanel() {
       (state.paceRemainingMs ?? 0) > 0;
     if (scanWait) {
       showPaceToast(
-        state.paceLabel || scanWaitMessage(state.matched || 0),
+        state.paceLabel ||
+          scanWaitMessage(
+            state.matched || 0,
+            undefined,
+            (state.applied || 0) + (state.skipped || 0)
+          ),
         0,
-        'Apply starts after 30 matches'
+        'Continues until 30 applied+skipped'
       );
     } else if (pacing) {
       showPaceToast(
@@ -1681,7 +1691,12 @@ export function mountCopilotPanel() {
       noticeEl.classList.add('show');
       noticeEl.classList.remove('is-alert', 'flash');
       noticeEl.textContent =
-        state.paceLabel || scanWaitMessage(state.matched || 0);
+        state.paceLabel ||
+        scanWaitMessage(
+          state.matched || 0,
+          undefined,
+          (state.applied || 0) + (state.skipped || 0)
+        );
     } else {
       noticeEl.classList.remove('show', 'is-alert', 'flash');
       noticeEl.textContent = '';
