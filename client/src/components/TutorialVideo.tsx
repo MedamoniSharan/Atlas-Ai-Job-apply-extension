@@ -22,11 +22,6 @@ type TutorialVideoProps = {
   shortsPlayer?: boolean;
   /** Autoplay muted, then pause after this many seconds (landing preview). */
   stopAfterSeconds?: number;
-  /**
-   * Start muted autoplay only after this player scrolls into view.
-   * Defaults to true when `stopAfterSeconds` is set.
-   */
-  playOnView?: boolean;
   className?: string;
 };
 
@@ -91,13 +86,20 @@ function loadYouTubeApi(): Promise<YtNamespace> {
   return youtubeApiPromise;
 }
 
+function isReadyPlayer(player: YtPlayer | null): player is YtPlayer {
+  return (
+    !!player &&
+    typeof player.playVideo === 'function' &&
+    typeof player.pauseVideo === 'function'
+  );
+}
+
 export function TutorialVideo({
   compact = false,
   showCaption = true,
   hideFallbackLink = false,
   shortsPlayer = false,
   stopAfterSeconds,
-  playOnView,
   className = '',
 }: TutorialVideoProps) {
   const rawId = useId();
@@ -108,21 +110,18 @@ export function TutorialVideo({
   const previewStoppedRef = useRef(false);
   const useControlledPreview =
     typeof stopAfterSeconds === 'number' && stopAfterSeconds > 0;
-  const shouldPlayOnView = playOnView ?? useControlledPreview;
 
+  // Load once when first visible — then leave autoplay alone (no scroll play/pause).
   const isInView = useInView(rootRef, {
-    once: false,
-    amount: 0.45,
-    margin: '0px 0px -8% 0px',
+    once: true,
+    amount: 0.35,
   });
-  const isInViewRef = useRef(isInView);
-  isInViewRef.current = isInView;
-  const [activated, setActivated] = useState(!shouldPlayOnView);
+  const [activated, setActivated] = useState(!useControlledPreview);
 
   useEffect(() => {
-    if (!shouldPlayOnView) return;
+    if (!useControlledPreview) return;
     if (isInView) setActivated(true);
-  }, [isInView, shouldPlayOnView]);
+  }, [isInView, useControlledPreview]);
 
   useEffect(() => {
     if (!useControlledPreview || !activated) return;
@@ -140,6 +139,7 @@ export function TutorialVideo({
 
     void loadYouTubeApi().then((YT) => {
       if (cancelled) return;
+      if (!document.getElementById(playerHostId)) return;
 
       playerRef.current = new YT.Player(playerHostId, {
         videoId: TUTORIAL_VIDEO_ID,
@@ -149,18 +149,20 @@ export function TutorialVideo({
           playsinline: 1,
           rel: 0,
           controls: 1,
-          autoplay: shouldPlayOnView ? 0 : 1,
+          autoplay: 1,
           mute: 1,
           modestbranding: 0,
         },
         events: {
           onReady: (event) => {
             if (cancelled) return;
-            if (shouldPlayOnView && !isInViewRef.current) return;
-            event.target.playVideo();
+            playerRef.current = event.target;
+            if (typeof event.target.playVideo === 'function') {
+              event.target.playVideo();
+            }
           },
           onStateChange: (event) => {
-            if (cancelled) return;
+            if (cancelled || !isReadyPlayer(event.target)) return;
             if (event.data === YT.PlayerState.PLAYING) {
               if (previewStoppedRef.current) {
                 clearPoll();
@@ -168,6 +170,10 @@ export function TutorialVideo({
               }
               clearPoll();
               pollRef.current = window.setInterval(() => {
+                if (!isReadyPlayer(event.target)) {
+                  clearPoll();
+                  return;
+                }
                 const t = event.target.getCurrentTime();
                 if (t >= limit) {
                   clearPoll();
@@ -187,28 +193,17 @@ export function TutorialVideo({
     return () => {
       cancelled = true;
       clearPoll();
-      playerRef.current?.destroy();
+      const player = playerRef.current;
       playerRef.current = null;
+      if (player && typeof player.destroy === 'function') {
+        try {
+          player.destroy();
+        } catch {
+          /* player may already be torn down */
+        }
+      }
     };
-  }, [
-    activated,
-    playerHostId,
-    shouldPlayOnView,
-    stopAfterSeconds,
-    useControlledPreview,
-  ]);
-
-  useEffect(() => {
-    if (!useControlledPreview || !shouldPlayOnView) return;
-    const player = playerRef.current;
-    if (!player || previewStoppedRef.current) return;
-
-    if (isInView) {
-      player.playVideo();
-    } else {
-      player.pauseVideo();
-    }
-  }, [isInView, shouldPlayOnView, useControlledPreview]);
+  }, [activated, playerHostId, stopAfterSeconds, useControlledPreview]);
 
   return (
     <figure
