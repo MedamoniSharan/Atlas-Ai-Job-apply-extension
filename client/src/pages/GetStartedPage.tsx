@@ -7,7 +7,6 @@ import { BrowserStoreButtons } from '../components/BrowserStoreButtons';
 import { CosmosLoader } from '../components/CosmosLogo';
 import { TutorialVideo } from '../components/TutorialVideo';
 import { ONBOARDING_QUERY_KEY } from '../lib/onboarding';
-import { TUTORIAL_VIDEO_PREVIEW_SECONDS } from '../lib/tutorialVideo';
 
 export function GetStartedPage() {
   const user = useAuthStore((s) => s.user);
@@ -81,7 +80,7 @@ export function GetStartedPage() {
           </p>
           <TutorialVideo
             shortsPlayer
-            stopAfterSeconds={TUTORIAL_VIDEO_PREVIEW_SECONDS}
+            autoplayOnView
           />
         </section>
 

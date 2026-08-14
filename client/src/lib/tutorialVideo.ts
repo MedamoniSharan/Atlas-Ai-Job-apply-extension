@@ -8,12 +8,13 @@ export const TUTORIAL_VIDEO_URL =
 export const TUTORIAL_VIDEO_WIDTH = 315;
 export const TUTORIAL_VIDEO_HEIGHT = 560;
 
-/** Landing preview: play this many seconds then pause. */
-export const TUTORIAL_VIDEO_PREVIEW_SECONDS = 19;
-
 /** Native Shorts player chrome (channel, progress, Shorts badge). */
 export const TUTORIAL_VIDEO_EMBED_URL =
-  `https://www.youtube.com/embed/${TUTORIAL_VIDEO_ID}?playsinline=1&rel=0&controls=1&enablejsapi=1` as const;
+  `https://www.youtube.com/embed/${TUTORIAL_VIDEO_ID}?playsinline=1&rel=0&controls=1` as const;
+
+/** Same embed with muted autoplay (no YouTube IFrame API). */
+export const TUTORIAL_VIDEO_AUTOPLAY_EMBED_URL =
+  `https://www.youtube.com/embed/${TUTORIAL_VIDEO_ID}?playsinline=1&rel=0&controls=1&autoplay=1&mute=1` as const;
 
 export const TUTORIAL_VIDEO_TITLE =
   'How to install Cosmo and auto-apply to jobs — step-by-step';

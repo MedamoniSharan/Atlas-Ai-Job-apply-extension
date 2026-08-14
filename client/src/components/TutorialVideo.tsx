@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useInView } from 'motion/react';
 import {
+  TUTORIAL_VIDEO_AUTOPLAY_EMBED_URL,
   TUTORIAL_VIDEO_EMBED_URL,
   TUTORIAL_VIDEO_HEIGHT,
-  TUTORIAL_VIDEO_ID,
   TUTORIAL_VIDEO_TITLE,
   TUTORIAL_VIDEO_URL,
   TUTORIAL_VIDEO_WIDTH,
@@ -20,190 +20,37 @@ type TutorialVideoProps = {
    * progress bar, Shorts badge) instead of a custom poster.
    */
   shortsPlayer?: boolean;
-  /** Autoplay muted, then pause after this many seconds (landing preview). */
-  stopAfterSeconds?: number;
+  /**
+   * Mount a muted autoplay iframe the first time this player scrolls into view.
+   * Prefer this over the YouTube IFrame API (which spams console postMessage errors).
+   */
+  autoplayOnView?: boolean;
   className?: string;
 };
-
-type YtPlayer = {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
-  getCurrentTime: () => number;
-  destroy: () => void;
-};
-
-type YtNamespace = {
-  Player: new (
-    elementId: string,
-    options: {
-      videoId: string;
-      width?: number | string;
-      height?: number | string;
-      playerVars?: Record<string, string | number>;
-      events?: {
-        onReady?: (event: { target: YtPlayer }) => void;
-        onStateChange?: (event: { data: number; target: YtPlayer }) => void;
-      };
-    },
-  ) => YtPlayer;
-  PlayerState: { PLAYING: number; PAUSED: number; ENDED: number };
-};
-
-declare global {
-  interface Window {
-    YT?: YtNamespace;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-let youtubeApiPromise: Promise<YtNamespace> | null = null;
-
-function loadYouTubeApi(): Promise<YtNamespace> {
-  if (typeof window === 'undefined') {
-    return Promise.reject(new Error('YouTube API requires a browser'));
-  }
-  if (window.YT?.Player) {
-    return Promise.resolve(window.YT);
-  }
-  if (youtubeApiPromise) return youtubeApiPromise;
-
-  youtubeApiPromise = new Promise((resolve) => {
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previous?.();
-      if (window.YT) resolve(window.YT);
-    };
-    if (!document.querySelector('script[data-cosmo-youtube-api]')) {
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      script.async = true;
-      script.dataset.cosmoYoutubeApi = 'true';
-      document.head.appendChild(script);
-    }
-  });
-
-  return youtubeApiPromise;
-}
-
-function isReadyPlayer(player: YtPlayer | null): player is YtPlayer {
-  return (
-    !!player &&
-    typeof player.playVideo === 'function' &&
-    typeof player.pauseVideo === 'function'
-  );
-}
 
 export function TutorialVideo({
   compact = false,
   showCaption = true,
   hideFallbackLink = false,
   shortsPlayer = false,
-  stopAfterSeconds,
+  autoplayOnView = false,
   className = '',
 }: TutorialVideoProps) {
-  const rawId = useId();
-  const playerHostId = `cosmo-yt-${rawId.replace(/:/g, '')}`;
   const rootRef = useRef<HTMLElement>(null);
-  const playerRef = useRef<YtPlayer | null>(null);
-  const pollRef = useRef<number | null>(null);
-  const previewStoppedRef = useRef(false);
-  const useControlledPreview =
-    typeof stopAfterSeconds === 'number' && stopAfterSeconds > 0;
-
-  // Load once when first visible — then leave autoplay alone (no scroll play/pause).
   const isInView = useInView(rootRef, {
     once: true,
     amount: 0.35,
   });
-  const [activated, setActivated] = useState(!useControlledPreview);
+  const [activated, setActivated] = useState(!autoplayOnView);
 
   useEffect(() => {
-    if (!useControlledPreview) return;
+    if (!autoplayOnView) return;
     if (isInView) setActivated(true);
-  }, [isInView, useControlledPreview]);
+  }, [autoplayOnView, isInView]);
 
-  useEffect(() => {
-    if (!useControlledPreview || !activated) return;
-
-    let cancelled = false;
-    const limit = stopAfterSeconds;
-    previewStoppedRef.current = false;
-
-    const clearPoll = () => {
-      if (pollRef.current != null) {
-        window.clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-
-    void loadYouTubeApi().then((YT) => {
-      if (cancelled) return;
-      if (!document.getElementById(playerHostId)) return;
-
-      playerRef.current = new YT.Player(playerHostId, {
-        videoId: TUTORIAL_VIDEO_ID,
-        width: '100%',
-        height: '100%',
-        playerVars: {
-          playsinline: 1,
-          rel: 0,
-          controls: 1,
-          autoplay: 1,
-          mute: 1,
-          modestbranding: 0,
-        },
-        events: {
-          onReady: (event) => {
-            if (cancelled) return;
-            playerRef.current = event.target;
-            if (typeof event.target.playVideo === 'function') {
-              event.target.playVideo();
-            }
-          },
-          onStateChange: (event) => {
-            if (cancelled || !isReadyPlayer(event.target)) return;
-            if (event.data === YT.PlayerState.PLAYING) {
-              if (previewStoppedRef.current) {
-                clearPoll();
-                return;
-              }
-              clearPoll();
-              pollRef.current = window.setInterval(() => {
-                if (!isReadyPlayer(event.target)) {
-                  clearPoll();
-                  return;
-                }
-                const t = event.target.getCurrentTime();
-                if (t >= limit) {
-                  clearPoll();
-                  previewStoppedRef.current = true;
-                  event.target.pauseVideo();
-                  event.target.seekTo(limit, true);
-                }
-              }, 100);
-            } else {
-              clearPoll();
-            }
-          },
-        },
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      clearPoll();
-      const player = playerRef.current;
-      playerRef.current = null;
-      if (player && typeof player.destroy === 'function') {
-        try {
-          player.destroy();
-        } catch {
-          /* player may already be torn down */
-        }
-      }
-    };
-  }, [activated, playerHostId, stopAfterSeconds, useControlledPreview]);
+  const embedSrc = autoplayOnView
+    ? TUTORIAL_VIDEO_AUTOPLAY_EMBED_URL
+    : TUTORIAL_VIDEO_EMBED_URL;
 
   return (
     <figure
@@ -211,24 +58,20 @@ export function TutorialVideo({
       className={`tutorial-video${compact ? ' tutorial-video--compact' : ''}${shortsPlayer ? ' tutorial-video--shorts' : ''}${className ? ` ${className}` : ''}`}
     >
       <div className="tutorial-video__frame">
-        {useControlledPreview ? (
-          activated ? (
-            <div id={playerHostId} className="tutorial-video__api-host" />
-          ) : (
-            <div
-              className="tutorial-video__api-host tutorial-video__api-host--idle"
-              aria-hidden
-            />
-          )
-        ) : (
+        {activated ? (
           <iframe
-            src={TUTORIAL_VIDEO_EMBED_URL}
+            src={embedSrc}
             title={TUTORIAL_VIDEO_TITLE}
             width={TUTORIAL_VIDEO_WIDTH}
             height={TUTORIAL_VIDEO_HEIGHT}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : (
+          <div
+            className="tutorial-video__api-host tutorial-video__api-host--idle"
+            aria-hidden
           />
         )}
       </div>

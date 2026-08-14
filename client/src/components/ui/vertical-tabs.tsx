@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { TutorialVideo } from '@/components/TutorialVideo';
 import { DiaTextReveal } from '@/components/ui/dia-text-reveal';
-import { TUTORIAL_VIDEO_PREVIEW_SECONDS } from '@/lib/tutorialVideo';
-
 const STEPS = [
   {
     id: '01',
@@ -176,7 +174,7 @@ export function VerticalTabs() {
               shortsPlayer
               showCaption={false}
               hideFallbackLink
-              stopAfterSeconds={TUTORIAL_VIDEO_PREVIEW_SECONDS}
+              autoplayOnView
               className="install-steps__video w-full max-w-[315px]"
             />
           </div>

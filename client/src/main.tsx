@@ -48,8 +48,8 @@ function RouteVercelMetrics() {
   const location = useLocation();
   return (
     <>
-      <Analytics path={location.pathname} />
-      <SpeedInsights route={location.pathname} />
+      <Analytics path={location.pathname} debug={false} />
+      <SpeedInsights route={location.pathname} debug={false} />
     </>
   );
 }
