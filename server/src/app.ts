@@ -18,6 +18,7 @@ import { billingRouter } from './features/billing/billing.routes';
 import { scanSessionsRouter } from './features/scanSessions/scanSessions.routes';
 import { adminRouter } from './features/admin/admin.routes';
 import { feedbackRouter } from './features/feedback/feedback.routes';
+import { leaderboardRouter } from './features/leaderboard/leaderboard.routes';
 import * as billingService from './features/billing/billing.service';
 
 export function createApp() {
@@ -83,6 +84,7 @@ export function createApp() {
   app.use('/api/v1/billing', billingRouter);
   app.use('/api/v1/scan-sessions', scanSessionsRouter);
   app.use('/api/v1/feedback', feedbackRouter);
+  app.use('/api/v1/leaderboard', leaderboardRouter);
   app.use('/api/v1/admin', adminRouter);
 
   app.use(errorHandler);

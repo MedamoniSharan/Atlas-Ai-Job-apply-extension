@@ -100,6 +100,8 @@ Route map (ANY → Lambda proxy):
 | ANY | `/api/v1/scan-sessions/{proxy+}` | cosmo-scan-sessions |
 | ANY | `/api/v1/billing/{proxy+}` | cosmo-billing |
 | ANY | `/api/v1/feedback/{proxy+}` | cosmo-feedback |
+| ANY | `/api/v1/leaderboard` | cosmo-leaderboard |
+| ANY | `/api/v1/leaderboard/{proxy+}` | cosmo-leaderboard |
 | ANY | `/api/v1/admin/{proxy+}` | cosmo-admin |
 
 Enable CORS on the API for your web origin(s) and extension ID.  

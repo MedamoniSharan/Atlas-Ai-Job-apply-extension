@@ -76,6 +76,24 @@ export function requireAuth(
   }
 }
 
+/** Attach user when a valid token is present; never reject missing/invalid tokens. */
+export function optionalAuth(
+  req: AuthedRequest,
+  _res: Response,
+  next: NextFunction
+) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return next();
+  }
+  try {
+    req.user = verifyAccessToken(header.slice(7));
+  } catch {
+    // Public routes ignore bad tokens.
+  }
+  next();
+}
+
 export function requireAdmin(
   req: AuthedRequest,
   _res: Response,

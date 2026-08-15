@@ -34,6 +34,7 @@ import { OfferTicker } from './components/OfferTicker';
 import { NoIndexHead } from './components/NoIndexHead';
 import { ShimmerButton } from './components/ui/ShimmerButton';
 import { PublicCompaniesPage } from './pages/CompaniesPage';
+import { PublicLeaderboardPage } from './pages/LeaderboardPage';
 
 export type ShellOutletContext = {
   search: string;
@@ -90,6 +91,7 @@ function pageTitle(pathname: string): string {
     return 'Get extension';
   }
   if (pathname.startsWith('/tracker')) return 'Tracker';
+  if (pathname.startsWith('/leaderboard')) return 'Top contests';
   if (pathname.startsWith('/profile')) return 'Profile';
   if (pathname.startsWith('/companies')) return 'Companies';
   if (pathname.startsWith('/applications')) return 'Applications';
@@ -170,6 +172,12 @@ export function AppLayout() {
       location.pathname === '/companies/'
     ) {
       return <PublicCompaniesPage />;
+    }
+    if (
+      location.pathname === '/leaderboard' ||
+      location.pathname.startsWith('/leaderboard/')
+    ) {
+      return <PublicLeaderboardPage />;
     }
     if (location.pathname.startsWith('/companies/')) {
       return <Navigate to="/login?next=%2Fdashboard" replace />;

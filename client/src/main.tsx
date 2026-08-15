@@ -29,6 +29,7 @@ import { GetStartedPage } from './pages/GetStartedPage';
 import { TrackerPage } from './pages/TrackerPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LegalPage } from './pages/LegalPage';
 import { SupportPage } from './pages/SupportPage';
 import { UninstallFeedbackPage } from './pages/UninstallFeedbackPage';
@@ -83,6 +84,7 @@ const app = (
             <Route path="/browse" element={<Navigate to="/companies" replace />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/tracker" element={<TrackerPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
           <Route path="/admin" element={<AdminLayout />}>

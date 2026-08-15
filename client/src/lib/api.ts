@@ -578,6 +578,35 @@ export async function fetchScanStats(
   return request<ScanStats>(`/api/v1/scan-sessions/stats?${search.toString()}`);
 }
 
+export async function fetchLeaderboard(params: {
+  period?: 'month' | 'last_month' | 'year' | 'all';
+  platform?: string;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.period) search.set('period', params.period);
+  if (params.platform) search.set('platform', params.platform);
+  const qs = search.toString();
+  return request<{
+    period: { label: string; key: string };
+    platform: string;
+    currentUserRank: number | null;
+    entries: Array<{
+      rank: number;
+      displayName: string;
+      handle: string;
+      initials: string;
+      platform: string;
+      applied: number;
+      matched: number;
+      scanned: number;
+      points: number;
+      isYou: boolean;
+      trends: { applied: number[]; matched: number[]; scanned: number[] };
+      change: { applied: number; matched: number; scanned: number };
+    }>;
+  }>(`/api/v1/leaderboard${qs ? `?${qs}` : ''}`);
+}
+
 // ─── Admin API ───────────────────────────────────────────────
 
 export async function fetchAdminMetrics(params: {
