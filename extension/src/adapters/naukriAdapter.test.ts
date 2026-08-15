@@ -297,7 +297,7 @@ describe('NaukriAdapter', () => {
     expect(job?.aboutCompany).toMatch(/Moglix/i);
     expect(job?.companyLogo).toContain('logo_images/groups');
   });
-  it('skips company-site apply jobs from search results', () => {
+  it('flags company-site apply jobs in search results (Cosmo skips them)', () => {
     const adapter = new NaukriAdapter();
     document.body.innerHTML = `
       <div class="srp-jobtuple-wrapper" data-job-id="111">
@@ -312,8 +312,11 @@ describe('NaukriAdapter', () => {
       </div>
     `;
     const jobs = adapter.readSearchResults(document);
-    expect(jobs).toHaveLength(1);
+    expect(jobs).toHaveLength(2);
     expect(jobs[0]?.title).toBe('Easy Apply Role');
+    expect(jobs[0]?.companySiteApply).toBe(false);
+    expect(jobs[1]?.title).toBe('External Role');
+    expect(jobs[1]?.companySiteApply).toBe(true);
   });
 
   it('finds the visible Easy Apply button on job detail pages', () => {
@@ -1030,6 +1033,20 @@ describe('Naukri pagination', () => {
     expect(
       adapter.nextSearchPageUrl('https://www.naukri.com/react-jobs-2')
     ).toBe('https://www.naukri.com/react-jobs-3');
+    expect(
+      adapter.nextSearchPageUrl(
+        'https://www.naukri.com/software-engineer-jobs-in-hyderabad-secunderabad'
+      )
+    ).toBe(
+      'https://www.naukri.com/software-engineer-jobs-in-hyderabad-secunderabad-2'
+    );
+    expect(
+      adapter.nextSearchPageUrl(
+        'https://www.naukri.com/software-engineer-jobs-in-hyderabad-secunderabad-2'
+      )
+    ).toBe(
+      'https://www.naukri.com/software-engineer-jobs-in-hyderabad-secunderabad-3'
+    );
     expect(
       adapter.nextSearchPageUrl(
         'https://www.naukri.com/jobs?k=react&pageNo=2'

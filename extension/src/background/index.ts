@@ -57,7 +57,13 @@ import {
   stopBot,
   closeSessionComplete,
   continueSessionForMoreApplies,
+  isBotRunning,
 } from '../core/botRunner';
+import {
+  isCopilotKeepAliveAlarm,
+  startCopilotKeepAlive,
+  stopCopilotKeepAlive,
+} from '../core/copilotKeepAlive';
 import {
   clearAllowedExtraTab,
   ensureNaukriWorkTab,
@@ -176,6 +182,41 @@ async function persistAndSync(
   await enqueue(event);
   await flushQueue();
 }
+
+function botHandlers() {
+  return {
+    persistJobDetected: async (payload: JobPayload) => {
+      await persistAndSync(
+        'JobDetected',
+        payload as unknown as Record<string, unknown>
+      );
+    },
+    persistApplicationRecorded: async (payload: JobPayload) => {
+      await persistAndSync(
+        'ApplicationRecorded',
+        payload as unknown as Record<string, unknown>
+      );
+    },
+  };
+}
+
+/** MV3 SW may die mid-session — resume from storage when the worker wakes. */
+async function resumeInterruptedCopilotIfNeeded(): Promise<void> {
+  try {
+    const state = await getCopilotState();
+    if (!state.running || state.paused || state.sessionComplete) return;
+    if (isBotRunning()) return;
+    logger.info('Resuming interrupted co-pilot after service-worker wake');
+    await startCopilotKeepAlive();
+    void runBot(botHandlers(), { resume: true });
+  } catch (error) {
+    logger.warn('Could not resume interrupted co-pilot', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+void resumeInterruptedCopilotIfNeeded();
 
 async function sendExtensionConnected(): Promise<void> {
   const auth = await getAuthState();
@@ -298,6 +339,21 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (isCopilotKeepAliveAlarm(alarm.name)) {
+    const state = await getCopilotState();
+    if (!state.running || state.sessionComplete) {
+      await stopCopilotKeepAlive();
+      return;
+    }
+    // Touch storage so the SW stays warm; resume the loop if it was killed.
+    await chrome.storage.session.set({ cosmoKeepAliveAt: Date.now() }).catch(() => undefined);
+    if (!isBotRunning() && !state.paused) {
+      logger.info('Keep-alive resuming interrupted co-pilot');
+      await startCopilotKeepAlive();
+      void runBot(botHandlers(), { resume: true });
+    }
+    return;
+  }
   if (alarm.name === 'sync-flush' || alarm.name.startsWith('retry-')) {
     await flushQueue();
     await flushScanSessions();
@@ -309,6 +365,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await loadPreferences();
     }
   }
+});
+
+/** Long-lived ports from the Naukri panel keep the SW alive during applies. */
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'cosmo-copilot-keepalive') return;
+  port.onMessage.addListener(() => {
+    /* ping */
+  });
+  port.onDisconnect.addListener(() => {
+    /* panel navigated — alarm keep-alive covers the gap */
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -589,20 +656,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           await clearCopilotLogs();
           await clearCopilotAlert();
-          void runBot({
-            persistJobDetected: async (payload) => {
-              await persistAndSync(
-                'JobDetected',
-                payload as unknown as Record<string, unknown>
-              );
-            },
-            persistApplicationRecorded: async (payload) => {
-              await persistAndSync(
-                'ApplicationRecorded',
-                payload as unknown as Record<string, unknown>
-              );
-            },
-          }).then(async () => {
+          void runBot(botHandlers(), { resume: false }).then(async () => {
             /* session finished */
           });
           // Open Cosmo dock on Naukri (consent / progress) even if it was minimized.
@@ -629,6 +683,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         case 'COPILOT_RESUME': {
           await resumeBot();
+          {
+            const st = await getCopilotState();
+            if (
+              st.running &&
+              !st.paused &&
+              !st.sessionComplete &&
+              !isBotRunning()
+            ) {
+              await startCopilotKeepAlive();
+              void runBot(botHandlers(), { resume: true });
+            }
+          }
           sendResponse({ ok: true });
           break;
         }
@@ -640,6 +706,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             paused: false,
           });
           await resumeBot();
+          if (!isBotRunning()) {
+            await startCopilotKeepAlive();
+            void runBot(botHandlers(), { resume: true });
+          }
           sendResponse({ ok: true });
           break;
         }

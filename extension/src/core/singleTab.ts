@@ -6,10 +6,27 @@
 
 import { getCopilotState } from './copilotState';
 
+const WORK_TAB_STORAGE_KEY = 'cosmoActiveNaukriWorkTabId';
+
 let activeWorkTabId: number | null = null;
 /** Tabs Cosmo intentionally opened (legacy allow-list; prefer zero extras). */
 const allowedExtraTabIds = new Set<number>();
 let guardInstalled = false;
+let workTabHydrated = false;
+
+async function hydrateWorkTabId(): Promise<void> {
+  if (workTabHydrated) return;
+  workTabHydrated = true;
+  try {
+    const data = await chrome.storage.session.get(WORK_TAB_STORAGE_KEY);
+    const raw = data[WORK_TAB_STORAGE_KEY];
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      activeWorkTabId = raw;
+    }
+  } catch {
+    /* session storage may be unavailable in tests */
+  }
+}
 
 export function getActiveWorkTabId(): number | null {
   return activeWorkTabId;
@@ -17,6 +34,9 @@ export function getActiveWorkTabId(): number | null {
 
 export function setActiveWorkTabId(tabId: number | null): void {
   activeWorkTabId = tabId;
+  void chrome.storage.session
+    .set({ [WORK_TAB_STORAGE_KEY]: tabId })
+    .catch(() => undefined);
 }
 
 export function allowExtraTab(tabId: number): void {
@@ -37,10 +57,15 @@ function isNaukriUrl(url: string | undefined): boolean {
 export async function closeExtraNaukriTabs(
   keepTabId: number | null = activeWorkTabId
 ): Promise<void> {
+  // Never close "everything" — if we lost the work-tab id (SW restart),
+  // closing all Naukri tabs aborts the session mid-queue.
+  const keep = keepTabId ?? activeWorkTabId;
+  if (keep == null) return;
+
   const tabs = await chrome.tabs.query({ url: NAUKRI_TAB_URLS });
   for (const tab of tabs) {
     if (tab.id == null) continue;
-    if (keepTabId != null && tab.id === keepTabId) continue;
+    if (tab.id === keep) continue;
     if (allowedExtraTabIds.has(tab.id)) continue;
     try {
       await chrome.tabs.remove(tab.id);
@@ -56,17 +81,28 @@ export async function ensureNaukriWorkTab(opts: {
   active: boolean;
 }): Promise<chrome.tabs.Tab> {
   installTabSpamGuard();
+  await hydrateWorkTabId();
+
+  const navigateIfNeeded = async (tabId: number): Promise<chrome.tabs.Tab> => {
+    const existing = await chrome.tabs.get(tabId);
+    const cur = existing.url || '';
+    if (!sameSearchIntent(cur, opts.url)) {
+      await chrome.tabs.update(tabId, {
+        url: opts.url,
+        active: opts.active,
+      });
+    } else if (opts.active && !existing.active) {
+      await chrome.tabs.update(tabId, { active: true });
+    }
+    await closeExtraNaukriTabs(tabId);
+    return chrome.tabs.get(tabId);
+  };
 
   if (activeWorkTabId != null) {
     try {
       const existing = await chrome.tabs.get(activeWorkTabId);
       if (existing.id != null) {
-        await chrome.tabs.update(existing.id, {
-          url: opts.url,
-          active: opts.active,
-        });
-        await closeExtraNaukriTabs(existing.id);
-        return chrome.tabs.get(existing.id);
+        return navigateIfNeeded(existing.id);
       }
     } catch {
       activeWorkTabId = null;
@@ -77,12 +113,7 @@ export async function ensureNaukriWorkTab(opts: {
   const reusable = naukriTabs.find((t) => t.id != null);
   if (reusable?.id != null) {
     activeWorkTabId = reusable.id;
-    await chrome.tabs.update(reusable.id, {
-      url: opts.url,
-      active: opts.active,
-    });
-    await closeExtraNaukriTabs(reusable.id);
-    return chrome.tabs.get(reusable.id);
+    return navigateIfNeeded(reusable.id);
   }
 
   const created = await chrome.tabs.create({
@@ -91,6 +122,26 @@ export async function ensureNaukriWorkTab(opts: {
   });
   activeWorkTabId = created.id ?? null;
   return created;
+}
+
+/** Keyword/location match — avoid reloading the same SRP on Start. */
+function sameSearchIntent(currentUrl: string, targetUrl: string): boolean {
+  try {
+    const cur = new URL(currentUrl);
+    const target = new URL(targetUrl);
+    if (!/naukri\.com/i.test(cur.hostname)) return false;
+    if (cur.origin !== target.origin) return false;
+    const curPath = cur.pathname.replace(/\/$/, '');
+    const targetPath = target.pathname.replace(/\/$/, '');
+    if (curPath === targetPath) return true;
+    const curK = (cur.searchParams.get('k') || '').trim().toLowerCase();
+    const targetK = (target.searchParams.get('k') || '').trim().toLowerCase();
+    const curL = (cur.searchParams.get('l') || '').trim().toLowerCase();
+    const targetL = (target.searchParams.get('l') || '').trim().toLowerCase();
+    return Boolean(curK && targetK && curK === targetK && curL === targetL);
+  } catch {
+    return false;
+  }
 }
 
 async function closeIfSpamTab(tabId: number): Promise<void> {

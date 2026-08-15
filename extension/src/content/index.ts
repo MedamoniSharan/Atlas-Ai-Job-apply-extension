@@ -277,6 +277,15 @@ async function runEasyApply(): Promise<{
 
   const btn = naukri.findEasyApplyButton(document);
   if (!btn) {
+    // No Easy Apply — treat as company/external and skip (never invent a click).
+    if (naukri.isCompanySiteApply(document)) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: 'Apply on company site — skipped',
+        job,
+      };
+    }
     return {
       ok: false,
       skipped: true,
@@ -286,13 +295,30 @@ async function runEasyApply(): Promise<{
   }
 
   const label = (btn.textContent || '').toLowerCase();
-  if (/company site|external/.test(label)) {
+  if (
+    /company site|external|company website|apply on company|apply to company/.test(
+      label
+    )
+  ) {
     return {
       ok: false,
       skipped: true,
       reason: 'External / company-site apply',
       job,
     };
+  }
+
+  // Final guard: never follow off-Naukri apply links in this tab.
+  if (btn instanceof HTMLAnchorElement) {
+    const href = btn.href || '';
+    if (href && !/naukri\.com/i.test(href)) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: 'Apply on company site — skipped',
+        job,
+      };
+    }
   }
 
   clickInSameTab(btn);
@@ -444,21 +470,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           typeof message?.focusLocation === 'string'
             ? message.focusLocation
             : null;
-        // 1) Open All Filters  2) tick prefs  3) reconfirm — then bot scans (no slowdown).
-        let result = await applyPreferenceFiltersAsync(document, prefs, 200, {
-          focusLocation,
-        });
-        for (let attempt = 0; attempt < 6 && !result.ready; attempt++) {
-          await new Promise((r) => setTimeout(r, 120));
-          result = await applyPreferenceFiltersAsync(document, prefs, 200, {
-            focusLocation,
-          });
-        }
 
-        if (
-          preferenceFiltersAlreadyApplied(document, prefs, focusLocation) &&
-          !result.applied.length
-        ) {
+        // Already matching — do not open All Filters / click again (causes blinks).
+        if (preferenceFiltersAlreadyApplied(document, prefs, focusLocation)) {
           const report = confirmPreferenceFilters(
             document,
             prefs,
@@ -469,18 +483,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             alreadyApplied: true,
             confirmed: report.ok,
             confirmDetails: report.details,
-            openedAllFilters: result.openedAllFilters ?? true,
+            openedAllFilters: false,
             applied: [],
-            skipped: result.skipped,
+            skipped: ['Filters already applied'],
             ready: true,
           });
           break;
         }
 
-        if (result.ready && !result.confirmed) {
-          result = await applyPreferenceFiltersAsync(document, prefs, 200, {
-            focusLocation,
-          });
+        // One apply pass + at most one retry. Nested retries used to re-tick
+        // filters 5–7 times and reload Naukri on every first Start.
+        let result = await applyPreferenceFiltersAsync(document, prefs, 200, {
+          focusLocation,
+        });
+        if (!result.ready || !result.confirmed) {
+          await new Promise((r) => setTimeout(r, 400));
+          if (!preferenceFiltersAlreadyApplied(document, prefs, focusLocation)) {
+            result = await applyPreferenceFiltersAsync(document, prefs, 200, {
+              focusLocation,
+            });
+          }
         }
 
         const report = confirmPreferenceFilters(

@@ -1333,15 +1333,15 @@ export function mountCopilotPanel() {
     if (show) setCollapsed(false);
     doneModal.classList.toggle('show', show);
     if (show && summary) {
-      const allDone = Boolean(summary.allApplied) || summary.applied > 0;
-      doneTitle.textContent = allDone
-        ? 'All jobs matched and applied'
-        : 'Session finished';
-      doneBody.textContent = allDone
-        ? `Matched and applied ${summary.applied} job(s) (matched ${summary.matched}, skipped ${summary.skipped}). Apply more, or close this tab and open your Cosmo dashboard?`
-        : summary.matched > 0
-          ? `Found ${summary.matched} match(es) (skipped ${summary.skipped}), but none were newly applied. Apply more, or close and open your dashboard?`
-          : `No preference matches this round (skipped ${summary.skipped}). Apply more with broader prefs, or close and open your dashboard?`;
+      const hitGoal =
+        Boolean(summary.allApplied) ||
+        summary.applied + summary.skipped >= 30;
+      doneTitle.textContent = hitGoal
+        ? 'Reached 30 applied+skipped'
+        : 'Still under 30 — results ran out';
+      doneBody.textContent = hitGoal
+        ? `Applied ${summary.applied}, skipped ${summary.skipped} (matched ${summary.matched}). Apply more, or close and open your Cosmo dashboard?`
+        : `Only ${summary.applied + summary.skipped}/30 processed (applied ${summary.applied}, skipped ${summary.skipped}, matched ${summary.matched}). Cosmo will keep going when you press Apply more, or close and open your dashboard.`;
       doneMoreBtn.textContent = 'Apply more';
       doneCloseBtn.textContent = 'Close — view dashboard';
     }
@@ -1703,8 +1703,55 @@ export function mountCopilotPanel() {
     }
   }
 
+  let keepAlivePort: chrome.runtime.Port | null = null;
+  let keepAlivePingTimer: ReturnType<typeof setInterval> | null = null;
+
+  function syncKeepAlivePort(running: boolean) {
+    if (running) {
+      if (keepAlivePort) return;
+      try {
+        keepAlivePort = chrome.runtime.connect({ name: 'cosmo-copilot-keepalive' });
+        keepAlivePort.onDisconnect.addListener(() => {
+          keepAlivePort = null;
+          if (keepAlivePingTimer) {
+            clearInterval(keepAlivePingTimer);
+            keepAlivePingTimer = null;
+          }
+          void getCopilotState().then((s) => {
+            if (s.running && !s.paused) {
+              window.setTimeout(() => syncKeepAlivePort(true), 800);
+            }
+          });
+        });
+        if (!keepAlivePingTimer) {
+          keepAlivePingTimer = setInterval(() => {
+            try {
+              keepAlivePort?.postMessage({ t: Date.now() });
+            } catch {
+              /* disconnected */
+            }
+          }, 20000);
+        }
+      } catch {
+        keepAlivePort = null;
+      }
+      return;
+    }
+    try {
+      keepAlivePort?.disconnect();
+    } catch {
+      /* ignore */
+    }
+    keepAlivePort = null;
+    if (keepAlivePingTimer) {
+      clearInterval(keepAlivePingTimer);
+      keepAlivePingTimer = null;
+    }
+  }
+
   async function refresh() {
     const state = await getCopilotState();
+    syncKeepAlivePort(Boolean(state.running && !state.sessionComplete));
     render(state);
     loadSafetyStrip(state);
   }

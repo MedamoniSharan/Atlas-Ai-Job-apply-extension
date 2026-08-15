@@ -7,6 +7,7 @@ alwaysApply: true
 
 **Session ceiling:** Keep going until `applied + skipped >= 30` (or results are truly exhausted).
 
+- Company-site / external-apply cards: bypass on the list — never open or click, and **do not** count them toward `applied + skipped` (Cosmo cannot Easy Apply them).
 - Apply Naukri **All Filters once** per search, then run continuously — **never** ask the user to click Next page or Apply more mid-run.
 - Flow: **filters → scan (auto next-page) → apply queued matches → continue** until `applied + skipped >= 30`.
   - Do not end a session while matched jobs are still **Queued**.

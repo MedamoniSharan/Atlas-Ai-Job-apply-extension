@@ -17,11 +17,30 @@ describe('botRunner continuous session invariants (source)', () => {
 
   it('applies queued matches before switching/ending a search', () => {
     expect(src).toContain('Phase 2: always apply what we queued before ending or switching');
+    expect(src).toContain('mustApplyQueuedBeforeContinue');
     expect(src).toContain('applyCollectedJobs');
-    // Must not early-return on filter failure before the loop can apply prior queue —
-    // filter failure now breaks the loop instead of return { ok:false } mid-batch.
-    expect(src).toMatch(
-      /Stopped while applying Naukri filters[\s\S]{0,120}hitLimit = true/
+    expect(src).toContain('Could not apply Naukri filters');
+    expect(src).toContain('trying next search');
+    expect(src).toContain('MAX_PLAN_PASSES');
+    expect(src).toContain('APPLY_CHUNK_SIZE');
+    expect(src).toContain('startCopilotKeepAlive');
+    expect(src).toContain('opts?.resume');
+    expect(src).toContain('ensureLiveWorkTabId');
+    expect(src).toContain('ensureLoggedInForSession');
+    expect(src).toContain('alreadySeenMatches');
+    expect(src).toContain('activeListUrl');
+    expect(src).toContain('collected.exhausted');
+    expect(src).toContain('isNaukriSearchListUrl');
+    expect(src).not.toContain('if (filterBatch.length < chunkTarget)');
+
+    const bg = readFileSync(path.join(root, 'src/background/index.ts'), 'utf8');
+    expect(bg).toContain('resume: true');
+    expect(bg).toContain('resumeInterruptedCopilotIfNeeded');
+    expect(bg).toContain('cosmo-copilot-keepalive');
+
+    // Regression: never break on ceiling between collect and apply.
+    expect(src).not.toMatch(
+      /hasHitProcessCeiling\(processed, SCAN_BATCH_SIZE\)\) break;\s*\n\s*if \(filterBatch\.length === 0\)/
     );
   });
 
@@ -29,6 +48,20 @@ describe('botRunner continuous session invariants (source)', () => {
     expect(src).toContain('Auto next page');
     expect(src).toContain('goToNextSearchPage');
     expect(src).not.toMatch(/ask.*Next page/i);
+  });
+
+  it('bypasses company-site on the list without burning the applied+skipped ceiling', () => {
+    expect(src).toContain('companySiteBypassed');
+    expect(src).toContain(
+      'Company site — bypassed (no Easy Apply, not counted)'
+    );
+    const listBypass = src.match(
+      /if \(job\.companySiteApply\) \{[\s\S]*?continue;\s*\n\s*\}/
+    )?.[0];
+    expect(listBypass).toBeTruthy();
+    expect(listBypass).not.toContain('upsertScannedJobs');
+    expect(listBypass).not.toContain("'skipped'");
+    expect(listBypass).toContain('companySiteBypassed');
   });
 });
 

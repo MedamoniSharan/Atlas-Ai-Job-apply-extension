@@ -1,6 +1,6 @@
 {
   "name": "@cosmo/extension",
-  "version": "1.0.7",
+  "version": "1.0.11",
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs",

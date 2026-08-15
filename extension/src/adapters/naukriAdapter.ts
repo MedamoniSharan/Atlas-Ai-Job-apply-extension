@@ -2428,10 +2428,8 @@ export class NaukriAdapter implements PlatformAdapter {
         .filter((s): s is string => Boolean(s))
         .slice(0, 30);
 
-      // Skip employer-site / external apply jobs during scan.
-      if (detectCompanySiteApply(root)) {
-        continue;
-      }
+      // Flag employer-site / external apply — Cosmo skips these (counts toward 30).
+      const companySiteApply = detectCompanySiteApply(root);
 
       results.push({
         title,
@@ -2448,7 +2446,7 @@ export class NaukriAdapter implements PlatformAdapter {
         rating,
         reviews,
         postedAt,
-        companySiteApply: false,
+        companySiteApply,
       });
     }
 
@@ -2803,15 +2801,23 @@ export class NaukriAdapter implements PlatformAdapter {
           return u.toString();
         }
       }
-      // Naukri path style: /foo-jobs → /foo-jobs-2 → /foo-jobs-3
-      const m = u.pathname.match(/^(.*?-jobs)(?:-(\d+))?\/?$/i);
-      if (m) {
-        const base = m[1]!;
-        const n = m[2] ? Number(m[2]) : 1;
-        u.pathname = `${base}-${n + 1}`;
+      // Job detail pages — never invent pagination.
+      if (/job-listings/i.test(u.pathname)) return null;
+      // Naukri path styles:
+      //   /react-jobs → /react-jobs-2
+      //   /react-jobs-2 → /react-jobs-3
+      //   /software-engineer-jobs-in-hyderabad-secunderabad → …-2
+      //   /software-engineer-jobs-in-hyderabad-secunderabad-2 → …-3
+      // Old regex stopped at the first "-jobs", so *-jobs-in-* never bumped
+      // and scan falsely exhausted after page 1.
+      if (!/-jobs/i.test(u.pathname)) return null;
+      const paged = u.pathname.match(/^(.*?)-(\d+)\/?$/i);
+      if (paged && /-jobs/i.test(paged[1]!)) {
+        u.pathname = `${paged[1]}-${Number(paged[2]) + 1}`;
         return u.toString();
       }
-      return null;
+      u.pathname = `${u.pathname.replace(/\/$/, '')}-2`;
+      return u.toString();
     } catch {
       return null;
     }

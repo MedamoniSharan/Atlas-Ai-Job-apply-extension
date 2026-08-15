@@ -51,8 +51,13 @@ import {
   wait,
 } from './humanPace';
 import {
+  startCopilotKeepAlive,
+  stopCopilotKeepAlive,
+} from './copilotKeepAlive';
+import {
   SCAN_MATCH_TARGET,
   hasHitProcessCeiling,
+  mustApplyQueuedBeforeContinue,
   remainingProcessSlots,
   scanWaitMessage,
   sessionProcessedCount,
@@ -106,10 +111,12 @@ async function sendToTab<T>(
 /**
  * Scan only: wait until job cards exist (or timeout). No human pacing.
  * Tight poll — exits as soon as cards appear.
+ * Default timeout must be long enough for slow Naukri SPAs; 800ms caused
+ * false "end of results" stops in production.
  */
 async function waitForSearchListReady(
   tabId: number,
-  timeoutMs = 800
+  timeoutMs = 4500
 ): Promise<number> {
   const end = Date.now() + timeoutMs;
   let count = 0;
@@ -125,12 +132,71 @@ async function waitForSearchListReady(
     } catch {
       /* content script may still be injecting */
     }
-    await wait(50);
+    await wait(100);
   }
   return count;
 }
 
+/** One empty scrape is not EOF — Naukri often needs a settle after nav/filter. */
+async function scrapeSearchListWithConfirm(
+  tabId: number
+): Promise<SearchResultJob[]> {
+  const first = await sendToTab<{ jobs?: SearchResultJob[] }>(tabId, {
+    type: 'RUN_SCAN_SCRAPE',
+  });
+  const firstJobs = first.jobs ?? [];
+  if (firstJobs.length > 0) return firstJobs;
+
+  await wait(500);
+  await waitForSearchListReady(tabId, 3000);
+  const second = await sendToTab<{ jobs?: SearchResultJob[] }>(tabId, {
+    type: 'RUN_SCAN_SCRAPE',
+  });
+  return second.jobs ?? [];
+}
+
 /** Apply Naukri filters first (no humanPace slowdown). Then scan/apply. */
+/** Same keyword/location search — ignore filter query noise that UI ticks will set. */
+function sameNaukriSearchIntent(currentUrl: string, targetUrl: string): boolean {
+  try {
+    const cur = new URL(currentUrl);
+    const target = new URL(targetUrl);
+    if (cur.origin !== target.origin) return false;
+    // Ignore pagination suffixes (-2, -3) when comparing search identity.
+    const stripPage = (p: string) =>
+      p.replace(/\/$/, '').replace(/-(\d+)$/i, '');
+    const curPath = stripPage(cur.pathname);
+    const targetPath = stripPage(target.pathname);
+    const curK = (cur.searchParams.get('k') || '').trim().toLowerCase();
+    const targetK = (target.searchParams.get('k') || '').trim().toLowerCase();
+    const curL = (cur.searchParams.get('l') || '').trim().toLowerCase();
+    const targetL = (target.searchParams.get('l') || '').trim().toLowerCase();
+    // When either side has k=, path alone is not enough (/jobs?k=A vs /jobs?k=B).
+    if (curK || targetK) {
+      return curPath === targetPath && curK === targetK && curL === targetL;
+    }
+    return curPath === targetPath;
+  } catch {
+    return normalizeUrl(currentUrl) === normalizeUrl(targetUrl);
+  }
+}
+
+/**
+ * Navigate with keyword/location only. Salary/work-mode go through All Filters UI.
+ * Putting ctcFilter/wfhType in the URL makes Naukri redirect/rewrite on first load
+ * (looks like 2–3 reloads before filters even run).
+ */
+function naukriKeywordNavUrl(searchUrl: string): string {
+  try {
+    const u = new URL(searchUrl);
+    u.searchParams.delete('ctcFilter');
+    u.searchParams.delete('wfhType');
+    return u.toString();
+  } catch {
+    return searchUrl;
+  }
+}
+
 async function applyNaukriPreferenceFilters(
   tabId: number,
   prefs: JobPreferences,
@@ -138,7 +204,9 @@ async function applyNaukriPreferenceFilters(
   searchUrl: string,
   options?: { forceNavigate?: boolean; focusLocation?: string | null }
 ): Promise<boolean> {
-  const forceNavigate = options?.forceNavigate !== false;
+  // Default false: All Filters UI ticks prefs on the current SRP.
+  // Full reloads blink the page and were happening every search.
+  const forceNavigate = options?.forceNavigate === true;
   const focusLocation = options?.focusLocation ?? null;
   const needsSalary = prefs.minSalaryLpa != null && prefs.minSalaryLpa > 0;
   const needsWork = prefs.workMode !== 'any' && prefs.workMode != null;
@@ -160,30 +228,27 @@ async function applyNaukriPreferenceFilters(
     'info'
   );
 
-  if (forceNavigate) {
-    await appendCopilotLog(`Filter search URL: ${searchUrl}`, 'info');
-    await chrome.tabs.update(tabId, {
-      url: searchUrl,
-      active: !stealth,
-    });
-    await waitForTabComplete(tabId);
-    await waitForSearchListReady(tabId);
-    if (!(await ensureNaukriLoggedIn(tabId))) return false;
-
-    for (let i = 0; i < 2; i++) {
-      const tab = await chrome.tabs.get(tabId);
-      if (searchUrlHasPreferenceFilters(tab.url || '', prefs)) break;
-      await appendCopilotLog(
-        'Naukri dropped filter params — reloading filtered URL…',
-        'warn'
-      );
+  const tabNow = await chrome.tabs.get(tabId);
+  const alreadyOnSearch = sameNaukriSearchIntent(tabNow.url || '', searchUrl);
+  if (forceNavigate || !alreadyOnSearch) {
+    if (!alreadyOnSearch) {
+      const navUrl = naukriKeywordNavUrl(searchUrl);
+      await appendCopilotLog(`Filter search URL: ${navUrl}`, 'info');
       await chrome.tabs.update(tabId, {
-        url: searchUrl,
+        url: navUrl,
         active: !stealth,
       });
       await waitForTabComplete(tabId);
       await waitForSearchListReady(tabId);
+      if (!(await ensureNaukriLoggedIn(tabId))) return false;
     }
+    // Do NOT reload when Naukri strips ctcFilter/wfhType from the URL —
+    // All Filters clicks below re-apply those without a full page blink.
+  } else {
+    await appendCopilotLog(
+      'Already on this search — applying All Filters without reload',
+      'info'
+    );
   }
 
   await appendCopilotLog(
@@ -193,7 +258,8 @@ async function applyNaukriPreferenceFilters(
 
   let confirmed = false;
   let lastDetails: string[] = [];
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // At most 2 outer attempts — content script already does one retry.
+  for (let attempt = 0; attempt < 2; attempt++) {
     if (!(await waitWhilePaused())) return false;
     try {
       const result = await sendToTab<{
@@ -251,7 +317,7 @@ async function applyNaukriPreferenceFilters(
         `All Filters attempt ${attempt + 1}: ${(result.skipped ?? []).join('; ') || 'panel not ready'}`,
         'warn'
       );
-      await wait(100);
+      await wait(250);
     } catch (error) {
       await appendCopilotLog(
         `All Filters click error: ${
@@ -259,7 +325,7 @@ async function applyNaukriPreferenceFilters(
         }`,
         'warn'
       );
-      await wait(100);
+      await wait(250);
     }
   }
 
@@ -436,14 +502,14 @@ async function ensureNaukriLoggedIn(tabId: number): Promise<boolean> {
   }
 
   await appendCopilotLog(
-    'Still not logged into Naukri. Stopping co-pilot.',
+    'Still not logged into Naukri — paused. Log in, then press Confirm / Resume.',
     'error'
   );
   await setCopilotState({
-    running: false,
-    paused: false,
-    needsLogin: false,
-    loginPauseReason: null,
+    // Keep the session alive — do not set running:false (that mass-skips the queue).
+    paused: true,
+    needsLogin: true,
+    loginPauseReason: 'loggedOut',
   });
   return false;
 }
@@ -465,15 +531,28 @@ async function checkBlockOnTab(tabId: number): Promise<boolean> {
   return false;
 }
 
+function isNaukriSearchListUrl(url: string | undefined): boolean {
+  if (!url || !/naukri\.com/i.test(url)) return false;
+  if (/job-listings/i.test(url)) return false;
+  return /\/(jobs|jobseeker|mnjuser)/i.test(url) || /-jobs/i.test(url);
+}
+
 async function goBackToList(
   tabId: number,
   searchUrl: string,
   stealth: boolean,
-  options?: { maxNavMs?: number; humanPace?: boolean }
+  options?: { maxNavMs?: number; humanPace?: boolean; listUrl?: string }
 ): Promise<void> {
   const mode = paceModeFromStealth(stealth);
+  // Prefer the live filtered/paged SRP URL. Keyword-only nav drops All Filters
+  // and page position, which made the next chunk think results were exhausted.
+  const preferred = options?.listUrl?.trim();
+  const navUrl =
+    preferred && isNaukriSearchListUrl(preferred)
+      ? preferred
+      : naukriKeywordNavUrl(searchUrl);
   await chrome.tabs.update(tabId, {
-    url: searchUrl,
+    url: navUrl,
     active: !stealth,
   });
   await waitForTabComplete(tabId);
@@ -486,6 +565,7 @@ async function goBackToList(
     });
     return;
   }
+  await waitForSearchListReady(tabId, 2500);
   await wait(options?.maxNavMs ?? 0);
 }
 
@@ -777,9 +857,7 @@ async function applyOneJob(
 
   if (companySiteApply) {
     await markCompanySite(handlers, enriched, id);
-    if (returnToList) {
-      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
-    }
+    // Stay on Naukri — never click external apply. Next job navigates away.
     return 'continue';
   }
 
@@ -834,6 +912,21 @@ async function applyOneJob(
   if (await checkBlockOnTab(tabId)) return 'stop';
   if (!(await ensureNaukriLoggedIn(tabId))) return 'stop';
 
+  // Re-check after dwell — Naukri sometimes reveals company-site CTA late.
+  try {
+    const late = await sendToTab<{ companySiteApply?: boolean }>(
+      tabId,
+      { type: 'READ_JOB_DETAIL' },
+      2
+    );
+    if (late.companySiteApply) {
+      await markCompanySite(handlers, enriched, id);
+      return 'continue';
+    }
+  } catch {
+    /* ignore */
+  }
+
   // If Apply vanished during detail scrape, wait briefly once more.
   if (!applyReady && !(await waitForApplyReady(tabId, APPLY_READY_RETRY_POLL_MS))) {
     await appendCopilotLog(
@@ -853,6 +946,19 @@ async function applyOneJob(
   if (result.blocked) {
     await handleBlockedPage(result.reason || 'verification page');
     return 'stop';
+  }
+
+  // External apply click must never strand us off Naukri.
+  if (
+    result.skipped &&
+    /company site|external/i.test(result.reason || '')
+  ) {
+    await markCompanySite(handlers, enriched, id);
+    const tabUrl = (await chrome.tabs.get(tabId)).url || '';
+    if (!/naukri\.com/i.test(tabUrl)) {
+      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
+    }
+    return 'continue';
   }
 
   // Reconfirm on the live page — never trust a hopeful Easy Apply result alone.
@@ -1075,16 +1181,57 @@ export type BotHandlers = {
 
 let botRunning = false;
 
+export function isBotRunning(): boolean {
+  return botRunning;
+}
+
 const MAX_SCROLL_ROUNDS = 20;
 /** Session ceiling: stop when applied + skipped reaches this. */
 const SCAN_BATCH_SIZE = SCAN_MATCH_TARGET;
+/**
+ * Collect/apply in small chunks toward 30 — never wait to queue all 30
+ * before the first Easy Apply (that left jobs Queued when the tab/SW hiccuped).
+ */
+const APPLY_CHUNK_SIZE = 5;
 /** How many Naukri result pages to walk for one title/keyword search (auto — never ask). */
 const MAX_SCAN_PAGES = 40;
 /** Stop after this many consecutive pages that add zero new matches. */
-const MAX_EMPTY_PAGES = 3;
+const MAX_EMPTY_PAGES = 6;
+/** Re-walk searches while under 30 — SW death / false EOF used to quit after 1–2. */
+const MAX_PLAN_PASSES = 10;
 
-async function publishScanWait(matched: number, target?: number): Promise<void> {
-  const goal = target ?? SCAN_BATCH_SIZE;
+/** Recover work tab if Chrome closed it or SW lost the id mid-run. */
+async function ensureLiveWorkTabId(
+  tabId: number | undefined,
+  searchUrl: string,
+  stealth: boolean
+): Promise<number> {
+  if (tabId != null) {
+    try {
+      const existing = await chrome.tabs.get(tabId);
+      if (existing.id != null) {
+        setActiveWorkTabId(existing.id);
+        return existing.id;
+      }
+    } catch {
+      /* tab gone */
+    }
+  }
+  const tab = await ensureNaukriWorkTab({
+    url: naukriKeywordNavUrl(searchUrl),
+    active: !stealth,
+  });
+  if (!tab.id) {
+    throw new Error('Could not open Naukri work tab');
+  }
+  setActiveWorkTabId(tab.id);
+  await appendCopilotLog('Recovered Naukri work tab — continuing toward 30', 'warn');
+  return tab.id;
+}
+
+async function publishScanWait(matched: number, _target?: number): Promise<void> {
+  // Always show progress against the session ceiling (30), not the chunk size.
+  const goal = SCAN_BATCH_SIZE;
   const state = await getCopilotState();
   const processed = sessionProcessedCount(state);
   await setCopilotState({
@@ -1105,6 +1252,21 @@ async function goToNextSearchPage(
   tabId: number
 ): Promise<{ ok: boolean; reason?: string }> {
   const before = (await chrome.tabs.get(tabId)).url || '';
+  let beforeFinger = '';
+  try {
+    const scrape = await sendToTab<{ jobs?: SearchResultJob[] }>(
+      tabId,
+      { type: 'RUN_SCAN_SCRAPE' },
+      2
+    );
+    beforeFinger = (scrape.jobs || [])
+      .map((j) => j.externalJobId || j.url || j.title)
+      .slice(0, 8)
+      .join('|');
+  } catch {
+    /* ignore */
+  }
+
   const clicked = await sendToTab<{ ok: boolean; reason?: string; via?: string }>(
     tabId,
     { type: 'CLICK_NEXT_PAGE' },
@@ -1115,7 +1277,23 @@ async function goToNextSearchPage(
   await waitForSearchListReady(tabId);
   let after = (await chrome.tabs.get(tabId)).url || '';
 
-  if (clicked.ok && after !== before) {
+  let afterFinger = beforeFinger;
+  try {
+    const scrape = await sendToTab<{ jobs?: SearchResultJob[] }>(
+      tabId,
+      { type: 'RUN_SCAN_SCRAPE' },
+      2
+    );
+    afterFinger = (scrape.jobs || [])
+      .map((j) => j.externalJobId || j.url || j.title)
+      .slice(0, 8)
+      .join('|');
+  } catch {
+    /* ignore */
+  }
+
+  // SPA may keep the same URL while replacing cards — treat that as success.
+  if (clicked.ok && (after !== before || (beforeFinger && afterFinger && afterFinger !== beforeFinger))) {
     return { ok: true };
   }
 
@@ -1145,6 +1323,23 @@ async function goToNextSearchPage(
 }
 
 /**
+ * Stay logged in during scan/apply. Login flicker must pause + wait —
+ * never treat it as end-of-results / abandon the search.
+ */
+async function ensureLoggedInForSession(tabId: number): Promise<boolean> {
+  while (true) {
+    if (!(await waitWhilePaused())) return false;
+    if (await ensureNaukriLoggedIn(tabId)) return true;
+    await appendCopilotLog(
+      'Waiting for Naukri login before continuing toward 30…',
+      'warn'
+    );
+    // ensureNaukriLoggedIn left us paused — block until Confirm/Resume/Stop.
+    if (!(await waitWhilePaused())) return false;
+  }
+}
+
+/**
  * Scroll the current search list and collect up to `target` preference matches.
  * Does not apply yet. `listCardsSeen` is cards on this page (0 = empty / past last).
  */
@@ -1160,12 +1355,27 @@ async function collectPreferenceMatches(opts: {
   into?: SearchResultJob[];
   /** Max matches to collect for this filter (remaining session cap). */
   target?: number;
-}): Promise<{ batch: SearchResultJob[]; listCardsSeen: number }> {
+}): Promise<{
+  batch: SearchResultJob[];
+  listCardsSeen: number;
+  /** Easy-Apply matches newly queued this call. */
+  newQueued: number;
+  /** already_applied skips (count toward applied+skipped ceiling). */
+  progressed: number;
+  /** Pref-matching company-site cards bypassed — keep paging, do NOT count toward ceiling. */
+  companySiteBypassed: number;
+  /** Pref-matching cards already in seenKeys (keep paging — not EOF). */
+  alreadySeenMatches: number;
+}> {
   const { tabId, searchUrl, stealth, prefs, seenKeys, scannedKeys } = opts;
   const prefix = opts.logPrefix ?? 'Scan';
   const target = Math.max(1, opts.target ?? SCAN_BATCH_SIZE);
   const batch = opts.into ?? [];
+  const batchStart = batch.length;
   let listCardsSeen = 0;
+  let progressed = 0;
+  let companySiteBypassed = 0;
+  let alreadySeenMatches = 0;
 
   await publishScanWait(batch.length, target);
   const processed = sessionProcessedCount(await getCopilotState());
@@ -1180,7 +1390,10 @@ async function collectPreferenceMatches(opts: {
     round++
   ) {
     if (!(await waitWhilePaused())) break;
-    if (!(await ensureNaukriLoggedIn(tabId))) break;
+    if (!(await ensureLoggedInForSession(tabId))) break;
+    if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) {
+      break;
+    }
 
     const tabInfo = await chrome.tabs.get(tabId);
     if (
@@ -1189,7 +1402,7 @@ async function collectPreferenceMatches(opts: {
       /job-listings/i.test(tabInfo.url)
     ) {
       await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 0 });
-      if (!(await ensureNaukriLoggedIn(tabId))) break;
+      if (!(await ensureLoggedInForSession(tabId))) break;
     }
 
     await appendCopilotLog(
@@ -1205,13 +1418,10 @@ async function collectPreferenceMatches(opts: {
       // No settle delay while scanning — scrape immediately after scroll.
     }
 
-    const scrape = await sendToTab<{ jobs: SearchResultJob[] }>(tabId, {
-      type: 'RUN_SCAN_SCRAPE',
-    });
-    const allJobs = scrape.jobs ?? [];
+    const allJobs = await scrapeSearchListWithConfirm(tabId);
     listCardsSeen = Math.max(listCardsSeen, allJobs.length);
 
-    // Empty listing = real end of results (or invented page past last).
+    // Empty listing after confirm = real end of results (or invented page).
     // Do not scroll 20 rounds or keep paging toward MAX_EMPTY_PAGES.
     if (allJobs.length === 0) {
       await appendCopilotLog(
@@ -1227,11 +1437,19 @@ async function collectPreferenceMatches(opts: {
 
     const appliedSet = await fetchAppliedSet(visible);
     let addedThisRound = 0;
+    let progressedThisRound = 0;
+    let companySiteThisRound = 0;
 
     for (const job of visible) {
       if (batch.length >= target) break;
+      if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) {
+        break;
+      }
       const id = jobKey(job);
-      if (seenKeys.has(id)) continue;
+      if (seenKeys.has(id)) {
+        alreadySeenMatches += 1;
+        continue;
+      }
       seenKeys.add(id);
 
       if (isAlreadyInDb(job, appliedSet)) {
@@ -1247,8 +1465,22 @@ async function collectPreferenceMatches(opts: {
           ],
           'already_applied'
         );
+        progressed += 1;
+        progressedThisRound += 1;
         await appendCopilotLog(
           `Already applied (Cosmo) — skipped: ${job.title}`,
+          'info'
+        );
+        continue;
+      }
+
+      // Company-site / external apply: never open or click — and do NOT burn
+      // the applied+skipped ceiling (Cosmo cannot Easy Apply these).
+      if (job.companySiteApply) {
+        companySiteBypassed += 1;
+        companySiteThisRound += 1;
+        await appendCopilotLog(
+          `Company site — bypassed (no Easy Apply, not counted): ${job.title}`,
           'info'
         );
         continue;
@@ -1269,12 +1501,26 @@ async function collectPreferenceMatches(opts: {
     }
 
     await appendCopilotLog(
-      `${prefix} round ${round + 1}: scanned ${scannedTotal} · +${addedThisRound} match → ${batch.length}/${target}`,
-      addedThisRound ? 'success' : 'warn'
+      `${prefix} round ${round + 1}: scanned ${scannedTotal} · +${addedThisRound} match → ${batch.length}/${target}` +
+        (progressedThisRound ? ` · ${progressedThisRound} already-applied toward ceiling` : '') +
+        (companySiteThisRound
+          ? ` · ${companySiteThisRound} company-site bypassed`
+          : ''),
+      addedThisRound || progressedThisRound || companySiteThisRound
+        ? 'success'
+        : 'warn'
     );
 
     if (batch.length >= target) break;
-    if (round > 0 && addedThisRound === 0) {
+    if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) {
+      break;
+    }
+    if (
+      round > 0 &&
+      addedThisRound === 0 &&
+      progressedThisRound === 0 &&
+      companySiteThisRound === 0
+    ) {
       await appendCopilotLog(
         `${prefix}: no more new matching jobs on this page`,
         'info'
@@ -1283,11 +1529,20 @@ async function collectPreferenceMatches(opts: {
     }
   }
 
-  return { batch, listCardsSeen };
+  return {
+    batch,
+    listCardsSeen,
+    newQueued: batch.length - batchStart,
+    progressed,
+    companySiteBypassed,
+    alreadySeenMatches,
+  };
 }
 
 /** Apply collected matches one by one (short settle — not full humanPace).
- * Stops early once applied + skipped hits the session ceiling.
+ * Always drains the queued batch before returning (product invariant).
+ * Soft ceiling stops *new* searches later — never leave jobs as Queued
+ * unless the user truly Stop'd or we are paused for login.
  */
 async function applyCollectedJobs(opts: {
   tabId: number;
@@ -1295,11 +1550,28 @@ async function applyCollectedJobs(opts: {
   prefs: JobPreferences;
   handlers: BotHandlers;
   searchUrl: string;
+  /** Filtered/paged list URL to restore after the chunk (not keyword-only). */
+  listUrl?: string;
   stealth: boolean;
 }): Promise<'ok' | 'stop' | 'limit' | 'waiting'> {
   const { tabId, jobs, prefs, handlers, searchUrl, stealth } = opts;
+  const listUrl = opts.listUrl || searchUrl;
+  const back = { maxNavMs: 800, listUrl } as const;
   if (jobs.length === 0) {
     await appendCopilotLog('Apply skipped — no matched jobs in queue', 'warn');
+    return 'waiting';
+  }
+
+  // Login flicker / false CHECK_LOGIN must not kill the batch.
+  let state = await getCopilotState();
+  if (!state.running) {
+    await setCopilotState({ running: true, paused: false });
+  }
+  if (!(await ensureLoggedInForSession(tabId))) {
+    await appendCopilotLog(
+      'Paused for Naukri login — matched jobs stay Queued until you Confirm.',
+      'warn'
+    );
     return 'waiting';
   }
 
@@ -1314,18 +1586,39 @@ async function applyCollectedJobs(opts: {
   });
 
   for (let i = 0; i < jobs.length; i++) {
-    if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) {
-      await appendCopilotLog(
-        `Reached ${SCAN_BATCH_SIZE} applied+skipped — stopping applies.`,
-        'success'
-      );
-      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
-      return 'ok';
-    }
     const job = jobs[i]!;
-    if (!(await waitWhilePaused())) {
-      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
+    state = await getCopilotState();
+    const existing = state.scannedJobs.find((j) => j.id === jobKey(job));
+    if (
+      existing &&
+      (existing.status === 'applied' ||
+        existing.status === 'already_applied' ||
+        existing.status === 'skipped')
+    ) {
+      continue;
+    }
+    if (!state.running) {
+      // User pressed Stop — leave remaining Queued (pending), don't fake-skip.
+      await appendCopilotLog(
+        `Stop pressed — ${jobs.length - i} job(s) left Queued`,
+        'warn'
+      );
+      await goBackToList(tabId, searchUrl, stealth, back);
       return 'stop';
+    }
+    if (state.paused) {
+      if (!(await waitWhilePaused())) {
+        await goBackToList(tabId, searchUrl, stealth, back);
+        return 'stop';
+      }
+    }
+    if (!(await ensureLoggedInForSession(tabId))) {
+      await appendCopilotLog(
+        `Paused for login — ${jobs.length - i} job(s) stay Queued`,
+        'warn'
+      );
+      await goBackToList(tabId, searchUrl, stealth, back);
+      return 'waiting';
     }
     await setCopilotState({
       runPhase: 'apply',
@@ -1342,17 +1635,113 @@ async function applyCollectedJobs(opts: {
       job,
       prefs,
       handlers,
-      searchUrl,
+      listUrl,
       stealth,
       { returnToList: false }
     );
-    if (outcome === 'stop' || outcome === 'limit') {
-      await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
-      return outcome;
+    if (outcome === 'limit') {
+      await markRemainingQueuedSkipped(jobs, i + 1, 'Apply limit reached');
+      await goBackToList(tabId, searchUrl, stealth, back);
+      return 'limit';
+    }
+    if (outcome === 'stop') {
+      const still = await getCopilotState();
+      if (!still.running) {
+        await goBackToList(tabId, searchUrl, stealth, back);
+        return 'stop';
+      }
+      // Login pause / soft interrupt — keep this job + rest Queued for retry.
+      await updateScannedJob(jobKey(job), { status: 'pending' });
+      await appendCopilotLog(
+        'Apply interrupted — keeping jobs Queued until login/resume',
+        'warn'
+      );
+      await goBackToList(tabId, searchUrl, stealth, back);
+      return 'waiting';
     }
   }
-  await goBackToList(tabId, searchUrl, stealth, { maxNavMs: 800 });
+  await goBackToList(tabId, searchUrl, stealth, back);
   return 'ok';
+}
+
+/** Clear leftover Queued rows so the panel never ends mid-batch on "Queued". */
+async function markRemainingQueuedSkipped(
+  jobs: SearchResultJob[],
+  fromIndex: number,
+  reason: string
+): Promise<void> {
+  for (let i = fromIndex; i < jobs.length; i++) {
+    const job = jobs[i]!;
+    const id = jobKey(job);
+    if (!id) continue;
+    await updateScannedJob(id, { status: 'skipped', skipReason: reason });
+  }
+}
+
+/** Never end a session while matched jobs are still Queued/Applying. */
+async function drainRemainingQueuedJobs(opts: {
+  tabId: number;
+  prefs: JobPreferences;
+  handlers: BotHandlers;
+  searchUrl: string;
+  stealth: boolean;
+}): Promise<void> {
+  const state = await getCopilotState();
+  const pending = state.scannedJobs.filter(
+    (j) => j.status === 'pending' || j.status === 'applying'
+  );
+  if (!pending.length) return;
+
+  await appendCopilotLog(
+    `Draining ${pending.length} Queued job(s) before ending session…`,
+    'warn'
+  );
+  // Keep session alive for the drain pass.
+  if (!state.running) {
+    await setCopilotState({ running: true, paused: false });
+  }
+
+  const jobs: SearchResultJob[] = pending.map((j) => ({
+    title: j.title,
+    company: j.company,
+    url: j.url,
+    externalJobId: j.externalJobId || j.id,
+  }));
+
+  let outcome = await applyCollectedJobs({
+    tabId: opts.tabId,
+    jobs,
+    prefs: opts.prefs,
+    handlers: opts.handlers,
+    searchUrl: opts.searchUrl,
+    listUrl: opts.searchUrl,
+    stealth: opts.stealth,
+  });
+
+  while (outcome === 'waiting') {
+    if (!(await waitWhilePaused())) break;
+    if (!(await ensureLoggedInForSession(opts.tabId))) continue;
+    outcome = await applyCollectedJobs({
+      tabId: opts.tabId,
+      jobs,
+      prefs: opts.prefs,
+      handlers: opts.handlers,
+      searchUrl: opts.searchUrl,
+      listUrl: opts.searchUrl,
+      stealth: opts.stealth,
+    });
+  }
+
+  // Absolute last resort — never leave the panel on Queued.
+  const leftover = (await getCopilotState()).scannedJobs.filter(
+    (j) => j.status === 'pending' || j.status === 'applying'
+  );
+  for (const j of leftover) {
+    await updateScannedJob(j.id, {
+      status: 'skipped',
+      skipReason: 'Session ended before apply finished',
+    });
+  }
 }
 
 /**
@@ -1369,12 +1758,36 @@ async function collectUntilMatchedBatch(opts: {
   pending?: SearchResultJob[];
   logPrefix?: string;
   target?: number;
-}): Promise<SearchResultJob[]> {
+}): Promise<{
+  jobs: SearchResultJob[];
+  listUrl: string;
+  /** True only when this search has no more pages/matches to mine. */
+  exhausted: boolean;
+}> {
   const batch = [...(opts.pending ?? [])];
   const prefix = opts.logPrefix ?? 'Scan';
   const target = Math.max(1, opts.target ?? SCAN_BATCH_SIZE);
   let emptyPages = 0;
   let listUrl = opts.searchUrl;
+  let recoveredEmptyFirstPage = false;
+  let exhausted = false;
+  let stoppedForTargetOrCeiling = false;
+
+  // Resume on the live SRP when possible (keeps filters + page).
+  try {
+    const cur = (await chrome.tabs.get(opts.tabId)).url || '';
+    if (isNaukriSearchListUrl(cur)) {
+      listUrl = cur;
+    } else if (isNaukriSearchListUrl(opts.searchUrl)) {
+      await goBackToList(opts.tabId, opts.searchUrl, opts.stealth, {
+        listUrl: opts.searchUrl,
+        maxNavMs: 400,
+      });
+      listUrl = (await chrome.tabs.get(opts.tabId)).url || opts.searchUrl;
+    }
+  } catch {
+    /* tab may be mid-nav */
+  }
 
   for (
     let page = 0;
@@ -1383,10 +1796,11 @@ async function collectUntilMatchedBatch(opts: {
   ) {
     // already_applied during scan counts as skipped toward the ceiling
     if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) {
+      stoppedForTargetOrCeiling = true;
       break;
     }
     if (!(await waitWhilePaused())) break;
-    if (!(await ensureNaukriLoggedIn(opts.tabId))) break;
+    if (!(await ensureLoggedInForSession(opts.tabId))) break;
 
     if (page > 0) {
       const processed = sessionProcessedCount(await getCopilotState());
@@ -1401,13 +1815,20 @@ async function collectUntilMatchedBatch(opts: {
           next.reason || `No more pages — still at ${batch.length}/${target} queued`,
           'warn'
         );
+        exhausted = true;
         break;
       }
       listUrl = (await chrome.tabs.get(opts.tabId)).url || listUrl;
     }
 
     const before = batch.length;
-    const { listCardsSeen } = await collectPreferenceMatches({
+    let {
+      listCardsSeen,
+      newQueued,
+      progressed,
+      companySiteBypassed,
+      alreadySeenMatches,
+    } = await collectPreferenceMatches({
       tabId: opts.tabId,
       searchUrl: listUrl,
       stealth: opts.stealth,
@@ -1420,8 +1841,62 @@ async function collectUntilMatchedBatch(opts: {
     });
     await notePageScanned();
     await reportScanSession('running');
-    if (batch.length >= target) break;
-    if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) break;
+    {
+      const cur = (await chrome.tabs.get(opts.tabId)).url || '';
+      if (isNaukriSearchListUrl(cur)) listUrl = cur;
+    }
+
+    // First page empty is often a false EOF (SPA not settled after nav/filters).
+    // Reload keyword URL once and re-scrape before abandoning this search.
+    if (
+      listCardsSeen === 0 &&
+      page === 0 &&
+      batch.length === before &&
+      !recoveredEmptyFirstPage
+    ) {
+      recoveredEmptyFirstPage = true;
+      const navUrl = isNaukriSearchListUrl(opts.searchUrl)
+        ? opts.searchUrl
+        : naukriKeywordNavUrl(opts.searchUrl);
+      await appendCopilotLog(
+        `${prefix}: first page looked empty — reloading search once and retrying…`,
+        'warn'
+      );
+      await chrome.tabs.update(opts.tabId, {
+        url: navUrl,
+        active: !opts.stealth,
+      });
+      await waitForTabComplete(opts.tabId);
+      await waitForSearchListReady(opts.tabId, 6000);
+      if (!(await ensureLoggedInForSession(opts.tabId))) break;
+      listUrl = (await chrome.tabs.get(opts.tabId)).url || navUrl;
+      const retry = await collectPreferenceMatches({
+        tabId: opts.tabId,
+        searchUrl: listUrl,
+        stealth: opts.stealth,
+        prefs: opts.prefs,
+        seenKeys: opts.seenKeys,
+        scannedKeys: opts.scannedKeys,
+        into: batch,
+        target,
+        logPrefix: `${prefix} p1-retry`,
+      });
+      listCardsSeen = retry.listCardsSeen;
+      newQueued = retry.newQueued;
+      progressed = retry.progressed;
+      companySiteBypassed = retry.companySiteBypassed;
+      alreadySeenMatches = retry.alreadySeenMatches;
+      await notePageScanned();
+    }
+
+    if (batch.length >= target) {
+      stoppedForTargetOrCeiling = true;
+      break;
+    }
+    if (hasHitProcessCeiling(sessionProcessedCount(await getCopilotState()), SCAN_BATCH_SIZE)) {
+      stoppedForTargetOrCeiling = true;
+      break;
+    }
 
     if (listCardsSeen === 0) {
       await appendCopilotLog(
@@ -1430,10 +1905,21 @@ async function collectUntilMatchedBatch(opts: {
           : `${prefix}: no jobs after page advance — treating as last page (${batch.length}/${target} queued)`,
         'warn'
       );
+      exhausted = true;
       break;
     }
 
-    if (batch.length === before) {
+    // Queued / already-applied / company-site-bypass reset the empty streak.
+    // Company-site does NOT count toward the applied+skipped ceiling.
+    // Already-seen match pages must keep paging — not count as EOF.
+    if (newQueued > 0 || progressed > 0 || companySiteBypassed > 0) {
+      emptyPages = 0;
+    } else if (alreadySeenMatches > 0) {
+      await appendCopilotLog(
+        `${prefix}: page already scanned — continuing to next page toward 30`,
+        'info'
+      );
+    } else {
       emptyPages += 1;
       await appendCopilotLog(
         `${prefix}: page added 0 new matches (${emptyPages}/${MAX_EMPTY_PAGES} empty)`,
@@ -1444,11 +1930,14 @@ async function collectUntilMatchedBatch(opts: {
           `${prefix}: stopping scan after ${MAX_EMPTY_PAGES} empty pages — ${batch.length}/${target} queued`,
           'warn'
         );
+        exhausted = true;
         break;
       }
-    } else {
-      emptyPages = 0;
     }
+  }
+
+  if (!stoppedForTargetOrCeiling && batch.length < target) {
+    exhausted = true;
   }
 
   const ready = batch.slice(0, target);
@@ -1469,11 +1958,12 @@ async function collectUntilMatchedBatch(opts: {
       'warn'
     );
   }
-  return ready;
+  return { jobs: ready, listUrl, exhausted };
 }
 
 export async function stopBot(): Promise<void> {
   setActiveWorkTabId(null);
+  await stopCopilotKeepAlive();
   await reportScanSession('stopped');
   await setCopilotState({
     running: false,
@@ -1514,7 +2004,10 @@ export async function resumeBot(): Promise<void> {
   );
 }
 
-export async function runBot(handlers: BotHandlers): Promise<{
+export async function runBot(
+  handlers: BotHandlers,
+  opts?: { resume?: boolean }
+): Promise<{
   ok: boolean;
   message: string;
 }> {
@@ -1530,6 +2023,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
     return { ok: false, message: 'Blocked cooldown active.' };
   }
   botRunning = true;
+  await startCopilotKeepAlive();
 
   try {
     // Prefer DB, then the dashboard-pushed / last-good cache.
@@ -1553,196 +2047,324 @@ export async function runBot(handlers: BotHandlers): Promise<{
     }
 
     const existing = await getCopilotState();
-    await setCopilotState({
-      running: true,
-      paused: false,
-      needsLogin: false,
-      loginUserConfirmed: false,
-      loginPauseReason: null,
-      keyword,
-      scanned: 0,
-      matched: 0,
-      applied: 0,
-      skipped: 0,
-      pagesScanned: 0,
-      appliesThisSession: 0,
-      stealthAppliesThisSession: 0,
-      stealthStartedAt: existing.runInBackground
-        ? new Date().toISOString()
-        : null,
-      sessionBreakUntil: null,
-      sessionBreakRemainingMs: null,
-      sessionComplete: null,
-      currentTitle: '',
-      scannedJobs: [],
-      runPhase: 'scan',
-      paceLabel: null,
-      paceRemainingMs: null,
-      runInBackground: existing.runInBackground,
-    });
-    await beginScanSession();
+    const resume =
+      Boolean(opts?.resume) &&
+      existing.running &&
+      !existing.sessionComplete &&
+      !hasHitProcessCeiling(sessionProcessedCount(existing), SCAN_BATCH_SIZE);
 
+    if (resume) {
+      await setCopilotState({
+        running: true,
+        paused: false,
+        sessionComplete: null,
+        runPhase: 'scan',
+        paceLabel: null,
+        paceRemainingMs: null,
+      });
+      await appendCopilotLog(
+        `Resuming co-pilot after background wake — ${sessionProcessedCount(existing)}/${SCAN_BATCH_SIZE} processed so far`,
+        'warn'
+      );
+    } else {
+      await setCopilotState({
+        running: true,
+        paused: false,
+        needsLogin: false,
+        loginUserConfirmed: false,
+        loginPauseReason: null,
+        keyword,
+        scanned: 0,
+        matched: 0,
+        applied: 0,
+        skipped: 0,
+        pagesScanned: 0,
+        appliesThisSession: 0,
+        stealthAppliesThisSession: 0,
+        stealthStartedAt: existing.runInBackground
+          ? new Date().toISOString()
+          : null,
+        sessionBreakUntil: null,
+        sessionBreakRemainingMs: null,
+        sessionComplete: null,
+        currentTitle: '',
+        scannedJobs: [],
+        runPhase: 'scan',
+        paceLabel: null,
+        paceRemainingMs: null,
+        runInBackground: existing.runInBackground,
+      });
+      await beginScanSession();
+    }
     const stealth = (await getCopilotState()).runInBackground;
-    await appendCopilotLog(
-      stealth
-        ? 'Stealth ON (background tabs) — higher account risk'
-        : 'Assisted mode (foreground)'
-    );
-    await appendCopilotLog(
-      `Co-pilot session started — searching for "${keyword}"`,
-      'success'
-    );
+    if (!resume) {
+      await appendCopilotLog(
+        stealth
+          ? 'Stealth ON (background tabs) — higher account risk'
+          : 'Assisted mode (foreground)'
+      );
+      await appendCopilotLog(
+        `Co-pilot session started — searching for "${keyword}"`,
+        'success'
+      );
+    }
     await broadcastCopilotToNaukriTabs({ type: 'COPILOT_EXPAND' });
 
     const searchPlan = buildNaukriSearchQueryPlan(prefs);
     const firstQuery = searchPlan[0]!;
     let searchUrl = firstQuery.url;
     installTabSpamGuard();
-    const tab = await ensureNaukriWorkTab({
-      url: searchUrl,
-      active: !stealth,
-    });
-    if (!tab.id) {
-      await appendCopilotLog('Could not open Naukri tab', 'error');
-      await setCopilotState({ running: false, runPhase: 'idle' });
-      return { ok: false, message: 'No tab.' };
-    }
-    setActiveWorkTabId(tab.id);
-    await closeExtraNaukriTabs(tab.id);
+    let workTabId = await ensureLiveWorkTabId(
+      undefined,
+      searchUrl,
+      stealth
+    );
 
-    await waitForTabComplete(tab.id);
-    await waitForSearchListReady(tab.id);
+    await waitForTabComplete(workTabId);
+    await waitForSearchListReady(workTabId);
 
-    if (await checkBlockOnTab(tab.id)) {
+    if (await checkBlockOnTab(workTabId)) {
       return { ok: false, message: 'Naukri block detected.' };
     }
 
     if (!(await waitWhilePaused())) {
       return { ok: true, message: 'Stopped.' };
     }
-
-    if (!(await ensureNaukriLoggedIn(tab.id))) {
-      return { ok: false, message: 'Not logged into Naukri.' };
+    if (!(await ensureLoggedInForSession(workTabId))) {
+      await appendCopilotLog(
+        'Still not logged into Naukri — paused. Confirm login to continue.',
+        'error'
+      );
+      // Keep running=true so keep-alive / resume can continue after Confirm.
+      await setCopilotState({ paused: true, needsLogin: true });
+      return { ok: false, message: 'Naukri login required.' };
     }
 
+    await closeExtraNaukriTabs(workTabId);
+
     const seenKeys = new Set<string>();
+    // On resume, don't re-queue jobs already in this session.
+    if (resume) {
+      for (const j of (await getCopilotState()).scannedJobs) {
+        if (j.id) seenKeys.add(j.id);
+      }
+    }
     const scannedKeys = new Set<string>();
     let hitLimit = false;
-    let anyMatched = false;
+    let anyMatched = resume
+      ? sessionProcessedCount(await getCopilotState()) > 0 ||
+        (await getCopilotState()).matched > 0
+      : false;
     let queriesTried = 0;
 
     // Continuous: filters once → scan pages → apply → repeat until
-    // applied + skipped >= 30 (or searches/pages are exhausted).
+    // applied + skipped >= 30 (or searches/pages are truly exhausted).
     await publishScanWait(0);
-    await appendCopilotLog(
-      scanWaitMessage(0, SCAN_BATCH_SIZE, 0),
-      'info'
-    );
-    await appendCopilotLog(
-      `Filters once per search, then scan → apply continuously until ${SCAN_BATCH_SIZE} applied+skipped.`,
-      'info'
-    );
-
-    for (let qi = 0; qi < searchPlan.length; qi++) {
-      let processed = sessionProcessedCount(await getCopilotState());
-      if (hasHitProcessCeiling(processed, SCAN_BATCH_SIZE)) {
-        await appendCopilotLog(
-          `Reached ${processed} applied+skipped — done.`,
-          'success'
-        );
-        break;
-      }
-
-      const query = searchPlan[qi]!;
-      searchUrl = query.url;
-      queriesTried += 1;
-      const remaining = remainingProcessSlots(processed, SCAN_BATCH_SIZE);
-      await setCopilotState({ keyword: query.keyword });
-      await publishScanWait(0, remaining);
+    if (!resume) {
       await appendCopilotLog(
-        `Search ${qi + 1}/${searchPlan.length} [${query.kind}]: "${query.keyword}"${
-          query.location ? ` in ${query.location}` : ' (India-wide)'
-        } — filters once, then scan → apply (${processed}/${SCAN_BATCH_SIZE} processed)`,
-        'success'
+        scanWaitMessage(0, SCAN_BATCH_SIZE, 0),
+        'info'
       );
+      await appendCopilotLog(
+        `Filters once per search, then scan → apply continuously until ${SCAN_BATCH_SIZE} applied+skipped.`,
+        'info'
+      );
+    }
 
-      if (qi > 0) {
-        await chrome.tabs.update(tab.id, { url: searchUrl, active: !stealth });
-        await waitForTabComplete(tab.id);
-        await waitForSearchListReady(tab.id);
-        if (!(await ensureNaukriLoggedIn(tab.id))) break;
-      }
-
-      if (
-        !(await applyNaukriPreferenceFilters(tab.id, prefs, stealth, searchUrl, {
-          focusLocation: query.location || null,
-        }))
-      ) {
+    outer: for (let pass = 0; pass < MAX_PLAN_PASSES; pass++) {
+      if (pass > 0) {
+        const mid = sessionProcessedCount(await getCopilotState());
+        if (hasHitProcessCeiling(mid, SCAN_BATCH_SIZE)) break;
         await appendCopilotLog(
-          'Stopped while applying Naukri filters.',
-          'error'
-        );
-        hitLimit = true;
-        break;
-      }
-
-      // Phase 1 for this search: scan / auto next-page until enough queued.
-      const filterBatch = await collectUntilMatchedBatch({
-        tabId: tab.id,
-        searchUrl,
-        stealth,
-        prefs,
-        seenKeys,
-        scannedKeys,
-        pending: [],
-        target: remaining,
-        logPrefix: `Scan “${query.keyword}”`,
-      });
-
-      processed = sessionProcessedCount(await getCopilotState());
-      if (hasHitProcessCeiling(processed, SCAN_BATCH_SIZE)) break;
-
-      if (filterBatch.length === 0) {
-        await appendCopilotLog(
-          `No new matches for "${query.keyword}"${
-            query.location ? ` / ${query.location}` : ''
-          } — next search…`,
+          `Still at ${mid}/${SCAN_BATCH_SIZE} — another pass over searches (${pass + 1}/${MAX_PLAN_PASSES})…`,
           'warn'
         );
-        continue;
       }
 
-      anyMatched = true;
+      for (let qi = 0; qi < searchPlan.length; qi++) {
+        let processed = sessionProcessedCount(await getCopilotState());
+        if (hasHitProcessCeiling(processed, SCAN_BATCH_SIZE)) {
+          await appendCopilotLog(
+            `Reached ${processed} applied+skipped — done.`,
+            'success'
+          );
+          break outer;
+        }
 
-      // Phase 2: always apply what we queued before ending or switching.
-      const toApply = filterBatch.slice(
-        0,
-        remainingProcessSlots(processed, SCAN_BATCH_SIZE)
-      );
-      const applyOutcome = await applyCollectedJobs({
-        tabId: tab.id,
-        jobs: toApply,
+        const query = searchPlan[qi]!;
+        searchUrl = query.url;
+        queriesTried += 1;
+        const remaining = remainingProcessSlots(processed, SCAN_BATCH_SIZE);
+        await setCopilotState({ keyword: query.keyword });
+        await publishScanWait(0, remaining);
+        await appendCopilotLog(
+          `Search ${qi + 1}/${searchPlan.length} [${query.kind}]: "${query.keyword}"${
+            query.location ? ` in ${query.location}` : ' (India-wide)'
+          } — filters once, then scan → apply (${processed}/${SCAN_BATCH_SIZE} processed)`,
+          'success'
+        );
+
+        workTabId = await ensureLiveWorkTabId(workTabId, searchUrl, stealth);
+        const navUrl = naukriKeywordNavUrl(searchUrl);
+        // Always open this plan query — skipping nav when path matched left us
+        // stuck on one filtered SRP and quit under 30 with scanned frozen.
+        await chrome.tabs.update(workTabId, { url: navUrl, active: !stealth });
+        await waitForTabComplete(workTabId);
+        await waitForSearchListReady(workTabId, 6000);
+        if (!(await ensureLoggedInForSession(workTabId))) {
+          await appendCopilotLog(
+            'Naukri login check failed — trying next search…',
+            'warn'
+          );
+          continue;
+        }
+
+        // Filters once per search via All Filters UI — no second reload.
+        if (
+          !(await applyNaukriPreferenceFilters(workTabId, prefs, stealth, searchUrl, {
+            forceNavigate: false,
+            focusLocation: query.location || null,
+          }))
+        ) {
+          await appendCopilotLog(
+            `Could not apply Naukri filters for "${query.keyword}" — trying next search…`,
+            'warn'
+          );
+          continue;
+        }
+
+        // Capture the filtered SRP URL — goBackToList must restore this, not keyword-only.
+        let activeListUrl =
+          (await chrome.tabs.get(workTabId)).url || searchUrl;
+        if (!isNaukriSearchListUrl(activeListUrl)) {
+          activeListUrl = searchUrl;
+        }
+
+        // Chunked scan→apply on this search until ceiling or no more matches.
+        let searchExhausted = false;
+        while (!searchExhausted) {
+          processed = sessionProcessedCount(await getCopilotState());
+          if (hasHitProcessCeiling(processed, SCAN_BATCH_SIZE)) {
+            await appendCopilotLog(
+              `Reached ${processed} applied+skipped — done.`,
+              'success'
+            );
+            break outer;
+          }
+          const slotsLeft = remainingProcessSlots(processed, SCAN_BATCH_SIZE);
+          const chunkTarget = Math.min(APPLY_CHUNK_SIZE, Math.max(1, slotsLeft));
+
+          workTabId = await ensureLiveWorkTabId(workTabId, activeListUrl, stealth);
+          const collected = await collectUntilMatchedBatch({
+            tabId: workTabId,
+            searchUrl: activeListUrl,
+            stealth,
+            prefs,
+            seenKeys,
+            scannedKeys,
+            pending: [],
+            target: chunkTarget,
+            logPrefix: `Scan “${query.keyword}”`,
+          });
+          const filterBatch = collected.jobs;
+          if (isNaukriSearchListUrl(collected.listUrl)) {
+            activeListUrl = collected.listUrl;
+          }
+
+          // Phase 2: always apply what we queued before ending or switching
+          if (mustApplyQueuedBeforeContinue(filterBatch.length)) {
+            anyMatched = true;
+            workTabId = await ensureLiveWorkTabId(workTabId, activeListUrl, stealth);
+            let applyOutcome = await applyCollectedJobs({
+              tabId: workTabId,
+              jobs: filterBatch,
+              prefs,
+              handlers,
+              searchUrl: activeListUrl,
+              listUrl: activeListUrl,
+              stealth,
+            });
+
+            while (applyOutcome === 'waiting') {
+              await appendCopilotLog(
+                'Paused for Naukri login — Confirm/Resume to keep applying toward 30…',
+                'warn'
+              );
+              if (!(await waitWhilePaused())) {
+                hitLimit = true;
+                break outer;
+              }
+              workTabId = await ensureLiveWorkTabId(workTabId, activeListUrl, stealth);
+              if (!(await ensureLoggedInForSession(workTabId))) {
+                continue;
+              }
+              applyOutcome = await applyCollectedJobs({
+                tabId: workTabId,
+                jobs: filterBatch,
+                prefs,
+                handlers,
+                searchUrl: activeListUrl,
+                listUrl: activeListUrl,
+                stealth,
+              });
+            }
+
+            if (applyOutcome === 'limit') {
+              hitLimit = true;
+              break outer;
+            }
+            if (applyOutcome === 'stop') {
+              const st = await getCopilotState();
+              if (!st.running) {
+                hitLimit = true;
+                break outer;
+              }
+              await appendCopilotLog(
+                'Apply interrupted — continuing toward 30 applied+skipped…',
+                'warn'
+              );
+            }
+
+            processed = sessionProcessedCount(await getCopilotState());
+            await appendCopilotLog(
+              `${processed}/${SCAN_BATCH_SIZE} processed — continuing…`,
+              'info'
+            );
+            // Only leave this search when collect truly exhausted pages —
+            // never because a chunk was smaller than APPLY_CHUNK_SIZE after
+            // goBackToList dropped filters (that was the early-stop bug).
+            if (collected.exhausted) {
+              searchExhausted = true;
+            }
+          } else {
+            await appendCopilotLog(
+              `No new matches for "${query.keyword}"${
+                query.location ? ` / ${query.location}` : ''
+              } — next search…`,
+              'warn'
+            );
+            searchExhausted = true;
+          }
+        }
+      }
+    }
+
+    // Product invariant: never show Apply more / Close with jobs still Queued.
+    try {
+      workTabId = await ensureLiveWorkTabId(workTabId, searchUrl, stealth);
+      await drainRemainingQueuedJobs({
+        tabId: workTabId,
         prefs,
         handlers,
         searchUrl,
         stealth,
       });
-      if (applyOutcome === 'stop' || applyOutcome === 'limit') {
-        hitLimit = true;
-        break;
-      }
-
-      processed = sessionProcessedCount(await getCopilotState());
-      if (hasHitProcessCeiling(processed, SCAN_BATCH_SIZE)) {
-        await appendCopilotLog(
-          `Reached ${processed} applied+skipped — done.`,
-          'success'
-        );
-        break;
-      }
+    } catch (drainErr) {
       await appendCopilotLog(
-        `${processed}/${SCAN_BATCH_SIZE} processed — continuing…`,
-        'info'
+        `Drain queued failed: ${
+          drainErr instanceof Error ? drainErr.message : String(drainErr)
+        }`,
+        'warn'
       );
     }
 
@@ -1769,9 +2391,7 @@ export async function runBot(handlers: BotHandlers): Promise<{
             : 'Session finished',
         hitCeiling
           ? `Applied ${finalState.applied}, skipped ${finalState.skipped}. Review them on your Cosmo dashboard.`
-          : appliedAny
-            ? `Processed ${processedFinal}/${SCAN_BATCH_SIZE} before results ran out.`
-            : `Matched ${finalState.matched}, no new applies this round.`
+          : `Processed ${processedFinal}/${SCAN_BATCH_SIZE} across ${queriesTried} search(es) — broaden prefs or press Apply more to keep going.`
       );
     }
 
@@ -1788,7 +2408,8 @@ export async function runBot(handlers: BotHandlers): Promise<{
           matched: finalState.matched,
           skipped: finalState.skipped,
           at: new Date().toISOString(),
-          allApplied: hitCeiling || appliedAny,
+          // Only true when we actually hit the 30 ceiling — never for partial runs.
+          allApplied: hitCeiling,
         },
       });
     } else {
@@ -1829,6 +2450,11 @@ export async function runBot(handlers: BotHandlers): Promise<{
       await reportScanSession('stopped');
     }
     botRunning = false;
+    // Login pause / SW death leave running=true — keep the alarm so Confirm
+    // or the next wake can resume toward 30. Clear only when truly done.
+    if (!leftover.running || leftover.sessionComplete) {
+      await stopCopilotKeepAlive();
+    }
   }
 }
 
