@@ -698,6 +698,7 @@ export async function fetchAdminMetrics(params: {
   }>(`/api/v1/admin/metrics${qs ? `?${qs}` : ''}`);
 }
 
+/** date can be YYYY-MM-DD (day grain) or YYYY-MM (month grain) */
 export async function fetchAdminDayDetail(date: string) {
   return request<{
     date: string;

@@ -1335,9 +1335,17 @@ export async function updatePlan(
 }
 
 export async function getDayDetail(date: string) {
-  const since = new Date(`${date}T00:00:00.000Z`);
+  // Accept both YYYY-MM-DD (day) and YYYY-MM (month) formats
+  const isMonth = /^\d{4}-\d{2}$/.test(date);
+  const since = isMonth
+    ? new Date(`${date}-01T00:00:00.000Z`)
+    : new Date(`${date}T00:00:00.000Z`);
   const until = new Date(since);
-  until.setUTCDate(until.getUTCDate() + 1);
+  if (isMonth) {
+    until.setUTCMonth(until.getUTCMonth() + 1);
+  } else {
+    until.setUTCDate(until.getUTCDate() + 1);
+  }
 
   const rows = await ScanSessionModel.aggregate<{
     _id: unknown;

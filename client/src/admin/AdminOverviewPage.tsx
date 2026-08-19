@@ -219,7 +219,7 @@ export function AdminOverviewPage() {
     };
     const point = rec?.activePayload?.[0]?.payload ?? rec?.payload ?? rec;
     const dateKey = point?.dateKey;
-    if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+    if (!dateKey || !/^\d{4}-\d{2}(-\d{2})?$/.test(dateKey)) return;
     const label = point?.date ?? dateKey;
     setDayDetail({ loading: true, data: null, label });
     try {

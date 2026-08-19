@@ -59,7 +59,7 @@ adminRouter.get(
   '/metrics/day-detail',
   asyncHandler(async (req: AuthedRequest, res) => {
     const date = String(req.query.date ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!/^\d{4}-\d{2}(-\d{2})?$/.test(date)) {
       throw new AppError('Invalid date. Expected YYYY-MM-DD', 400, 'VALIDATION_ERROR');
     }
     const data = await adminService.getDayDetail(date);
