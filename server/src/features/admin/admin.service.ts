@@ -1334,6 +1334,62 @@ export async function updatePlan(
   };
 }
 
+export async function getDayDetail(date: string) {
+  const since = new Date(`${date}T00:00:00.000Z`);
+  const until = new Date(since);
+  until.setUTCDate(until.getUTCDate() + 1);
+
+  const rows = await ScanSessionModel.aggregate<{
+    _id: unknown;
+    applied: number;
+    scanned: number;
+    sessions: number;
+  }>([
+    { $match: { startedAt: { $gte: since, $lt: until } } },
+    {
+      $group: {
+        _id: '$userId',
+        applied: { $sum: '$applied' },
+        scanned: { $sum: '$scanned' },
+        sessions: { $sum: 1 },
+      },
+    },
+    { $sort: { applied: -1 } },
+  ]);
+
+  const userDocs = await UserModel.find({
+    _id: { $in: rows.map((r) => r._id) },
+  })
+    .select('name email')
+    .lean();
+  const userMap = new Map(userDocs.map((u) => [u._id.toString(), u] as const));
+
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.applied += r.applied;
+      acc.scanned += r.scanned;
+      return acc;
+    },
+    { applied: 0, scanned: 0 }
+  );
+
+  return {
+    date,
+    totals,
+    users: rows.map((r) => {
+      const u = userMap.get(String(r._id));
+      return {
+        userId: String(r._id),
+        userName: u?.name,
+        userEmail: u?.email,
+        applied: r.applied,
+        scanned: r.scanned,
+        sessions: r.sessions,
+      };
+    }),
+  };
+}
+
 export async function listAudit(page = 1, limit = 40) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([

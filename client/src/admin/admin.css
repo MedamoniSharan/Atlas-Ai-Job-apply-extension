@@ -950,3 +950,111 @@
   gap: 0.4rem;
   flex-shrink: 0;
 }
+
+/* ── Day-detail modal ─────────────────────────────────────── */
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.admin-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 640px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--admin-line, #e5e7eb);
+}
+
+.admin-modal__header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.admin-modal__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #6b7280;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+.admin-modal__close:hover {
+  background: #f3f4f6;
+}
+
+.admin-modal__summary {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--admin-line, #e5e7eb);
+  font-size: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.admin-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.admin-modal__table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  padding: 0.6rem 1.25rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid var(--admin-line, #e5e7eb);
+}
+.admin-modal__table thead th.num,
+.admin-modal__table tbody td.num {
+  text-align: right;
+}
+
+.admin-modal__table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+.admin-modal__table tbody tr:last-child {
+  border-bottom: none;
+}
+.admin-modal__table tbody td {
+  padding: 0.55rem 1.25rem;
+  vertical-align: middle;
+}
+
+.admin-modal__name {
+  display: block;
+  font-weight: 500;
+  color: #111;
+}
+.admin-modal__email {
+  display: block;
+  font-size: 0.78rem;
+  color: #6b7280;
+}

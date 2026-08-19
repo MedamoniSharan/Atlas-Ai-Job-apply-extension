@@ -698,6 +698,21 @@ export async function fetchAdminMetrics(params: {
   }>(`/api/v1/admin/metrics${qs ? `?${qs}` : ''}`);
 }
 
+export async function fetchAdminDayDetail(date: string) {
+  return request<{
+    date: string;
+    totals: { applied: number; scanned: number };
+    users: Array<{
+      userId: string;
+      userName?: string;
+      userEmail?: string;
+      applied: number;
+      scanned: number;
+      sessions: number;
+    }>;
+  }>(`/api/v1/admin/metrics/day-detail?date=${encodeURIComponent(date)}`);
+}
+
 export async function fetchAdminUsers(params: {
   q?: string;
   plan?: string;

@@ -17,7 +17,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { fetchAdminMetrics } from '../lib/api';
+import { fetchAdminMetrics, fetchAdminDayDetail } from '../lib/api';
 import { CosmosLoader } from '../components/CosmosLogo';
 
 function formatInr(paise: number): string {
@@ -122,10 +122,24 @@ function usersPathForSignupBucket(dateKey: string): string {
   return `/admin/users?${params.toString()}`;
 }
 
+type DayDetail = {
+  date: string;
+  totals: { applied: number; scanned: number };
+  users: Array<{
+    userId: string;
+    userName?: string;
+    userEmail?: string;
+    applied: number;
+    scanned: number;
+    sessions: number;
+  }>;
+};
+
 export function AdminOverviewPage() {
   const now = new Date();
   const navigate = useNavigate();
   const [range, setRange] = useState<Range>('30d');
+  const [dayDetail, setDayDetail] = useState<{ loading: boolean; data: DayDetail | null; label: string } | null>(null);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
@@ -183,17 +197,42 @@ export function AdminOverviewPage() {
       ? jobBuckets.map((key) => {
           const row = jobsByDate.get(key);
           return {
+            dateKey: key,
             date: formatAxisDate(key, grain),
             scanned: row?.scanned ?? 0,
             applied: row?.applied ?? 0,
           };
         })
       : (series.jobsDaily ?? []).map((d) => ({
+          dateKey: d.date,
           date: formatAxisDate(d.date, grain),
           scanned: d.scanned,
           applied: d.applied,
         }));
   const jobsAngleLabels = jobsChart.length > 12;
+
+  async function openDayDetail(raw: unknown) {
+    const rec = raw as {
+      dateKey?: string;
+      payload?: { dateKey?: string; date?: string };
+      activePayload?: Array<{ payload?: { dateKey?: string; date?: string } }>;
+    };
+    const point = rec?.activePayload?.[0]?.payload ?? rec?.payload ?? rec;
+    const dateKey = point?.dateKey;
+    if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+    const label = point?.date ?? dateKey;
+    setDayDetail({ loading: true, data: null, label });
+    try {
+      const res = await fetchAdminDayDetail(dateKey);
+      if (res.success) {
+        setDayDetail({ loading: false, data: res.data, label });
+      } else {
+        setDayDetail(null);
+      }
+    } catch {
+      setDayDetail(null);
+    }
+  }
 
   function openSignupUsers(raw: unknown) {
     const rec = raw as {
@@ -212,6 +251,68 @@ export function AdminOverviewPage() {
 
   return (
     <div className="admin-page">
+      {dayDetail !== null && (
+        <div
+          className="admin-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Day detail for ${dayDetail.label}`}
+          onClick={(e) => { if (e.target === e.currentTarget) setDayDetail(null); }}
+        >
+          <div className="admin-modal">
+            <div className="admin-modal__header">
+              <h3>Engine activity — {dayDetail.label}</h3>
+              <button
+                className="admin-modal__close"
+                onClick={() => setDayDetail(null)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            {dayDetail.loading ? (
+              <p className="admin-note" style={{ padding: '1rem' }}>Loading…</p>
+            ) : dayDetail.data ? (
+              <>
+                <div className="admin-modal__summary">
+                  <span><strong>{dayDetail.data.totals.scanned.toLocaleString()}</strong> scanned</span>
+                  <span><strong>{dayDetail.data.totals.applied.toLocaleString()}</strong> applied</span>
+                  <span className="admin-note">{dayDetail.data.users.length} users active</span>
+                </div>
+                {dayDetail.data.users.length === 0 ? (
+                  <p className="admin-note" style={{ padding: '0 1rem 1rem' }}>No activity on this day.</p>
+                ) : (
+                  <table className="admin-modal__table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th className="num">Scanned</th>
+                        <th className="num">Applied</th>
+                        <th className="num">Sessions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dayDetail.data.users.map((u) => (
+                        <tr key={u.userId}>
+                          <td>
+                            <span className="admin-modal__name">{u.userName || '—'}</span>
+                            {u.userEmail ? (
+                              <span className="admin-modal__email">{u.userEmail}</span>
+                            ) : null}
+                          </td>
+                          <td className="num">{u.scanned.toLocaleString()}</td>
+                          <td className="num">{u.applied.toLocaleString()}</td>
+                          <td className="num">{u.sessions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
       <div className="admin-filters admin-filters--metrics">
         <label>
           Period
@@ -311,9 +412,10 @@ export function AdminOverviewPage() {
       <div className="admin-chart-grid">
         <section className="admin-panel admin-panel--wide">
           <h2>Engine Performance (Scanned vs Applied)</h2>
-          <div className="admin-chart">
+          <p className="admin-note">Click a bar to see per-user breakdown</p>
+          <div className="admin-chart admin-chart--clickable">
             <ResponsiveContainer width="100%" height={jobsAngleLabels ? 320 : 280}>
-              <BarChart data={jobsChart} margin={{ bottom: jobsAngleLabels ? 8 : 0 }}>
+              <BarChart data={jobsChart} margin={{ bottom: jobsAngleLabels ? 8 : 0 }} onClick={openDayDetail}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -327,8 +429,8 @@ export function AdminOverviewPage() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="scanned" fill="#6366f1" name="Jobs Scanned" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="applied" fill="#10b981" name="Jobs Applied" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="scanned" fill="#6366f1" name="Jobs Scanned" radius={[4, 4, 0, 0]} cursor="pointer" />
+                <Bar dataKey="applied" fill="#10b981" name="Jobs Applied" radius={[4, 4, 0, 0]} cursor="pointer" />
               </BarChart>
             </ResponsiveContainer>
           </div>
