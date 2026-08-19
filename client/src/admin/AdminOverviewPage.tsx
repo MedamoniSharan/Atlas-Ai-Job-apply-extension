@@ -214,10 +214,15 @@ export function AdminOverviewPage() {
   async function openDayDetail(raw: unknown) {
     const rec = raw as {
       dateKey?: string;
+      date?: string;
       payload?: { dateKey?: string; date?: string };
       activePayload?: Array<{ payload?: { dateKey?: string; date?: string } }>;
     };
-    const point = rec?.activePayload?.[0]?.payload ?? rec?.payload ?? rec;
+    // Recharts Bar onClick gives { payload } directly; BarChart onClick gives { activePayload }
+    const point =
+      rec?.activePayload?.[0]?.payload ??
+      rec?.payload ??
+      (rec?.dateKey ? rec : null);
     const dateKey = point?.dateKey;
     if (!dateKey || !/^\d{4}-\d{2}(-\d{2})?$/.test(dateKey)) return;
     const label = point?.date ?? dateKey;
@@ -429,8 +434,8 @@ export function AdminOverviewPage() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="scanned" fill="#6366f1" name="Jobs Scanned" radius={[4, 4, 0, 0]} cursor="pointer" />
-                <Bar dataKey="applied" fill="#10b981" name="Jobs Applied" radius={[4, 4, 0, 0]} cursor="pointer" />
+                <Bar dataKey="scanned" fill="#6366f1" name="Jobs Scanned" radius={[4, 4, 0, 0]} cursor="pointer" onClick={openDayDetail} />
+                <Bar dataKey="applied" fill="#10b981" name="Jobs Applied" radius={[4, 4, 0, 0]} cursor="pointer" onClick={openDayDetail} />
               </BarChart>
             </ResponsiveContainer>
           </div>
