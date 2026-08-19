@@ -503,6 +503,63 @@ def revoke_plan(user: Dict[str, Any]) -> None:
 # ─── Handlers ──────────────────────────────────────────────────
 
 
+def get_day_detail(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
+    date = qs(event).get("date", "")
+    if not re.match(r"^\d{4}-\d{2}(-\d{2})?$", date):
+        return err(event, "Invalid date. Expected YYYY-MM-DD or YYYY-MM", 400)
+    is_month = bool(re.match(r"^\d{4}-\d{2}$", date))
+    if is_month:
+        y, m = int(date[:4]), int(date[5:7])
+        since = datetime(y, m, 1, tzinfo=timezone.utc)
+        until = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m == 12 else datetime(y, m + 1, 1, tzinfo=timezone.utc)
+    else:
+        since = datetime.fromisoformat(date + "T00:00:00+00:00")
+        until = since + timedelta(days=1)
+
+    try:
+        sessions = scan_all(scan_sessions_tbl)
+    except Exception:
+        sessions = []
+
+    sessions_in_range = [
+        s for s in sessions
+        if (dt := parse_iso(s.get("startedAt"))) and since <= dt < until
+    ]
+
+    user_stats: Dict[str, Dict[str, int]] = {}
+    for s in sessions_in_range:
+        uid = s.get("userId") or ""
+        if not uid:
+            continue
+        row = user_stats.setdefault(uid, {"applied": 0, "scanned": 0, "sessions": 0})
+        row["applied"] += as_int(s.get("applied"))
+        row["scanned"] += as_int(s.get("scanned"))
+        row["sessions"] += 1
+
+    sorted_users = sorted(user_stats.items(), key=lambda x: x[1]["applied"], reverse=True)
+    uid_list = [uid for uid, _ in sorted_users]
+    um = umap(uid_list)
+
+    total_applied = sum(v["applied"] for v in user_stats.values())
+    total_scanned = sum(v["scanned"] for v in user_stats.values())
+
+    return ok(event, {
+        "date": date,
+        "totals": {"applied": total_applied, "scanned": total_scanned},
+        "users": [
+            {
+                "userId": uid,
+                "userName": uinfo(um, uid)[0],
+                "userEmail": uinfo(um, uid)[1],
+                "applied": stats["applied"],
+                "scanned": stats["scanned"],
+                "sessions": stats["sessions"],
+            }
+            for uid, stats in sorted_users
+        ],
+    })
+
+
 def get_metrics(event: Dict[str, Any], _aid: str) -> Dict[str, Any]:
     q, now = qs(event), datetime.now(timezone.utc)
     rk = q.get("range") or ("7d" if q.get("days") == "7" else "90d" if q.get("days") == "90" else "30d")
@@ -1566,6 +1623,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return delete_coupon(event, admin_id, body.get("code") or body.get("id") or "")
 
     rest = {
+        ("/admin/metrics/day-detail", "GET"): get_day_detail,
         ("/admin/metrics", "GET"): get_metrics,
         ("/admin/users", "GET"): list_users,
         ("/admin/subscriptions", "GET"): list_subscriptions,
